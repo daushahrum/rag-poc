@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RAG Chat</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="sidebar" aria-label="Chat navigation">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">AI</div>
+          <div>
+            <h1>RAG Chat</h1>
+            <p>Knowledge assistant</p>
+          </div>
+        </div>
+
+        <button class="new-chat" id="newChatButton" type="button">
+          <span aria-hidden="true">+</span>
+          New chat
+        </button>
+
+        <div class="sidebar-section">
+          <p class="section-label">Recent</p>
+          <button class="history-item active" type="button">Customer support session</button>
+          <button class="history-item" type="button">Document lookup</button>
+          <button class="history-item" type="button">Policy questions</button>
+        </div>
+      </aside>
+
+      <section class="chat-panel" aria-label="AI chat">
+        <header class="chat-header">
+          <div>
+            <p class="eyebrow">Assistant</p>
+            <h2>Ask your documents</h2>
+          </div>
+          <div class="status-pill">
+            <span aria-hidden="true"></span>
+            Online
+          </div>
+        </header>
+
+        <div class="messages" id="messages" aria-live="polite">
+          <article class="message assistant">
+            <div class="avatar" aria-hidden="true">AI</div>
+            <div class="bubble">
+              <p>Hello. Ask me anything from your ingested documents.</p>
+            </div>
+          </article>
+        </div>
+
+        <form class="composer" id="chatForm">
+          <label class="sr-only" for="messageInput">Message</label>
+          <textarea
+            id="messageInput"
+            name="message"
+            rows="1"
+            placeholder="Message RAG Chat"
+            autocomplete="off"
+          ></textarea>
+          <button class="send-button" type="submit" aria-label="Send message">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M3.4 20.4 21 12 3.4 3.6 3 10l10 2-10 2 .4 6.4Z" />
+            </svg>
+          </button>
+        </form>
+      </section>
+    </main>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>
