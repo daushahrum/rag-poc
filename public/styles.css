@@ -47,14 +47,19 @@ button:disabled {
 .app-shell {
   display: grid;
   grid-template-columns: 292px minmax(0, 1fr);
+  height: 100vh;
   min-height: 100vh;
+  overflow: hidden;
 }
 
 .sidebar {
+  position: sticky;
+  top: 0;
   display: flex;
   flex-direction: column;
   gap: 18px;
-  min-height: 100vh;
+  height: 100vh;
+  min-height: 0;
   padding: 14px;
   overflow-y: auto;
   background: var(--sidebar);
@@ -94,7 +99,7 @@ button:disabled {
 .bubble h3,
 .bubble h4,
 .bubble h5,
-.ingest-panel h2,
+.ingest-drawer h2,
 .ingest-status {
   margin: 0;
 }
@@ -110,6 +115,7 @@ button:disabled {
 }
 
 .new-chat,
+.developer-menu-button,
 .history-item,
 .ingest-button {
   width: 100%;
@@ -120,7 +126,8 @@ button:disabled {
   text-align: left;
 }
 
-.new-chat {
+.new-chat,
+.developer-menu-button {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -129,7 +136,12 @@ button:disabled {
   font-weight: 650;
 }
 
-.new-chat span {
+.developer-menu-button {
+  background: var(--sidebar-soft);
+}
+
+.new-chat span,
+.developer-menu-button span {
   display: grid;
   place-items: center;
   width: 20px;
@@ -159,23 +171,90 @@ button:disabled {
 
 .history-item.active,
 .history-item:hover,
-.new-chat:hover {
+.new-chat:hover,
+.developer-menu-button:hover {
   background: #2f2f2f;
 }
 
-.ingest-panel {
+.ingest-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 20;
   display: grid;
-  gap: 12px;
-  margin-top: auto;
-  padding: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
-  background: #202020;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 14px;
+  width: min(420px, 100vw);
+  height: 100vh;
+  padding: 18px;
+  border-left: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: -18px 0 48px rgba(0, 0, 0, 0.14);
+  transform: translateX(100%);
+  transition: transform 180ms ease;
 }
 
-.ingest-panel h2 {
+.ingest-drawer.open {
+  transform: translateX(0);
+}
+
+.drawer-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.ingest-drawer h2 {
   margin-top: 4px;
-  font-size: 15px;
+  font-size: 18px;
+}
+
+.icon-button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 22px;
+  line-height: 1;
+}
+
+.icon-button:hover {
+  background: var(--surface-soft);
+}
+
+.ingest-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-soft);
+}
+
+.ingest-tab {
+  min-height: 36px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.ingest-tab.active {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.08);
+}
+
+.ingest-tab-panel {
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .ingest-form {
@@ -184,7 +263,7 @@ button:disabled {
 }
 
 .ingest-form label {
-  color: #d8d8df;
+  color: var(--text);
   font-size: 12px;
   font-weight: 650;
 }
@@ -193,11 +272,11 @@ button:disabled {
   width: 100%;
   min-height: 156px;
   resize: vertical;
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 10px;
-  background: #111111;
-  color: #f4f4f5;
+  background: var(--surface);
+  color: var(--text);
   outline: none;
   line-height: 1.45;
 }
@@ -221,16 +300,44 @@ button:disabled {
 
 .ingest-status {
   min-height: 18px;
-  color: #c9c9d1;
+  color: var(--muted);
   font-size: 12px;
   line-height: 1.45;
+}
+
+.upload-dropzone {
+  display: grid;
+  gap: 10px;
+  min-height: 180px;
+  margin-bottom: 12px;
+  padding: 18px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  color: var(--muted);
+}
+
+.upload-dropzone label {
+  color: var(--text);
+  font-weight: 750;
+}
+
+.upload-dropzone input {
+  width: 100%;
+}
+
+.upload-dropzone p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .chat-panel {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   min-width: 0;
-  min-height: 100vh;
+  height: 100vh;
+  min-height: 0;
   background: var(--surface);
 }
 
@@ -370,6 +477,17 @@ button:disabled {
   background: var(--surface-soft);
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 0.9em;
+}
+
+.bubble a {
+  color: #0b6bcb;
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.message.user .bubble a {
+  color: #084e98;
 }
 
 .bubble pre {
@@ -520,19 +638,24 @@ button:disabled {
 @media (max-width: 820px) {
   .app-shell {
     grid-template-columns: 1fr;
+    height: auto;
+    overflow: visible;
   }
 
   .sidebar {
+    position: static;
+    height: auto;
     min-height: auto;
     gap: 12px;
     padding: 12px;
   }
 
-  .ingest-panel {
-    margin-top: 0;
+  .ingest-drawer {
+    width: 100vw;
   }
 
   .chat-panel {
+    height: auto;
     min-height: 72vh;
   }
 

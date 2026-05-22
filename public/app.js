@@ -2,9 +2,16 @@ const form = document.querySelector("#chatForm");
 const input = document.querySelector("#messageInput");
 const messages = document.querySelector("#messages");
 const newChatButton = document.querySelector("#newChatButton");
+const openIngestButton = document.querySelector("#openIngestButton");
+const closeIngestButton = document.querySelector("#closeIngestButton");
+const ingestDrawer = document.querySelector("#ingestDrawer");
 const ingestForm = document.querySelector("#ingestForm");
 const knowledgeInput = document.querySelector("#knowledgeInput");
 const ingestStatus = document.querySelector("#ingestStatus");
+const textIngestTab = document.querySelector("#textIngestTab");
+const documentIngestTab = document.querySelector("#documentIngestTab");
+const textIngestPanel = document.querySelector("#textIngestPanel");
+const documentIngestPanel = document.querySelector("#documentIngestPanel");
 let sessionId = null;
 
 function createMessage(role, content, sources = []) {
@@ -129,13 +136,28 @@ function renderFormattedText(content) {
 }
 
 function appendInlineFormatting(parent, text) {
-  const pattern = /(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*)/g;
+  const pattern =
+    /(\[[^\]]+\]\(https?:\/\/[^\s)]+\)|https?:\/\/[^\s<]+|`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*)/g;
   let cursor = 0;
 
   for (const match of text.matchAll(pattern)) {
     parent.append(document.createTextNode(text.slice(cursor, match.index)));
 
     const token = match[0];
+    const markdownLink = token.match(/^\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)$/);
+
+    if (markdownLink) {
+      parent.append(createLink(markdownLink[1], markdownLink[2]));
+      cursor = match.index + token.length;
+      continue;
+    }
+
+    if (token.startsWith("http://") || token.startsWith("https://")) {
+      parent.append(createLink(token, token));
+      cursor = match.index + token.length;
+      continue;
+    }
+
     const element = document.createElement(
       token.startsWith("`")
         ? "code"
@@ -153,6 +175,15 @@ function appendInlineFormatting(parent, text) {
   }
 
   parent.append(document.createTextNode(text.slice(cursor)));
+}
+
+function createLink(label, url) {
+  const link = document.createElement("a");
+  link.href = url;
+  link.textContent = label;
+  link.target = "_blank";
+  link.rel = "noopener noreferrer";
+  return link;
 }
 
 function createSources(sources) {
@@ -300,6 +331,12 @@ input.addEventListener("keydown", (event) => {
   }
 });
 
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && ingestDrawer.classList.contains("open")) {
+    closeIngestMenu();
+  }
+});
+
 newChatButton.addEventListener("click", async () => {
   messages.innerHTML = "";
   messages.append(
@@ -313,6 +350,44 @@ newChatButton.addEventListener("click", async () => {
     messages.append(createMessage("assistant", error.message));
   }
 });
+
+openIngestButton.addEventListener("click", () => {
+  ingestDrawer.classList.add("open");
+  ingestDrawer.setAttribute("aria-hidden", "false");
+  knowledgeInput.focus();
+});
+
+closeIngestButton.addEventListener("click", () => {
+  closeIngestMenu();
+});
+
+function closeIngestMenu() {
+  ingestDrawer.classList.remove("open");
+  ingestDrawer.setAttribute("aria-hidden", "true");
+  openIngestButton.focus();
+}
+
+textIngestTab.addEventListener("click", () => {
+  setIngestTab("text");
+});
+
+documentIngestTab.addEventListener("click", () => {
+  setIngestTab("document");
+});
+
+function setIngestTab(tab) {
+  const isText = tab === "text";
+
+  textIngestTab.classList.toggle("active", isText);
+  documentIngestTab.classList.toggle("active", !isText);
+  textIngestTab.setAttribute("aria-selected", String(isText));
+  documentIngestTab.setAttribute("aria-selected", String(!isText));
+
+  textIngestPanel.classList.toggle("active", isText);
+  documentIngestPanel.classList.toggle("active", !isText);
+  textIngestPanel.hidden = !isText;
+  documentIngestPanel.hidden = isText;
+}
 
 ingestForm.addEventListener("submit", async (event) => {
   event.preventDefault();
