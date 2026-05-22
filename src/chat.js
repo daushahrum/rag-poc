@@ -1,48 +1,71 @@
 import { openai } from "./openai.js";
 import { retrieveDocuments } from "./retrieve.js";
+import {
+  getHistory,
+  saveMessage,
+} from "./chatSession.js";
 
-export async function askAI(question) {
+export async function askAI(
+  sessionId,
+  question
+) {
 
-  const documents =
+  const docs =
     await retrieveDocuments(question);
 
+  const history =
+    await getHistory(sessionId);
+
   const context =
-    documents
-      .map(doc => doc.content)
+    docs
+      .map(d => d.content)
       .join("\n\n");
 
-  const prompt = `
-You are a customer support AI assistant.
+  const messages = [
+    {
+      role: "system",
+      content: `
+You are ANDI.
 
-Answer ONLY using the provided context.
-
-If the answer does not exist in the context,
-say:
-"I could not find the answer."
+Use retrieved context when answering.
 
 Context:
 ${context}
+`
+    },
 
-Question:
-${question}
-`;
+    ...history.map(msg => ({
+      role: msg.role,
+      content: msg.content
+    })),
+
+    {
+      role: "user",
+      content: question
+    }
+  ];
 
   const response =
     await openai.chat.completions.create({
       model: "gpt-4.1-mini",
-      messages: [
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
+      messages
     });
 
-  return {
-    answer:
-      response.choices[0]
-        .message.content,
+  const answer =
+    response.choices[0]
+      .message.content;
 
-    sources: documents,
-  };
+  await saveMessage(
+    sessionId,
+    "user",
+    question
+  );
+
+  await saveMessage(
+    sessionId,
+    "assistant",
+    answer
+  );
+
+  return answer;
 }
