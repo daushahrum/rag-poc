@@ -3,6 +3,8 @@ import { createEmbedding } from "./embedding.js";
 
 export async function retrieveDocuments(query) {
 
+  //converts query into vector embedding, then retrieves relevant documents from Supabase using pgvector similarity search
+
   try {
 
     const queryEmbedding =
