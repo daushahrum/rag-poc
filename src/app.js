@@ -4,7 +4,11 @@ import dotenv from "dotenv";
 import { askAI } from "./chat.js";
 import { ingestDocument } from "./ingest.js";
 
-import { createSession } from "./chatSession.js";
+import {
+  createSession,
+  getSessionMessages,
+  listSessions,
+} from "./chatSession.js";
 
 dotenv.config();
 
@@ -90,6 +94,46 @@ app.post(
   "/sessions",
   createSessionHandler
 );
+
+app.get("/sessions", async (req, res) => {
+  try {
+    const sessions =
+      await listSessions();
+
+    res.json({
+      sessions,
+    });
+  } catch (error) {
+    console.error(
+      "List Sessions Error:",
+      error.message
+    );
+
+    res.status(500).json({
+      error: "Could not load chat sessions",
+    });
+  }
+});
+
+app.get("/sessions/:sessionId/messages", async (req, res) => {
+  try {
+    const messages =
+      await getSessionMessages(req.params.sessionId);
+
+    res.json({
+      messages,
+    });
+  } catch (error) {
+    console.error(
+      "Load Messages Error:",
+      error.message
+    );
+
+    res.status(500).json({
+      error: "Could not load chat messages",
+    });
+  }
+});
 
 app.post(
   "/session",

@@ -2,6 +2,7 @@ const form = document.querySelector("#chatForm");
 const input = document.querySelector("#messageInput");
 const messages = document.querySelector("#messages");
 const newChatButton = document.querySelector("#newChatButton");
+const historyList = document.querySelector("#historyList");
 const openIngestButton = document.querySelector("#openIngestButton");
 const closeIngestButton = document.querySelector("#closeIngestButton");
 const ingestDrawer = document.querySelector("#ingestDrawer");
@@ -13,6 +14,28 @@ const documentIngestTab = document.querySelector("#documentIngestTab");
 const textIngestPanel = document.querySelector("#textIngestPanel");
 const documentIngestPanel = document.querySelector("#documentIngestPanel");
 let sessionId = null;
+let sessions = [];
+
+let randomGreetingMessages = [
+  "Hi there! What would you like to talk about today?",
+  "Hello! I'm here to help. What can I do for you?",
+  "Hey! Feel free to ask me anything.",
+  "Greetings! What would you like to discuss?",
+  "Hi! I'm ready to chat. What's on your mind?",
+
+];
+
+function getRandomGreeting() {
+  const index = Math.floor(Math.random() * randomGreetingMessages.length);
+  return randomGreetingMessages[index];
+}
+
+function renderWelcomeMessage() {
+  messages.innerHTML = "";
+  messages.append(
+    createMessage("assistant", getRandomGreeting()),
+  );
+}
 
 function createMessage(role, content, sources = []) {
   const article = document.createElement("article");
@@ -101,7 +124,7 @@ function renderFormattedText(content) {
     }
 
     const bullet = trimmed.match(/^[-*]\s+(.+)$/);
-    const numbered = trimmed.match(/^\d+\.\s+(.+)$/);
+    const numbered = trimmed.match(/^(\d+)\.\s+(.+)$/);
 
     if (bullet || numbered) {
       flushParagraph();
@@ -113,10 +136,14 @@ function renderFormattedText(content) {
           type,
           element: document.createElement(type),
         };
+
+        if (numbered) {
+          list.element.start = Number(numbered[1]);
+        }
       }
 
       const item = document.createElement("li");
-      appendInlineFormatting(item, bullet ? bullet[1] : numbered[1]);
+      appendInlineFormatting(item, bullet ? bullet[1] : numbered[2]);
       list.element.append(item);
       continue;
     }
@@ -264,6 +291,30 @@ async function sendMessage(message) {
   return response.json();
 }
 
+async function fetchSessions() {
+  const response = await fetch("/sessions");
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error ?? "Could not load chat history.");
+  }
+
+  const data = await response.json();
+  return data.sessions ?? [];
+}
+
+async function fetchSessionMessages(nextSessionId) {
+  const response = await fetch(`/sessions/${encodeURIComponent(nextSessionId)}/messages`);
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error ?? "Could not load that chat.");
+  }
+
+  const data = await response.json();
+  return data.messages ?? [];
+}
+
 async function ingestKnowledge(content) {
   const response = await fetch("/ingest", {
     method: "POST",
@@ -292,6 +343,127 @@ async function startSession() {
 
   const data = await response.json();
   sessionId = data.sessionId;
+  await refreshSessions();
+}
+
+async function refreshSessions() {
+  sessions = await fetchSessions();
+  renderHistory();
+}
+
+function renderHistory() {
+  historyList.innerHTML = "";
+
+  if (sessions.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "history-empty";
+    empty.textContent = "No previous chats";
+    historyList.append(empty);
+    return;
+  }
+
+  for (const session of sessions) {
+    const button = document.createElement("button");
+    button.className = "history-item";
+    button.type = "button";
+    button.classList.toggle("active", session.id === sessionId);
+    button.setAttribute("aria-current", session.id === sessionId ? "true" : "false");
+
+    const title = document.createElement("span");
+    title.className = "history-title";
+    title.textContent = truncateText(session.title, 58);
+
+    const meta = document.createElement("span");
+    meta.className = "history-meta";
+    meta.textContent = formatSessionTime(session.updated_at);
+
+    button.append(title, meta);
+    button.addEventListener("click", () => {
+      loadSession(session.id);
+    });
+
+    historyList.append(button);
+  }
+}
+
+async function loadSession(nextSessionId) {
+  if (nextSessionId === sessionId) return;
+
+  sessionId = nextSessionId;
+  renderHistory();
+  messages.innerHTML = "";
+  messages.append(createTypingMessage());
+
+  try {
+    const sessionMessages =
+      await fetchSessionMessages(nextSessionId);
+
+    messages.innerHTML = "";
+
+    if (sessionMessages.length === 0) {
+      renderWelcomeMessage();
+    } else {
+      for (const message of sessionMessages) {
+        messages.append(createMessage(message.role, message.content));
+      }
+    }
+
+    scrollToBottom();
+    input.focus();
+  } catch (error) {
+    messages.innerHTML = "";
+    messages.append(createMessage("assistant", error.message));
+  }
+}
+
+function truncateText(text, maxLength) {
+  const value = String(text ?? "").trim();
+
+  if (value.length <= maxLength) {
+    return value || "New chat";
+  }
+
+  return `${value.slice(0, maxLength - 1).trim()}...`;
+}
+
+function formatSessionTime(value) {
+  if (!value) return "";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  const now = new Date();
+  const isToday = date.toDateString() === now.toDateString();
+
+  if (isToday) {
+    return date.toLocaleTimeString([], {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  }
+
+  return date.toLocaleDateString([], {
+    month: "short",
+    day: "numeric",
+  });
+}
+
+async function initializeChat() {
+  try {
+    await refreshSessions();
+
+    const latestSession = sessions[0];
+
+    if (latestSession) {
+      await loadSession(latestSession.id);
+    } else {
+      renderWelcomeMessage();
+      await startSession();
+    }
+  } catch (error) {
+    renderWelcomeMessage();
+    messages.append(createMessage("assistant", error.message));
+  }
 }
 
 form.addEventListener("submit", async (event) => {
@@ -313,6 +485,7 @@ form.addEventListener("submit", async (event) => {
   try {
     const data = await sendMessage(message);
     typing.replaceWith(createMessage("assistant", data.answer, data.sources));
+    await refreshSessions();
   } catch (error) {
     typing.replaceWith(createMessage("assistant", error.message));
   } finally {
@@ -338,10 +511,7 @@ document.addEventListener("keydown", (event) => {
 });
 
 newChatButton.addEventListener("click", async () => {
-  messages.innerHTML = "";
-  messages.append(
-    createMessage("assistant", "Hello. Ask me anything from your ingested documents."),
-  );
+  renderWelcomeMessage();
 
   try {
     await startSession();
@@ -414,6 +584,4 @@ ingestForm.addEventListener("submit", async (event) => {
 });
 
 resizeInput();
-startSession().catch((error) => {
-  messages.append(createMessage("assistant", error.message));
-});
+initializeChat();
