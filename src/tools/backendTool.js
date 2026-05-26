@@ -1,4 +1,4 @@
-export async function getJobOrderDetails(joNo) {
+export async function callBackendTool(module, action, payload) {
   const apiToken = process.env.LINIQ_TOKEN;
 
   if (!apiToken) {
@@ -10,14 +10,20 @@ export async function getJobOrderDetails(joNo) {
 
   try {
     const response = await fetch(
-        `${process.env.LINIQ_URL}/api/job_order/details/${encodeURIComponent(joNo)}`,
+        `${process.env.LINIQ_URL}/api/ai/gateway`,
       // `https://tliniq.amastsales-sandbox.com/api/job_order/details/${encodeURIComponent(joNo)}`,
       {
-        method: "GET",
+        method: "POST",
         headers: {
           Authorization: `Bearer ${apiToken}`,
           Accept: "*/*",
+          'Content-Type': "application/json",
         },
+        body: JSON.stringify({
+          module,
+          action,
+          params: payload,
+        }),
       }
     );
 
@@ -28,7 +34,7 @@ export async function getJobOrderDetails(joNo) {
 
       return {
         error: true,
-        message: "Unable to retrieve Job Order",
+        message: "Unable to call backend tool",
       };
     }
 
@@ -38,7 +44,7 @@ export async function getJobOrderDetails(joNo) {
 
     return {
       error: true,
-      message: "Unable to retrieve Job Order",
+      message: "Unable to call backend tool",
     };
   }
 }

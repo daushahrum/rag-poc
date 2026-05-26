@@ -1,8 +1,8 @@
 import { openai } from "./ai/openai.js";
 import { retrieveDocuments } from "./retrieve.js";
 import { tools } from "./ai/tools.js";
-import { getJobOrderDetails } from "./tools/jobOrderTool.js";
-import { getTextileDetails } from "./tools/textileTool.js";
+import { callBackendTool as callAiGateway } from "./tools/backendTool.js";
+import { getSchema } from "./services/schemaService.js";
 
 import {
   getHistory,
@@ -26,6 +26,12 @@ export async function askAI(
       .map(d => d.content)
       .join("\n\n");
 
+  //load tools with schema definitions for model to use when generating tool calls
+  const apiSchema = getSchema();
+
+  const schemaContext = apiSchema
+    ? JSON.stringify(apiSchema, null, 2)
+    : "No API schema is currently loaded.";
 
   //construct prompt with retrieved knowledge and conversation history, then ask OpenAI
   //format -> {system, context, user}
@@ -37,6 +43,14 @@ export async function askAI(
       You are ANDI.
 
       Use retrieved context when answering.
+
+      For live operational data, use only the callBackendTool function.
+      Do not invent or request any other tool names.
+      Choose module, action, and payload from the Available API schema.
+      The backend AI gateway owns the actual API calls.
+
+      Available API schema:
+      ${schemaContext}
 
       Context:
       ${context}
@@ -152,29 +166,38 @@ async function runToolCall(toolCall) {
     };
   }
 
-  if (toolCall.function.name === "getJobOrderDetails") {
-    return getJobOrderDetails(
-      args.joNo
-    );
-  }
-
-  if (toolCall.function.name === "getTextileDetails") {
-    if (!Array.isArray(args.rfids)) {
-      return {
-        error: true,
-        message: "rfids must be an array",
-      };
-    }
-
-    return getTextileDetails(
-      args.rfids
-    );
+  if (toolCall.function.name === "callBackendTool") {
+    return callBackendTool(args);
   }
 
   return {
     error: true,
     message: `Unknown tool: ${toolCall.function.name}`,
   };
+}
+
+async function callBackendTool(args) {
+  const moduleName =
+    String(args.module ?? "").trim();
+
+  const action =
+    String(args.action ?? "").trim();
+
+  const payload =
+    args.payload ?? {};
+
+  if (!moduleName || !action) {
+    return {
+      error: true,
+      message: "module and action are required",
+    };
+  }
+
+  return callAiGateway(
+    moduleName,
+    action,
+    payload
+  );
 }
 
 async function generateTopic(prompt) {

@@ -9,6 +9,7 @@ import {
   replaceDocumentContent,
 } from "./ingest.js";
 import { supabase } from "./supabase.js";
+import { loadSchema } from "./services/schemaService.js";
 
 import {
   createSession,
@@ -483,4 +484,15 @@ app.listen(PORT, HOST, () => {
   console.log(
     `Server running on http://${HOST}:${PORT}`
   );
+
+  loadSchema()
+    .then(() => {
+      console.log("Schema service loaded");
+    })
+    .catch((error) => {
+      console.error(
+        "Schema service failed to load:",
+        error.message
+      );
+    });
 });

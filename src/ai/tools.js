@@ -2,39 +2,26 @@ export const tools = [
   {
     type: "function",
     function: {
-      name: "getJobOrderDetails",
+      name: "callBackendTool",
       description:
-        "Retrieve Job Order details using a Job Order number",
+        "Call a backend module/action using the loaded API schema. Use this when the user asks for live operational data. Choose the module, action, and payload from the schema provided in the system prompt.",
       parameters: {
         type: "object",
         properties: {
-          joNo: {
+          module: {
             type: "string",
-            description: "Job Order Number"
+            description: "Backend module name from the schema"
+          },
+          action: {
+            type: "string",
+            description: "Backend action/operation name from the schema"
+          },
+          payload: {
+            type: "object",
+            description: "Payload required by the selected action"
           }
         },
-        required: ["joNo"]
-      }
-    }
-  },
-  {
-    type: "function",
-    function: {
-      name: "getTextileDetails",
-      description:
-        "Retrieve Textile details using a list of RFIDs",
-      parameters: {
-        type: "object",
-        properties: {
-          rfids: {
-            type: "array",
-            items: {
-              type: "string"
-            },
-            description: "List of RFID tags to retrieve details for"
-          }
-        },
-        required: ["rfids"]
+        required: ["module", "action", "payload"]
       }
     }
   }

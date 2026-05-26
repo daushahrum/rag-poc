@@ -10,7 +10,8 @@ export async function getTextileDetails(rfids) {
 
   try {
     const response = await fetch(
-      `https://tliniq.amastsales-sandbox.com/api/textiles/rfidNameAndCategory`,
+        `${process.env.LINIQ_URL}/api/textiles/rfidNameAndCategory`,
+      // `https://tliniq.amastsales-sandbox.com/api/textiles/rfidNameAndCategory`,
       {
         method: "POST",
         headers: {
