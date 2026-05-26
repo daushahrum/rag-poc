@@ -31,6 +31,7 @@ body {
 }
 
 button,
+input,
 textarea {
   font: inherit;
 }
@@ -117,7 +118,9 @@ button:disabled {
 .new-chat,
 .developer-menu-button,
 .history-item,
-.ingest-button {
+.ingest-button,
+.danger-button,
+.small-button {
   width: 100%;
   min-height: 42px;
   border-radius: 8px;
@@ -229,6 +232,159 @@ button:disabled {
   transition: transform 180ms ease;
 }
 
+.knowledge-center {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 292px;
+  z-index: 30;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 16px;
+  padding: 18px;
+  background: var(--surface);
+  transform: translateX(100%);
+  transition: transform 180ms ease;
+}
+
+.knowledge-center.open {
+  transform: translateX(0);
+}
+
+.knowledge-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.knowledge-header h2 {
+  margin: 4px 0 0;
+  font-size: 20px;
+}
+
+.knowledge-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  gap: 18px;
+  min-height: 0;
+}
+
+.knowledge-list-panel,
+.knowledge-editor {
+  min-height: 0;
+}
+
+.knowledge-list-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 10px;
+  border-right: 1px solid var(--border);
+  padding-right: 18px;
+}
+
+.knowledge-list-header,
+.knowledge-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.knowledge-list-header {
+  justify-content: space-between;
+}
+
+.knowledge-list {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  overflow-y: auto;
+}
+
+.knowledge-item {
+  display: grid;
+  gap: 5px;
+  width: 100%;
+  min-height: 76px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+}
+
+.knowledge-item:hover,
+.knowledge-item.active {
+  border-color: var(--accent);
+  background: #f1fbf8;
+}
+
+.knowledge-item-title,
+.knowledge-item-meta,
+.knowledge-item-preview {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.knowledge-item-title {
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.knowledge-item-meta,
+.knowledge-item-preview {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.knowledge-editor {
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto auto;
+  gap: 9px;
+}
+
+.knowledge-editor label {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.knowledge-editor textarea {
+  min-height: 0;
+}
+
+.small-button,
+.danger-button {
+  border: 1px solid var(--border);
+  padding: 0 12px;
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 700;
+  text-align: center;
+}
+
+.small-button {
+  width: auto;
+  min-height: 34px;
+}
+
+.small-button:hover {
+  background: var(--surface-soft);
+}
+
+.danger-button {
+  background: #fff5f5;
+  color: var(--danger);
+}
+
+.danger-button:hover {
+  background: #ffe7e5;
+}
+
 .ingest-drawer.open {
   transform: translateX(0);
 }
@@ -303,10 +459,11 @@ button:disabled {
   font-weight: 650;
 }
 
-.ingest-form textarea {
+.ingest-form input,
+.knowledge-editor input,
+.ingest-form textarea,
+.knowledge-editor textarea {
   width: 100%;
-  min-height: 156px;
-  resize: vertical;
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 10px;
@@ -316,7 +473,24 @@ button:disabled {
   line-height: 1.45;
 }
 
-.ingest-form textarea:focus {
+.ingest-form input,
+.knowledge-editor input {
+  min-height: 42px;
+}
+
+.ingest-form textarea {
+  min-height: 156px;
+  resize: vertical;
+}
+
+.knowledge-editor textarea {
+  resize: none;
+}
+
+.ingest-form input:focus,
+.knowledge-editor input:focus,
+.ingest-form textarea:focus,
+.knowledge-editor textarea:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(16, 163, 127, 0.2);
 }
@@ -687,6 +861,23 @@ button:disabled {
 
   .ingest-drawer {
     width: 100vw;
+  }
+
+  .knowledge-center {
+    left: 0;
+    padding: 14px;
+  }
+
+  .knowledge-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(180px, 32vh) minmax(0, 1fr);
+  }
+
+  .knowledge-list-panel {
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+    padding-right: 0;
+    padding-bottom: 14px;
   }
 
   .chat-panel {

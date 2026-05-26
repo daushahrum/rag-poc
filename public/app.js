@@ -4,17 +4,35 @@ const messages = document.querySelector("#messages");
 const newChatButton = document.querySelector("#newChatButton");
 const historyList = document.querySelector("#historyList");
 const openIngestButton = document.querySelector("#openIngestButton");
+const openKnowledgeButton = document.querySelector("#openKnowledgeButton");
 const closeIngestButton = document.querySelector("#closeIngestButton");
 const ingestDrawer = document.querySelector("#ingestDrawer");
 const ingestForm = document.querySelector("#ingestForm");
+const knowledgeTitleInput = document.querySelector("#knowledgeTitleInput");
 const knowledgeInput = document.querySelector("#knowledgeInput");
 const ingestStatus = document.querySelector("#ingestStatus");
 const textIngestTab = document.querySelector("#textIngestTab");
 const documentIngestTab = document.querySelector("#documentIngestTab");
 const textIngestPanel = document.querySelector("#textIngestPanel");
 const documentIngestPanel = document.querySelector("#documentIngestPanel");
+const documentUpload = document.querySelector("#documentUpload");
+const uploadDocumentButton = document.querySelector("#uploadDocumentButton");
+const documentIngestStatus = document.querySelector("#documentIngestStatus");
+const knowledgeCenter = document.querySelector("#knowledgeCenter");
+const closeKnowledgeButton = document.querySelector("#closeKnowledgeButton");
+const refreshKnowledgeButton = document.querySelector("#refreshKnowledgeButton");
+const knowledgeList = document.querySelector("#knowledgeList");
+const knowledgeEditor = document.querySelector("#knowledgeEditor");
+const knowledgeEditorTitle = document.querySelector("#knowledgeEditorTitle");
+const knowledgeEditorContent = document.querySelector("#knowledgeEditorContent");
+const saveKnowledgeButton = document.querySelector("#saveKnowledgeButton");
+const deleteKnowledgeButton = document.querySelector("#deleteKnowledgeButton");
+const knowledgeCenterStatus = document.querySelector("#knowledgeCenterStatus");
+
 let sessionId = null;
 let sessions = [];
+let knowledgeDocuments = [];
+let selectedKnowledgeId = null;
 
 let randomGreetingMessages = [
   "Hi there! What would you like to talk about today?",
@@ -124,7 +142,7 @@ function renderFormattedText(content) {
     }
 
     const bullet = trimmed.match(/^[-*]\s+(.+)$/);
-    const numbered = trimmed.match(/^(\d+)\.\s+(.+)$/);
+    const numbered = trimmed.match(/^\d+\.\s+(.+)$/);
 
     if (bullet || numbered) {
       flushParagraph();
@@ -136,14 +154,10 @@ function renderFormattedText(content) {
           type,
           element: document.createElement(type),
         };
-
-        if (numbered) {
-          list.element.start = Number(numbered[1]);
-        }
       }
 
       const item = document.createElement("li");
-      appendInlineFormatting(item, bullet ? bullet[1] : numbered[2]);
+      appendInlineFormatting(item, bullet ? bullet[1] : numbered[1]);
       list.element.append(item);
       continue;
     }
@@ -321,12 +335,86 @@ async function ingestKnowledge(content) {
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ content }),
+    body: JSON.stringify({
+      title: knowledgeTitleInput.value.trim(),
+      content,
+    }),
   });
 
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
     throw new Error(data.error ?? "Could not ingest knowledge.");
+  }
+
+  return response.json();
+}
+
+async function fetchKnowledgeDocuments() {
+  const response = await fetch("/knowledge");
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error ?? "Could not load knowledge documents.");
+  }
+
+  const data = await response.json();
+  return data.documents ?? [];
+}
+
+async function fetchKnowledgeDocument(documentId) {
+  const response = await fetch(`/knowledge/${encodeURIComponent(documentId)}`);
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error ?? "Could not load knowledge document.");
+  }
+
+  const data = await response.json();
+  return data.document;
+}
+
+async function updateKnowledgeDocument(documentId, payload) {
+  const response = await fetch(`/knowledge/${encodeURIComponent(documentId)}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error ?? "Could not update knowledge document.");
+  }
+
+  return response.json();
+}
+
+async function deleteKnowledgeDocument(documentId) {
+  const response = await fetch(`/knowledge/${encodeURIComponent(documentId)}`, {
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error ?? "Could not delete knowledge document.");
+  }
+
+  return response.json();
+}
+
+async function ingestDocumentFile(file) {
+  const formData = new FormData();
+  formData.append("document", file);
+
+  const response = await fetch("/ingest/document", {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.error ?? "Could not ingest document.");
   }
 
   return response.json();
@@ -384,6 +472,85 @@ function renderHistory() {
 
     historyList.append(button);
   }
+}
+
+async function refreshKnowledgeDocuments() {
+  knowledgeDocuments =
+    await fetchKnowledgeDocuments();
+
+  renderKnowledgeDocuments();
+}
+
+function renderKnowledgeDocuments() {
+  knowledgeList.innerHTML = "";
+
+  if (knowledgeDocuments.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "history-empty";
+    empty.textContent = "No knowledge documents";
+    knowledgeList.append(empty);
+    return;
+  }
+
+  for (const knowledgeDocument of knowledgeDocuments) {
+    const button = document.createElement("button");
+    button.className = "knowledge-item";
+    button.type = "button";
+    button.classList.toggle("active", knowledgeDocument.id === selectedKnowledgeId);
+
+    const title = document.createElement("span");
+    title.className = "knowledge-item-title";
+    title.textContent = knowledgeDocument.title;
+
+    const meta = document.createElement("span");
+    meta.className = "knowledge-item-meta";
+    meta.textContent = `${knowledgeDocument.chunk_count} chunks · ${formatSessionTime(knowledgeDocument.created_at)}`;
+
+    const preview = document.createElement("span");
+    preview.className = "knowledge-item-preview";
+    preview.textContent = knowledgeDocument.preview || "No preview available";
+
+    button.append(title, meta, preview);
+    button.addEventListener("click", () => {
+      loadKnowledgeDocument(knowledgeDocument.id);
+    });
+
+    knowledgeList.append(button);
+  }
+}
+
+async function loadKnowledgeDocument(documentId) {
+  selectedKnowledgeId = documentId;
+  renderKnowledgeDocuments();
+  setKnowledgeEditorDisabled(true);
+  knowledgeCenterStatus.textContent = "Loading document...";
+
+  try {
+    const document =
+      await fetchKnowledgeDocument(documentId);
+
+    selectedKnowledgeId = document.id;
+    knowledgeEditorTitle.value = document.title;
+    knowledgeEditorContent.value = document.content;
+    setKnowledgeEditorDisabled(false);
+    knowledgeCenterStatus.textContent = `${document.chunk_count} chunks loaded.`;
+  } catch (error) {
+    knowledgeCenterStatus.textContent = error.message;
+  }
+}
+
+function clearKnowledgeEditor() {
+  selectedKnowledgeId = null;
+  knowledgeEditorTitle.value = "";
+  knowledgeEditorContent.value = "";
+  setKnowledgeEditorDisabled(true);
+}
+
+function setKnowledgeEditorDisabled(disabled) {
+  knowledgeEditorTitle.disabled = disabled;
+  knowledgeEditorContent.disabled = disabled;
+  saveKnowledgeButton.disabled = disabled;
+  deleteKnowledgeButton.disabled = disabled;
 }
 
 async function loadSession(nextSessionId) {
@@ -508,6 +675,10 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && ingestDrawer.classList.contains("open")) {
     closeIngestMenu();
   }
+
+  if (event.key === "Escape" && knowledgeCenter.classList.contains("open")) {
+    closeKnowledgeCenter();
+  }
 });
 
 newChatButton.addEventListener("click", async () => {
@@ -527,14 +698,48 @@ openIngestButton.addEventListener("click", () => {
   knowledgeInput.focus();
 });
 
+openKnowledgeButton.addEventListener("click", async () => {
+  knowledgeCenter.classList.add("open");
+  knowledgeCenter.setAttribute("aria-hidden", "false");
+  knowledgeCenterStatus.textContent = "Loading documents...";
+
+  try {
+    await refreshKnowledgeDocuments();
+    knowledgeCenterStatus.textContent = "";
+  } catch (error) {
+    knowledgeCenterStatus.textContent = error.message;
+  }
+});
+
 closeIngestButton.addEventListener("click", () => {
   closeIngestMenu();
+});
+
+closeKnowledgeButton.addEventListener("click", () => {
+  closeKnowledgeCenter();
+});
+
+refreshKnowledgeButton.addEventListener("click", async () => {
+  knowledgeCenterStatus.textContent = "Refreshing documents...";
+
+  try {
+    await refreshKnowledgeDocuments();
+    knowledgeCenterStatus.textContent = "";
+  } catch (error) {
+    knowledgeCenterStatus.textContent = error.message;
+  }
 });
 
 function closeIngestMenu() {
   ingestDrawer.classList.remove("open");
   ingestDrawer.setAttribute("aria-hidden", "true");
   openIngestButton.focus();
+}
+
+function closeKnowledgeCenter() {
+  knowledgeCenter.classList.remove("open");
+  knowledgeCenter.setAttribute("aria-hidden", "true");
+  openKnowledgeButton.focus();
 }
 
 textIngestTab.addEventListener("click", () => {
@@ -574,8 +779,12 @@ ingestForm.addEventListener("submit", async (event) => {
 
   try {
     await ingestKnowledge(content);
+    knowledgeTitleInput.value = "";
     knowledgeInput.value = "";
     ingestStatus.textContent = "Knowledge ingested.";
+    if (knowledgeCenter.classList.contains("open")) {
+      await refreshKnowledgeDocuments();
+    }
   } catch (error) {
     ingestStatus.textContent = error.message;
   } finally {
@@ -583,5 +792,84 @@ ingestForm.addEventListener("submit", async (event) => {
   }
 });
 
+uploadDocumentButton.addEventListener("click", async () => {
+  const file = documentUpload.files[0];
+
+  if (!file) {
+    documentIngestStatus.textContent = "Choose a document first.";
+    return;
+  }
+
+  uploadDocumentButton.disabled = true;
+  documentIngestStatus.textContent = "Uploading document...";
+
+  try {
+    await ingestDocumentFile(file);
+    documentUpload.value = "";
+    documentIngestStatus.textContent = "Document ingested.";
+    if (knowledgeCenter.classList.contains("open")) {
+      await refreshKnowledgeDocuments();
+    }
+  } catch (error) {
+    documentIngestStatus.textContent = error.message;
+  } finally {
+    uploadDocumentButton.disabled = false;
+  }
+});
+
+knowledgeEditor.addEventListener("submit", async (event) => {
+  event.preventDefault();
+
+  if (!selectedKnowledgeId) return;
+
+  const title = knowledgeEditorTitle.value.trim();
+  const content = knowledgeEditorContent.value.trim();
+
+  if (!title || !content) {
+    knowledgeCenterStatus.textContent = "Title and content are required.";
+    return;
+  }
+
+  setKnowledgeEditorDisabled(true);
+  knowledgeCenterStatus.textContent = "Saving document...";
+
+  try {
+    await updateKnowledgeDocument(selectedKnowledgeId, {
+      title,
+      content,
+    });
+    await refreshKnowledgeDocuments();
+    await loadKnowledgeDocument(selectedKnowledgeId);
+    knowledgeCenterStatus.textContent = "Document updated.";
+  } catch (error) {
+    knowledgeCenterStatus.textContent = error.message;
+    setKnowledgeEditorDisabled(false);
+  }
+});
+
+deleteKnowledgeButton.addEventListener("click", async () => {
+  if (!selectedKnowledgeId) return;
+
+  const confirmed = window.confirm(
+    "Delete this knowledge document and all of its chunks?"
+  );
+
+  if (!confirmed) return;
+
+  setKnowledgeEditorDisabled(true);
+  knowledgeCenterStatus.textContent = "Deleting document...";
+
+  try {
+    await deleteKnowledgeDocument(selectedKnowledgeId);
+    clearKnowledgeEditor();
+    await refreshKnowledgeDocuments();
+    knowledgeCenterStatus.textContent = "Document deleted.";
+  } catch (error) {
+    knowledgeCenterStatus.textContent = error.message;
+    setKnowledgeEditorDisabled(false);
+  }
+});
+
+clearKnowledgeEditor();
 resizeInput();
 initializeChat();

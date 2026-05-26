@@ -27,6 +27,11 @@
           Ingest knowledge
         </button>
 
+        <button class="developer-menu-button" id="openKnowledgeButton" type="button">
+          <span aria-hidden="true">D</span>
+          Knowledge center
+        </button>
+
         <div class="sidebar-section">
           <p class="section-label">Chats</p>
           <div class="history-list" id="historyList" aria-live="polite"></div>
@@ -38,10 +43,6 @@
           <div>
             <h2>ANDI</h2>
             <p>Ask questions across your ingested knowledge.</p>
-          </div>
-          <div class="status-pill">
-            <span aria-hidden="true"></span>
-            Online
           </div>
         </header>
 
@@ -95,6 +96,13 @@
 
         <div class="ingest-tab-panel active" id="textIngestPanel" role="tabpanel" aria-labelledby="textIngestTab">
           <form id="ingestForm" class="ingest-form">
+            <label for="knowledgeTitleInput">Title</label>
+            <input
+              id="knowledgeTitleInput"
+              name="title"
+              type="text"
+              placeholder="Policy, FAQ, playbook, or source name"
+            />
             <label for="knowledgeInput">Add source text</label>
             <textarea
               id="knowledgeInput"
@@ -114,12 +122,58 @@
               id="documentUpload"
               name="document"
               type="file"
-              accept=".pdf,.txt,.md,.doc,.docx"
-              disabled
+              accept=".pdf,.txt,.md"
             />
-            <p>Document upload is ready in the UI and can be wired to the backend later.</p>
+            <p>Select a PDF, TXT, or Markdown file.</p>
           </div>
-          <button class="ingest-button" type="button" disabled>Upload document</button>
+          <button class="ingest-button" id="uploadDocumentButton" type="button">Upload document</button>
+          <p class="ingest-status" id="documentIngestStatus" role="status"></p>
+        </div>
+      </section>
+
+      <section class="knowledge-center" id="knowledgeCenter" aria-labelledby="knowledgeCenterTitle" aria-hidden="true">
+        <header class="knowledge-header">
+          <div>
+            <p class="section-label">Library</p>
+            <h2 id="knowledgeCenterTitle">Knowledge center</h2>
+          </div>
+          <button class="icon-button" id="closeKnowledgeButton" type="button" aria-label="Close knowledge center">
+            &times;
+          </button>
+        </header>
+
+        <div class="knowledge-layout">
+          <aside class="knowledge-list-panel" aria-label="Knowledge documents">
+            <div class="knowledge-list-header">
+              <strong>Documents</strong>
+              <button class="small-button" id="refreshKnowledgeButton" type="button">Refresh</button>
+            </div>
+            <div class="knowledge-list" id="knowledgeList" aria-live="polite"></div>
+          </aside>
+
+          <form class="knowledge-editor" id="knowledgeEditor">
+            <label for="knowledgeEditorTitle">Title</label>
+            <input
+              id="knowledgeEditorTitle"
+              name="title"
+              type="text"
+              placeholder="Select a document"
+            />
+
+            <label for="knowledgeEditorContent">Content</label>
+            <textarea
+              id="knowledgeEditorContent"
+              name="content"
+              rows="18"
+              placeholder="Select a document to view or edit its chunked content."
+            ></textarea>
+
+            <div class="knowledge-actions">
+              <button class="ingest-button" id="saveKnowledgeButton" type="submit" disabled>Save changes</button>
+              <button class="danger-button" id="deleteKnowledgeButton" type="button" disabled>Delete</button>
+            </div>
+            <p class="ingest-status" id="knowledgeCenterStatus" role="status"></p>
+          </form>
         </div>
       </section>
     </main>
