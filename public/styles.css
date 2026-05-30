@@ -100,6 +100,9 @@ button:disabled {
 .bubble h3,
 .bubble h4,
 .bubble h5,
+.project-drawer h2,
+.project-result h3,
+.project-result p,
 .ingest-drawer h2,
 .ingest-status {
   margin: 0;
@@ -124,9 +127,10 @@ button:disabled {
   width: 100%;
   min-height: 42px;
   border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: none;
   color: inherit;
   text-align: left;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
 .new-chat,
@@ -137,10 +141,12 @@ button:disabled {
   padding: 10px 12px;
   background: transparent;
   font-weight: 650;
+  background: transparent;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
 .developer-menu-button {
-  background: var(--sidebar-soft);
+  background: transparent;
 }
 
 .new-chat span,
@@ -168,18 +174,56 @@ button:disabled {
 }
 
 .history-item {
-  display: grid;
-  gap: 3px;
-  padding: 9px 11px;
-  background: var(--sidebar-soft);
-  color: #ededf0;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 12px;
+  background: transparent;
+  color: #b6b6bf;
+  border: none;
+  border-radius: 8px;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
-.history-item.active,
-.history-item:hover,
+.history-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+.history-item.active {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+.history-item.active .history-title,
+.history-item.active .history-meta {
+  color: #ffffff;
+}
+
+.history-title {
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 650;
+  color: inherit;
+}
+
+.history-meta {
+  color: inherit;
+  opacity: 0.7;
+  font-size: 11px;
+  font-weight: 600;
+}
+
 .new-chat:hover,
-.developer-menu-button:hover {
-  background: #2f2f2f;
+.developer-menu-button:hover,
+.new-chat.active,
+.developer-menu-button.active {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
 }
 
 .history-list {
@@ -199,12 +243,14 @@ button:disabled {
 .history-title {
   font-size: 13px;
   font-weight: 650;
+  color: inherit;
 }
 
 .history-meta {
-  color: #b6b6bf;
   font-size: 11px;
   font-weight: 600;
+  color: inherit;
+  opacity: 0.7;
 }
 
 .history-empty {
@@ -214,6 +260,7 @@ button:disabled {
   font-size: 12px;
 }
 
+.project-drawer,
 .ingest-drawer {
   position: fixed;
   top: 0;
@@ -230,6 +277,10 @@ button:disabled {
   box-shadow: -18px 0 48px rgba(0, 0, 0, 0.14);
   transform: translateX(100%);
   transition: transform 180ms ease;
+}
+
+.project-drawer {
+  grid-template-rows: auto auto minmax(0, 1fr);
 }
 
 .knowledge-center {
@@ -359,9 +410,9 @@ button:disabled {
 
 .small-button,
 .danger-button {
-  border: 1px solid var(--border);
+  border: none;
   padding: 0 12px;
-  background: var(--surface);
+  background: transparent;
   color: var(--text);
   font-weight: 700;
   text-align: center;
@@ -385,6 +436,7 @@ button:disabled {
   background: #ffe7e5;
 }
 
+.project-drawer.open,
 .ingest-drawer.open {
   transform: translateX(0);
 }
@@ -396,6 +448,7 @@ button:disabled {
   gap: 16px;
 }
 
+.project-drawer h2,
 .ingest-drawer h2 {
   margin-top: 4px;
   font-size: 18px;
@@ -406,9 +459,9 @@ button:disabled {
   place-items: center;
   width: 34px;
   height: 34px;
-  border: 1px solid var(--border);
+  border: none;
   border-radius: 8px;
-  background: var(--surface);
+  background: transparent;
   color: var(--text);
   font-size: 22px;
   line-height: 1;
@@ -448,17 +501,20 @@ button:disabled {
   overflow-y: auto;
 }
 
+.project-form,
 .ingest-form {
   display: grid;
   gap: 9px;
 }
 
+.project-form label,
 .ingest-form label {
   color: var(--text);
   font-size: 12px;
   font-weight: 650;
 }
 
+.project-form input,
 .ingest-form input,
 .knowledge-editor input,
 .ingest-form textarea,
@@ -473,6 +529,7 @@ button:disabled {
   line-height: 1.45;
 }
 
+.project-form input,
 .ingest-form input,
 .knowledge-editor input {
   min-height: 42px;
@@ -487,12 +544,63 @@ button:disabled {
   resize: none;
 }
 
+.project-form input:focus,
 .ingest-form input:focus,
 .knowledge-editor input:focus,
 .ingest-form textarea:focus,
 .knowledge-editor textarea:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(16, 163, 127, 0.2);
+}
+
+.project-result {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-height: 0;
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+}
+
+.project-result[hidden] {
+  display: none;
+}
+
+.project-result h3 {
+  margin-top: 4px;
+  font-size: 17px;
+  line-height: 1.25;
+}
+
+.project-result p {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.project-result label {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.project-key-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.project-key-row input {
+  min-width: 0;
+  min-height: 42px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  background: var(--surface-soft);
+  color: var(--text);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  outline: none;
 }
 
 .ingest-button {
@@ -859,6 +967,7 @@ button:disabled {
     padding: 12px;
   }
 
+  .project-drawer,
   .ingest-drawer {
     width: 100vw;
   }

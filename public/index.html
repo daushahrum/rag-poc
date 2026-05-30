@@ -22,6 +22,11 @@
           New chat
         </button>
 
+        <button class="developer-menu-button" id="openProjectButton" type="button">
+          <span aria-hidden="true">P</span>
+          Create project
+        </button>
+
         <button class="developer-menu-button" id="openIngestButton" type="button">
           <span aria-hidden="true">K</span>
           Ingest knowledge
@@ -72,6 +77,61 @@
             </button>
           </div>
         </form>
+      </section>
+
+      <section class="project-drawer" id="projectDrawer" aria-labelledby="projectTitle" aria-hidden="true">
+        <div class="drawer-header">
+          <div>
+            <p class="section-label">Project</p>
+            <h2 id="projectTitle">Create project</h2>
+          </div>
+          <button class="icon-button" id="closeProjectButton" type="button" aria-label="Close project menu">
+            &times;
+          </button>
+        </div>
+
+        <form id="projectForm" class="project-form">
+          <label for="projectNameInput">Name</label>
+          <input
+            id="projectNameInput"
+            name="name"
+            type="text"
+            placeholder="Insert project name"
+            autocomplete="off"
+            required
+          />
+
+          <label for="projectCodeInput">Code</label>
+          <input
+            id="projectCodeInput"
+            name="code"
+            type="text"
+            placeholder="Insert unique project code (e.g. 'acme-corp')"
+            autocomplete="off"
+            required
+          />
+
+          <button class="ingest-button" id="createProjectButton" type="submit">Create project</button>
+          <p class="ingest-status" id="projectStatus" role="status"></p>
+        </form>
+
+        <div class="project-result" id="projectResult" hidden>
+          <div>
+            <p class="section-label">Created</p>
+            <h3 id="createdProjectName"></h3>
+            <p id="createdProjectCode"></p>
+          </div>
+
+          <label for="projectKeyOutput">Project key</label>
+          <div class="project-key-row">
+            <input
+              id="projectKeyOutput"
+              type="text"
+              readonly
+            />
+            <button class="small-button" id="copyProjectKeyButton" type="button">Copy</button>
+          </div>
+        </div>
       </section>
 
       <section class="ingest-drawer" id="ingestDrawer" aria-labelledby="ingestTitle" aria-hidden="true">

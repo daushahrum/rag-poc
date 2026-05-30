@@ -3,9 +3,22 @@ const input = document.querySelector("#messageInput");
 const messages = document.querySelector("#messages");
 const newChatButton = document.querySelector("#newChatButton");
 const historyList = document.querySelector("#historyList");
+const openProjectButton = document.querySelector("#openProjectButton");
 const openIngestButton = document.querySelector("#openIngestButton");
 const openKnowledgeButton = document.querySelector("#openKnowledgeButton");
+const closeProjectButton = document.querySelector("#closeProjectButton");
 const closeIngestButton = document.querySelector("#closeIngestButton");
+const projectDrawer = document.querySelector("#projectDrawer");
+const projectForm = document.querySelector("#projectForm");
+const projectNameInput = document.querySelector("#projectNameInput");
+const projectCodeInput = document.querySelector("#projectCodeInput");
+const createProjectButton = document.querySelector("#createProjectButton");
+const projectStatus = document.querySelector("#projectStatus");
+const projectResult = document.querySelector("#projectResult");
+const createdProjectName = document.querySelector("#createdProjectName");
+const createdProjectCode = document.querySelector("#createdProjectCode");
+const projectKeyOutput = document.querySelector("#projectKeyOutput");
+const copyProjectKeyButton = document.querySelector("#copyProjectKeyButton");
 const ingestDrawer = document.querySelector("#ingestDrawer");
 const ingestForm = document.querySelector("#ingestForm");
 const knowledgeTitleInput = document.querySelector("#knowledgeTitleInput");
@@ -329,6 +342,27 @@ async function fetchSessionMessages(nextSessionId) {
   return data.messages ?? [];
 }
 
+async function createProject(name, code) {
+  const response = await fetch("/create_project", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      name,
+      code,
+    }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(data.error ?? "Could not create project.");
+  }
+
+  return data.project;
+}
+
 async function ingestKnowledge(content) {
   const response = await fetch("/ingest", {
     method: "POST",
@@ -455,17 +489,17 @@ function renderHistory() {
     button.className = "history-item";
     button.type = "button";
     button.classList.toggle("active", session.id === sessionId);
-    button.setAttribute("aria-current", session.id === sessionId ? "true" : "false");
+    button.setAttribute(
+      "aria-current",
+      session.id === sessionId ? "true" : "false"
+    );
 
     const title = document.createElement("span");
     title.className = "history-title";
     title.textContent = truncateText(session.title, 58);
 
-    const meta = document.createElement("span");
-    meta.className = "history-meta";
-    meta.textContent = formatSessionTime(session.updated_at);
+    button.append(title);
 
-    button.append(title, meta);
     button.addEventListener("click", () => {
       loadSession(session.id);
     });
@@ -672,6 +706,10 @@ input.addEventListener("keydown", (event) => {
 });
 
 document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && projectDrawer.classList.contains("open")) {
+    closeProjectMenu();
+  }
+
   if (event.key === "Escape" && ingestDrawer.classList.contains("open")) {
     closeIngestMenu();
   }
@@ -698,6 +736,12 @@ openIngestButton.addEventListener("click", () => {
   knowledgeInput.focus();
 });
 
+openProjectButton.addEventListener("click", () => {
+  projectDrawer.classList.add("open");
+  projectDrawer.setAttribute("aria-hidden", "false");
+  projectNameInput.focus();
+});
+
 openKnowledgeButton.addEventListener("click", async () => {
   knowledgeCenter.classList.add("open");
   knowledgeCenter.setAttribute("aria-hidden", "false");
@@ -709,6 +753,10 @@ openKnowledgeButton.addEventListener("click", async () => {
   } catch (error) {
     knowledgeCenterStatus.textContent = error.message;
   }
+});
+
+closeProjectButton.addEventListener("click", () => {
+  closeProjectMenu();
 });
 
 closeIngestButton.addEventListener("click", () => {
@@ -736,11 +784,61 @@ function closeIngestMenu() {
   openIngestButton.focus();
 }
 
+function closeProjectMenu() {
+  projectDrawer.classList.remove("open");
+  projectDrawer.setAttribute("aria-hidden", "true");
+  openProjectButton.focus();
+}
+
 function closeKnowledgeCenter() {
   knowledgeCenter.classList.remove("open");
   knowledgeCenter.setAttribute("aria-hidden", "true");
   openKnowledgeButton.focus();
 }
+
+projectForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+
+  const name = projectNameInput.value.trim();
+  const code = projectCodeInput.value.trim();
+
+  if (!name || !code) {
+    projectStatus.textContent = "Name and code are required.";
+    return;
+  }
+
+  createProjectButton.disabled = true;
+  projectStatus.textContent = "Creating project...";
+  projectResult.hidden = true;
+
+  try {
+    const project =
+      await createProject(name, code);
+
+    createdProjectName.textContent = project.name;
+    createdProjectCode.textContent = project.code;
+    projectKeyOutput.value = project.project_key;
+    projectResult.hidden = false;
+    projectForm.reset();
+    projectStatus.textContent = "Project created.";
+  } catch (error) {
+    projectStatus.textContent = error.message;
+  } finally {
+    createProjectButton.disabled = false;
+  }
+});
+
+copyProjectKeyButton.addEventListener("click", async () => {
+  if (!projectKeyOutput.value) return;
+
+  try {
+    await navigator.clipboard.writeText(projectKeyOutput.value);
+    projectStatus.textContent = "Project key copied.";
+  } catch (error) {
+    projectKeyOutput.select();
+    projectStatus.textContent = "Project key selected.";
+  }
+});
 
 textIngestTab.addEventListener("click", () => {
   setIngestTab("text");
