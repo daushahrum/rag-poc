@@ -1,4 +1,4 @@
-import { supabase } from "./supabase.js";
+import { supabase } from "../database/supabase.js";
 import { v4 as uuidv4 } from "uuid";
 
 export async function createSession() {

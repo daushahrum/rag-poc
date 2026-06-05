@@ -1,4 +1,4 @@
-import { openai } from "./ai/openai.js";
+import { openai } from "../utils/ai/openai.js";
 
 export async function createEmbedding(text) {
   const response = await openai.embeddings.create({

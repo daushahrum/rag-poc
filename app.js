@@ -3,25 +3,25 @@ import dotenv from "dotenv";
 import multer from "multer";
 import { PDFParse } from "pdf-parse";
 
-import { askAI } from "./chat.js";
+import { askAI } from "./src/services/chat.js";
 import {
   ingestDocument,
   replaceDocumentContent,
-} from "./ingest.js";
-import { supabase } from "./supabase.js";
-import { loadSchema } from "./services/schemaService.js";
-import { createProject } from "./services/createProjectService.js";
+} from "./src/services/ingest.js";
+import { supabase } from "./src/database/supabase.js";
+import { loadSchema } from "./src/services/schemaService.js";
+import { createProject } from "./src/services/createProjectService.js";
 
 import {
   createSession,
   getSessionMessages,
   listSessions,
-} from "./chatSession.js";
+} from "./src/services/chatSession.js";
 
-import projectRoutes from "./routes/project.routes.js";
+import projectRoutes from "./src/routes/project.routes.js";
 
 
-dotenv.config();
+dotenv.config({ path: './config/.env' });
 
 const app = express();
 const upload = multer({
@@ -33,10 +33,11 @@ const upload = multer({
 
 app.use(express.json());
 app.use(express.static("public"));
+app.use(express.static("views"));
 
 app.get("/", (req, res) => {
   res.sendFile("index.html", {
-    root: "public",
+    root: "views",
   });
 });
 

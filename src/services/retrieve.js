@@ -1,4 +1,4 @@
-import { supabase } from "./supabase.js";
+import { supabase } from "../database/supabase.js";
 import { createEmbedding } from "./embedding.js";
 
 export async function retrieveDocuments(query) {

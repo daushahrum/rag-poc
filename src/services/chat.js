@@ -1,8 +1,8 @@
-import { openai } from "./ai/openai.js";
+import { openai } from "../utils/ai/openai.js";
 import { retrieveDocuments } from "./retrieve.js";
-import { tools } from "./ai/tools.js";
+import { tools } from "../utils/ai/tools.js";
 import { callBackendTool as callAiGateway } from "./tools/backendTool.js";
-import { getSchema } from "./services/schemaService.js";
+import { getSchema } from "./schemaService.js";
 
 import {
   getHistory,
