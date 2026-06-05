@@ -47,6 +47,16 @@ let sessions = [];
 let knowledgeDocuments = [];
 let selectedKnowledgeId = null;
 
+import { supabase } from './auth.js';
+
+const {
+  data: { session },
+} = await supabase.auth.getSession();
+
+if (!session) {
+  window.location.href = '/login.html';
+}
+
 let randomGreetingMessages = [
   "Hi there! What would you like to talk about today?",
   "Hello! I'm here to help. What can I do for you?",
@@ -72,11 +82,6 @@ function createMessage(role, content, sources = []) {
   const article = document.createElement("article");
   article.className = `message ${role}`;
 
-  const avatar = document.createElement("div");
-  avatar.className = "avatar";
-  avatar.setAttribute("aria-hidden", "true");
-  avatar.textContent = role === "user" ? "You" : "AI";
-
   const bubble = document.createElement("div");
   bubble.className = "bubble";
 
@@ -86,7 +91,7 @@ function createMessage(role, content, sources = []) {
     bubble.append(createSources(sources));
   }
 
-  article.append(avatar, bubble);
+  article.append(bubble);
   return article;
 }
 
@@ -281,7 +286,7 @@ function createTypingMessage() {
     </div>
   `;
 
-  article.append(avatar, bubble);
+  article.append(bubble);
   return article;
 }
 
@@ -343,7 +348,7 @@ async function fetchSessionMessages(nextSessionId) {
 }
 
 async function createProject(name, code) {
-  const response = await fetch("/create_project", {
+  const response = await fetch("/projects", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -652,15 +657,8 @@ function formatSessionTime(value) {
 async function initializeChat() {
   try {
     await refreshSessions();
-
-    const latestSession = sessions[0];
-
-    if (latestSession) {
-      await loadSession(latestSession.id);
-    } else {
-      renderWelcomeMessage();
-      await startSession();
-    }
+    renderWelcomeMessage();
+    await startSession();
   } catch (error) {
     renderWelcomeMessage();
     messages.append(createMessage("assistant", error.message));
@@ -971,3 +969,14 @@ deleteKnowledgeButton.addEventListener("click", async () => {
 clearKnowledgeEditor();
 resizeInput();
 initializeChat();
+
+
+logoutButton.addEventListener(
+  'click',
+  async () => {
+    await supabase.auth.signOut()
+
+    window.location.href =
+      '/login.html'
+  }
+)

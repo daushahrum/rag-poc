@@ -45,6 +45,13 @@ button:disabled {
   opacity: 0.58;
 }
 
+.project-key-warning {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #b45309;
+  line-height: 1.4;
+}
+
 .app-shell {
   display: grid;
   grid-template-columns: 292px minmax(0, 1fr);
@@ -711,7 +718,7 @@ button:disabled {
 }
 
 .message {
-  display: grid;
+  justify-content: flex-start;
   grid-template-columns: 36px minmax(0, 1fr);
   gap: 12px;
   width: min(100%, 820px);
@@ -719,6 +726,7 @@ button:disabled {
 }
 
 .message.user {
+  justify-content: flex-end;
   grid-template-columns: minmax(0, 1fr) 36px;
 }
 
@@ -903,6 +911,15 @@ button:disabled {
   color: var(--text);
   outline: none;
   line-height: 1.5;
+}
+
+.logout-button {
+  padding: 8px 12px;
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-weight: 700;
 }
 
 .send-button {

@@ -49,11 +49,13 @@
             <h2>ANDI</h2>
             <p>Ask questions across your ingested knowledge.</p>
           </div>
+          <button class="logout-button" id="logoutButton" type="button">
+            Logout
+          </button>
         </header>
 
         <div class="messages" id="messages" aria-live="polite">
           <article class="message assistant">
-            <div class="avatar" aria-hidden="true">AI</div>
             <div class="bubble">
               <p>Hello. Ask me anything from your ingested documents.</p>
             </div>
@@ -131,6 +133,10 @@
             />
             <button class="small-button" id="copyProjectKeyButton" type="button">Copy</button>
           </div>
+
+        <p class="project-key-warning">
+          Save this project key now. It will not be shown again and is required for clients to connect to this project.
+        </p>
         </div>
       </section>
 
