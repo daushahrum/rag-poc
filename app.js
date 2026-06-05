@@ -20,6 +20,8 @@ import {
 
 import projectRoutes from "./src/routes/project.routes.js";
 
+import { db } from "./src/database/db.js";
+db.testConnection();
 
 dotenv.config({ path: './config/.env' });
 
