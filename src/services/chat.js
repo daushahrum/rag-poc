@@ -35,7 +35,7 @@ export async function askAI(
 
   //construct prompt with retrieved knowledge and conversation history, then ask OpenAI
   //format -> {system, context, user}
-
+  
   const messages = [
     {
       role: "system",

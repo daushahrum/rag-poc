@@ -31,6 +31,9 @@ const sequelize = new Sequelize(conf.database, conf.user, conf.password, {
   alter: false
 });
 
+//model initialization
+import { initModels } from './models/index.model.js';
+const models = initModels(sequelize);
 
 const db = {};
 db.testConnection = async function() {
