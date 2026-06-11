@@ -1,93 +1,84 @@
-const { DataTypes, Model } = require('sequelize');
-const sequelize = require('../config/database');
+import { DataTypes } from 'sequelize';
 
-class Tool extends Model {}
+export default function ToolModel(sequelize) {
+    return sequelize.define(
+        'Tool',
+        {
+            id: {
+                type: DataTypes.UUID,
+                primaryKey: true,
+                allowNull: false,
+                defaultValue: DataTypes.UUIDV4,
+            },
 
-Tool.init(
-  {
-    id: {
-      type: DataTypes.UUID,
-      defaultValue: DataTypes.UUIDV4,
-      primaryKey: true,
-    },
+            project_id: {
+                type: DataTypes.BIGINT,
+                allowNull: false,
+            },
 
-    projectId: {
-      type: DataTypes.BIGINT,
-      allowNull: false,
-      field: 'project_id',
-    },
+            tool_name: {
+                type: DataTypes.STRING(100),
+                allowNull: false,
+            },
 
-    toolName: {
-      type: DataTypes.STRING(100),
-      allowNull: false,
-      field: 'tool_name',
-    },
+            description: {
+                type: DataTypes.TEXT,
+                allowNull: true,
+            },
 
-    description: {
-      type: DataTypes.TEXT,
-    },
+            endpoint: {
+                type: DataTypes.STRING(500),
+                allowNull: false,
+            },
 
-    endpoint: {
-      type: DataTypes.STRING(500),
-      allowNull: false,
-    },
+            method: {
+                type: DataTypes.STRING(10),
+                allowNull: false,
+                defaultValue: 'GET',
+            },
 
-    method: {
-      type: DataTypes.STRING(10),
-      defaultValue: 'GET',
-    },
+            path_params: {
+                type: DataTypes.JSONB,
+                allowNull: true,
+            },
 
-    pathParams: {
-      type: DataTypes.JSONB,
-      field: 'path_params',
-    },
+            query_params: {
+                type: DataTypes.JSONB,
+                allowNull: true,
+            },
 
-    queryParams: {
-      type: DataTypes.JSONB,
-      field: 'query_params',
-    },
+            body_schema: {
+                type: DataTypes.JSONB,
+                allowNull: true,
+            },
 
-    bodySchema: {
-      type: DataTypes.JSONB,
-      field: 'body_schema',
-    },
+            example_payload: {
+                type: DataTypes.JSONB,
+                allowNull: true,
+            },
 
-    examplePayload: {
-      type: DataTypes.JSONB,
-      field: 'example_payload',
-    },
+            response_schema: {
+                type: DataTypes.JSONB,
+                allowNull: true,
+            },
 
-    responseSchema: {
-      type: DataTypes.JSONB,
-      field: 'response_schema',
-    },
+            version: {
+                type: DataTypes.STRING(20),
+                allowNull: true,
+                defaultValue: '1.0.0',
+            },
 
-    version: {
-      type: DataTypes.STRING(20),
-      defaultValue: '1.0.0',
-    },
-
-    isEnabled: {
-      type: DataTypes.BOOLEAN,
-      defaultValue: true,
-      field: 'is_enabled',
-    },
-
-    createdAt: {
-      type: DataTypes.DATE,
-      field: 'created_at',
-    },
-
-    updatedAt: {
-      type: DataTypes.DATE,
-      field: 'updated_at',
-    },
-  },
-  {
-    sequelize,
-    tableName: 'tools',
-    timestamps: false,
-  }
-);
-
-module.exports = Tool;
+            is_enabled: {
+                type: DataTypes.BOOLEAN,
+                allowNull: true,
+                defaultValue: true,
+            },
+        },
+        {
+            tableName: 'tools',
+            timestamps: true,
+            createdAt: 'created_at',
+            updatedAt: 'updated_at',
+        }
+    );
+}

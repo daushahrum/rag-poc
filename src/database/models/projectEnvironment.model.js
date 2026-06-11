@@ -1,65 +1,52 @@
-const { DataTypes, Model } = require('sequelize');
-const sequelize = require('../config/database');
+import { DataTypes } from 'sequelize';
 
-class ProjectEnvironment extends Model {}
+export default function ProjectEnvironmentModel(sequelize) {
+    return sequelize.define(
+        'ProjectEnvironment',
+        {
+            id: {
+                type: DataTypes.BIGINT,
+                primaryKey: true,
+                autoIncrement: true,
+            },
 
-ProjectEnvironment.init(
-  {
-    id: {
-      type: DataTypes.BIGINT,
-      autoIncrement: true,
-      primaryKey: true,
-    },
+            project_id: {
+                type: DataTypes.BIGINT,
+                allowNull: false,
+            },
 
-    projectId: {
-      type: DataTypes.BIGINT,
-      allowNull: false,
-      field: 'project_id',
-    },
+            environment: {
+                type: DataTypes.STRING(50),
+                allowNull: false,
+            },
 
-    environment: {
-      type: DataTypes.STRING(50),
-      allowNull: false,
-    },
+            base_url: {
+                type: DataTypes.TEXT,
+                allowNull: false,
+            },
 
-    baseUrl: {
-      type: DataTypes.TEXT,
-      allowNull: false,
-      field: 'base_url',
-    },
+            auth_type: {
+                type: DataTypes.STRING(50),
+                allowNull: false,
+                defaultValue: 'none',
+            },
 
-    authType: {
-      type: DataTypes.STRING(50),
-      defaultValue: 'none',
-      field: 'auth_type',
-    },
+            auth_config: {
+                type: DataTypes.JSONB,
+                allowNull: true,
+            },
 
-    authConfig: {
-      type: DataTypes.JSONB,
-      field: 'auth_config',
-    },
-
-    isActive: {
-      type: DataTypes.BOOLEAN,
-      defaultValue: true,
-      field: 'is_active',
-    },
-
-    createdAt: {
-      type: DataTypes.DATE,
-      field: 'created_at',
-    },
-
-    updatedAt: {
-      type: DataTypes.DATE,
-      field: 'updated_at',
-    },
-  },
-  {
-    sequelize,
-    tableName: 'project_environments',
-    timestamps: false,
-  }
-);
-
-module.exports = ProjectEnvironment;
+            is_active: {
+                type: DataTypes.BOOLEAN,
+                allowNull: true,
+                defaultValue: true,
+            },
+        },
+        {
+            tableName: 'project_environments',
+            timestamps: true,
+            createdAt: 'created_at',
+            updatedAt: 'updated_at',
+        }
+    );
+}

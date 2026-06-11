@@ -1,54 +1,42 @@
-const { DataTypes, Model } = require('sequelize');
-const sequelize = require('../config/database');
+import { DataTypes } from 'sequelize';
 
-class Project extends Model {}
+export default function ProjectModel(sequelize) {
+    return sequelize.define(
+        'Project',
+        {
+            id: {
+                type: DataTypes.BIGINT,
+                primaryKey: true,
+                autoIncrement: true,
+            },
 
-Project.init(
-  {
-    id: {
-      type: DataTypes.BIGINT,
-      autoIncrement: true,
-      primaryKey: true,
-    },
+            code: {
+                type: DataTypes.STRING(50),
+                allowNull: false,
+                unique: true,
+            },
 
-    code: {
-      type: DataTypes.STRING(50),
-      allowNull: false,
-      unique: true,
-    },
+            name: {
+                type: DataTypes.STRING(255),
+                allowNull: false,
+            },
 
-    name: {
-      type: DataTypes.STRING(255),
-      allowNull: false,
-    },
+            project_key_hash: {
+                type: DataTypes.TEXT,
+                allowNull: false,
+            },
 
-    projectKeyHash: {
-      type: DataTypes.TEXT,
-      allowNull: false,
-      field: 'project_key_hash',
-    },
-
-    isActive: {
-      type: DataTypes.BOOLEAN,
-      defaultValue: true,
-      field: 'is_active',
-    },
-
-    createdAt: {
-      type: DataTypes.DATE,
-      field: 'created_at',
-    },
-
-    updatedAt: {
-      type: DataTypes.DATE,
-      field: 'updated_at',
-    },
-  },
-  {
-    sequelize,
-    tableName: 'projects',
-    timestamps: false,
-  }
-);
-
-module.exports = Project;
+            is_active: {
+                type: DataTypes.BOOLEAN,
+                allowNull: true,
+                defaultValue: true,
+            },
+        },
+        {
+            tableName: 'projects',
+            timestamps: true,
+            createdAt: 'created_at',
+            updatedAt: 'updated_at',
+        }
+    );
+}
