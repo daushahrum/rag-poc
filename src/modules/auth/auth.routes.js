@@ -15,9 +15,7 @@ router.post(
 router.post(
     '/change-password',
     auth.authenticate,
-    async (req, res) =>{
-        authController.changePassword(req, res)
-    }
+    authController.changePassword
 );
 
 export default router;
