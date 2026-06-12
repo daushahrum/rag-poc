@@ -20,6 +20,8 @@ import {
 
 import projectRoutes from "./src/routes/project.routes.js";
 
+import authRoutes from './src/modules/auth/auth.routes.js';
+
 import { db } from "./src/database/db.js";
 db.testConnection();
 
@@ -42,6 +44,11 @@ app.get("/", (req, res) => {
     root: "views",
   });
 });
+
+app.use(
+    '/api/auth',
+    authRoutes
+);
 
 app.use("/projects", projectRoutes);
 

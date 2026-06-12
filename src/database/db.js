@@ -45,4 +45,4 @@ db.testConnection = async function() {
   }
 }
 
-export { sequelize, db };
+export { sequelize, models, db };
