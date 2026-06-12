@@ -43,13 +43,12 @@ export async function updateSession(id, sessionId) {
     );
 }
 
-export async function updatePassword({ req }, id, password) {
+export async function updatePassword(id, password, updated_by) {
     const hashedPassword = await bcrypt.hash(password, 10);
     return User.update(
         {
             password: hashedPassword,
-            updated_by: req.token.id,
-            updated_at: new Date()
+            updated_by
         },
         {
             where: { id },

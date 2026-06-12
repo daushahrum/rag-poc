@@ -44,8 +44,11 @@ export async function login(id, password) {
         user,
     };
 }
-export async function changePassword({ req }, id, old_password, new_password) {
-    console.log('LOGIN ID:', id);
+export async function changePassword(payload) {
+    const id = payload.id;
+    const old_password = payload.old_password;
+    const new_password = payload.new_password;
+    const updated_by = payload.updated_by;
 
     // ** Check valid id
     const user = await authRepository.findById(id);
@@ -74,9 +77,10 @@ export async function changePassword({ req }, id, old_password, new_password) {
         throw new Error(validNewPassword.message);
     }
 
-    await authRepository.updatePassword( { req }, 
+    await authRepository.updatePassword( 
         user.id,
-        new_password
+        new_password,
+        updated_by
     );
 
     return {

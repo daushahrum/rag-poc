@@ -26,11 +26,12 @@ export async function changePassword(req, res) {
     const token = req.token
 
     try {
-        const result = await authService.changePassword( { req },
-            req.body.id,
-            req.body.old_password,
-            req.body.new_password,
-        );
+        const payload = {
+            ...req.body,
+            updated_by: req.token.id
+        }
+        
+        const result = await authService.changePassword(payload);
 
         return res.json({ status: 'Success', message: result.message });
     } catch (error) {
