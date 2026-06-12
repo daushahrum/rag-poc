@@ -42,8 +42,20 @@ export async function deleteUser(id) {
     return userRepository.deleteUser(id);
 }
 
-export async function updateUser(id, data) {
-    return userRepository.updateUser(id, data);
+export async function updateUser(payload) {
+
+    const id = payload.id;
+
+    const {
+        role,
+        name,
+        email,
+        mobile,
+        updated_by,
+        project_id,
+    } = payload;
+
+    return userRepository.updateUser(id, payload);
 }
 
 export async function getUsers() {

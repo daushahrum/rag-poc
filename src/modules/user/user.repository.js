@@ -6,9 +6,9 @@ export async function createUser(payload) {
     return User.create(payload);
 }
 
-export async function updateUser(id, data) {
+export async function updateUser(id, payload) {
     const [affectedRows] = await User.update(
-        data,
+        payload,
         {
             where: { id },
         }

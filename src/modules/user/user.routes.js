@@ -19,6 +19,18 @@ router.post(
     userController.createUser
 );
 
+router.post(
+    '/update',
+    auth.authenticate,
+    userController.updateUser
+);
+
+router.post(
+    '/delete',
+    auth.authenticate,
+    userController.deleteUser
+);
+
 router.get(
     '/list',
     auth.authenticate,
