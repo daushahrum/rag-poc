@@ -20,3 +20,25 @@ export async function login(req, res) {
         });
     }
 }
+export async function changePassword(req, res) {
+    console.log('BODY:', req.body);
+    console.log('TOKEN:', req.token);
+    const token = req.token
+
+    try {
+        const result = await authService.changePassword( { req },
+            req.body.id,
+            req.body.old_password,
+            req.body.new_password,
+        );
+
+        return res.json({ status: 'Success', message: result.message });
+    } catch (error) {
+        console.error(error);
+
+        return res.status(401).json({
+            status: 'Failed',
+            message: error.message,
+        });
+    }
+}

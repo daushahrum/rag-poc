@@ -1,4 +1,5 @@
 // modules/auth/auth.repository.js
+import bcrypt from 'bcrypt';
 
 import { models } from '../../database/db.js';
 
@@ -35,6 +36,20 @@ export async function updateSession(id, sessionId) {
     return User.update(
         {
             session_id: sessionId,
+        },
+        {
+            where: { id },
+        }
+    );
+}
+
+export async function updatePassword({ req }, id, password) {
+    const hashedPassword = await bcrypt.hash(password, 10);
+    return User.update(
+        {
+            password: hashedPassword,
+            updated_by: req.token.id,
+            updated_at: new Date()
         },
         {
             where: { id },

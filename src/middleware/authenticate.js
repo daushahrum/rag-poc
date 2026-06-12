@@ -25,7 +25,7 @@ export function authenticate(
         );
 
     try {
-        req.user = jwt.verify(
+        req.token = jwt.verify(
             token,
             process.env.JWT_SECRET
         );
