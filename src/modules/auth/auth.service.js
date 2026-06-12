@@ -28,11 +28,10 @@ export async function login(id, password) {
         {
             id: user.id,
             role: user.role,
+            project_id: user.project_id
         },
         process.env.JWT_SECRET,
-        {
-            
-        }
+        {}
     );
 
     await authRepository.updateLastLogin(

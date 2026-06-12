@@ -1,0 +1,28 @@
+// router.post('/', createUser);
+// router.get('/', getUsers);
+// router.get('/:id', getUser);
+// router.put('/:id', updateUser);
+// router.delete('/:id', deleteUser);
+
+// modules/user/user.routes.js
+
+import express from 'express';
+
+import * as userController from './user.controller.js';
+import * as auth from '../../middleware/authenticate.js'
+
+const router = express.Router();
+
+router.post(
+    '/create',
+    auth.authenticate,
+    userController.createUser
+);
+
+router.get(
+    '/list',
+    auth.authenticate,
+    userController.listUser
+);
+
+export default router;
