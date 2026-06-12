@@ -18,10 +18,14 @@ import {
   listSessions,
 } from "./src/services/chatSession.js";
 
-import projectRoutes from "./src/routes/project.routes.js";
+// import projectRoutes from "./src/routes/project.routes.js";
 
+
+//NEW RESTRUCTURED
 import authRoutes from './src/modules/auth/auth.routes.js';
 import userRoutes from './src/modules/user/user.routes.js';
+import projectRoutes from './src/modules/project/project.routes.js';
+//END OF NEW RESTRUCTURED
 
 import { db } from "./src/database/db.js";
 db.testConnection();
@@ -46,6 +50,7 @@ app.get("/", (req, res) => {
   });
 });
 
+//NEW ROUTES
 app.use(
     '/api/auth',
     authRoutes
@@ -56,7 +61,13 @@ app.use(
     userRoutes
 );
 
-app.use("/projects", projectRoutes);
+app.use(
+    '/api/project',
+    projectRoutes
+);
+//END OF NEW ROUTES
+
+// app.use("/projects", projectRoutes);
 
 app.post("/ingest", async (req, res) => {
   try {

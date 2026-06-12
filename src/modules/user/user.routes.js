@@ -37,4 +37,10 @@ router.get(
     userController.listUser
 );
 
+router.get(
+    '/:id',
+    auth.authenticate,
+    userController.getUser
+);
+
 export default router;

@@ -61,3 +61,7 @@ export async function updateUser(payload) {
 export async function getUsers() {
     return userRepository.getUsers();
 }
+
+export async function getUserById(id) {
+    return userRepository.getUserById(id);
+}
