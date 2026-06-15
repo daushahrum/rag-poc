@@ -2,6 +2,7 @@
 
 import { Router } from 'express';
 import * as projectController from './project.controller.js';
+import * as projectEnvironmentController from '../projectEnvironment/projectEnvironment.controller.js';
 
 import * as auth from '../../middleware/authenticate.js'
 
@@ -11,6 +12,12 @@ router.post(
     '/create',
     auth.authenticate,
     projectController.createProject
+);
+
+router.post(
+    '/create_environment',
+    auth.authenticate,
+    projectEnvironmentController.createProjectEnvironment
 );
 
 router.post(
@@ -30,6 +37,13 @@ router.get(
     auth.authenticate,
     projectController.listProject
 );
+
+router.get(
+    '/environment_list/:project_id',
+    auth.authenticate,
+    projectEnvironmentController.getProjectEnvironments
+);
+
 
 router.get(
     '/:id',

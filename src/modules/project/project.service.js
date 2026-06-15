@@ -1,33 +1,30 @@
-// modules/user/user.service.js
+// modules/project/project.service.js
+import crypto from 'crypto';
 import * as projectRepository from './project.repository.js';
+
+function generateProjectKeyHash() {
+    return crypto.randomBytes(32).toString('hex');
+}
 
 export async function createProject(payload) {
     if (!payload || typeof payload !== 'object') {
         throw new Error('Project payload is required');
     }
 
-    const {
-        id,
-        name,
-        description,
-        owner_id,
-        created_by,
-        updated_by,
-        // add any other project model fields here
-    } = payload;
+    const { code, name } = payload;
+
+    if (!code) {
+        throw new Error('Project code is required');
+    }
 
     if (!name) {
         throw new Error('Project name is required');
     }
 
-    if (!owner_id) {
-        throw new Error('Project owner_id is required');
-    }
-
-    // build saved object (preserve any extra fields passed in payload)
     const projectToCreate = {
         ...payload,
-        active: payload.active ?? true,
+        project_key_hash: generateProjectKeyHash(),
+        is_active: payload.is_active ?? true,
     };
 
     return projectRepository.createProject(projectToCreate);
@@ -50,24 +47,15 @@ export async function updateProject(payload) {
         throw new Error('Project id is required for update');
     }
 
-    // Optionally pick allowed updatable fields to avoid accidental writes
-    const {
-        name,
-        description,
-        owner_id,
-        updated_by,
-        // add other updatable fields here
-    } = payload;
+    const { code, name, is_active, updated_by } = payload;
 
     const updatePayload = {
+        ...(code !== undefined && { code }),
         ...(name !== undefined && { name }),
-        ...(description !== undefined && { description }),
-        ...(owner_id !== undefined && { owner_id }),
+        ...(is_active !== undefined && { is_active }),
         ...(updated_by !== undefined && { updated_by }),
-        // include other fields as needed
     };
 
-    // If no updatable fields present, return early or throw
     if (Object.keys(updatePayload).length === 0) {
         throw new Error('No updatable fields provided');
     }

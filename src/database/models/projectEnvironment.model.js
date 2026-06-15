@@ -5,9 +5,8 @@ export default function ProjectEnvironmentModel(sequelize) {
         'ProjectEnvironment',
         {
             id: {
-                type: DataTypes.BIGINT,
+                type: DataTypes.TEXT,
                 primaryKey: true,
-                autoIncrement: true,
             },
 
             project_id: {

@@ -22,10 +22,11 @@ import {
 
 
 //NEW RESTRUCTURED
-import authRoutes from './src/modules/auth/auth.routes.js';
-import userRoutes from './src/modules/user/user.routes.js';
-import projectRoutes from './src/modules/project/project.routes.js';
-import projectUserRoutes from './src/modules/projectUser/projectUser.routes.js';
+import authRoutes from './src/modules/auth/auth.route.js';
+import userRoutes from './src/modules/user/user.route.js';
+import projectRoutes from './src/modules/project/project.route.js';
+import projectUserRoutes from './src/modules/projectUser/projectUser.route.js';
+import toolRoutes from './src/modules/tool/tool.route.js';
 //END OF NEW RESTRUCTURED
 
 import { db } from "./src/database/db.js";
@@ -70,6 +71,11 @@ app.use(
 app.use(
     '/api/project_user',
     projectUserRoutes
+);
+
+app.use(
+    '/api/tool',
+    toolRoutes
 );
 //END OF NEW ROUTES
 
