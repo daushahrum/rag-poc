@@ -3,6 +3,8 @@
 import bcrypt from 'bcrypt';
 
 import * as userRepository from './user.repository.js';
+import * as projectUserRepository from '../projectUser/projectUser.repository.js';
+import * as projectRepository from '../project/project.repository.js';
 
 export async function createUser(payload) {
     const {
@@ -32,11 +34,29 @@ export async function createUser(payload) {
     // hash password
     const hash = await bcrypt.hash(password, 10);
 
-    return userRepository.createUser({
+    const project = await projectRepository.getProjectById(
+        payload.project_id
+    );
+
+    if (!project) {
+        throw new Error('Project not found');
+    }
+
+    const user = await userRepository.createUser({
         ...payload,
         password: hash,
         active: true,
     });
+
+    await projectUserRepository.createProjectUser({
+        id: `${project.code}_${payload.id}`,
+        project_id: payload.project_id,
+        external_user_id: payload.id,
+        name: payload.name,
+        user_type: 'portal',
+    });
+
+    return user;
 }
 export async function deleteUser(id) {
     return userRepository.deleteUser(id);

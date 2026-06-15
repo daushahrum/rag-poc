@@ -25,6 +25,7 @@ import {
 import authRoutes from './src/modules/auth/auth.routes.js';
 import userRoutes from './src/modules/user/user.routes.js';
 import projectRoutes from './src/modules/project/project.routes.js';
+import projectUserRoutes from './src/modules/projectUser/projectUser.routes.js';
 //END OF NEW RESTRUCTURED
 
 import { db } from "./src/database/db.js";
@@ -64,6 +65,11 @@ app.use(
 app.use(
     '/api/project',
     projectRoutes
+);
+
+app.use(
+    '/api/project_user',
+    projectUserRoutes
 );
 //END OF NEW ROUTES
 

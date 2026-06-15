@@ -7,6 +7,7 @@ import KnowledgeDocumentsModel from './knowledgeDocuments.model.js';
 import DocumentChunksModel from './documentChunks.model.js';
 import ChatMessagesModel from './chatMessages.model.js';
 import ChatSessionsModel from './chatSessions.model.js';
+import ProjectUserModel from './projectUser.model.js';
 
 export function initModels(sequelize) {
     const models = {
@@ -18,6 +19,7 @@ export function initModels(sequelize) {
         DocumentChunks: DocumentChunksModel(sequelize),
         ChatSessions: ChatSessionsModel(sequelize),
         ChatMessages: ChatMessagesModel(sequelize),
+        ProjectUser: ProjectUserModel(sequelize),
     };
 
     Object.values(models).forEach((m) => {
