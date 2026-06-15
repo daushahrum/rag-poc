@@ -108,3 +108,10 @@ export async function getToolById(id) {
     }
     return toolRepository.getToolById(id);
 }
+
+export async function getProjectTools(project_id) {
+    if (!project_id) {
+        throw new Error('Project ID is required');
+    }
+    return toolRepository.getProjectTools(project_id);
+}

@@ -29,6 +29,14 @@ export async function getToolById(id) {
     return Tool.findByPk(id);
 }
 
+export async function getProjectTools(project_id) {
+    return Tool.findAll({
+        where : {
+            project_id : project_id
+        }
+    });
+}
+
 export async function getTools(filters = {}) {
     const where = {};
 

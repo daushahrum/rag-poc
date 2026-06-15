@@ -3,6 +3,7 @@
 import { Router } from 'express';
 import * as projectController from './project.controller.js';
 import * as projectEnvironmentController from '../projectEnvironment/projectEnvironment.controller.js';
+import * as toolController from '../tool/tool.controller.js';
 
 import * as auth from '../../middleware/authenticate.js'
 
@@ -44,6 +45,12 @@ router.get(
     projectEnvironmentController.getProjectEnvironments
 );
 
+
+router.get(
+    '/tools/:project_id',
+    auth.authenticate,
+    toolController.getProjectTool
+);
 
 router.get(
     '/:id',

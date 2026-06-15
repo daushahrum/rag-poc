@@ -31,9 +31,8 @@ export default function DocumentChunksModel(sequelize) {
         },
       },
       content: { type: DataTypes.TEXT, allowNull: false },
-      embedding: { type: new VECTOR(1536), allowNull: true }, // ← now VECTOR is defined
+      embedding: { type: new VECTOR(1536), allowNull: true },
       chunk_index: { type: DataTypes.INTEGER, allowNull: false },
-      project_id: { type: DataTypes.BIGINT, allowNull: true },
     },
     {
       tableName: 'document_chunks',

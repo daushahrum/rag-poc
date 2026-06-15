@@ -76,3 +76,15 @@ export async function getTool(req, res) {
         });
     }
 }
+
+export async function getProjectTool(req, res) {
+    try {
+        const tool = await toolService.getProjectTools(req.params.project_id);
+
+        return res.json(tool);
+    } catch (error) {
+        return res.status(400).json({
+            message: error.message,
+        });
+    }
+}
