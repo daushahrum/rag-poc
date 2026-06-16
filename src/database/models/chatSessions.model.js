@@ -8,7 +8,8 @@ export default function ChatSessionsModel(sequelize) {
             created_at: { type: DataTypes.DATE, allowNull: true, defaultValue: DataTypes.NOW },
             topic: { type: DataTypes.TEXT, allowNull: true },
             project_id: { type: DataTypes.BIGINT, allowNull: true },
-            environment_id:  { type: DataTypes.TEXT, allowNull: true }
+            environment_id:  { type: DataTypes.TEXT, allowNull: true },
+            project_user_id:  { type: DataTypes.TEXT, allowNull: true },
         },
         {
             tableName: 'chat_sessions',
