@@ -29,6 +29,7 @@ import projectUserRoutes from './src/modules/projectUser/projectUser.route.js';
 import toolRoutes from './src/modules/tool/tool.route.js';
 import documentChunkRoutes from './src/modules/documentChunk/documentChunk.route.js';
 import knowledgeDocumentRoutes from './src/modules/knowledgeDocument/knowledgeDocument.route.js';
+import ragRoutes from './src/modules/rag/rag.route.js';
 //END OF NEW RESTRUCTURED
 
 import { db } from "./src/database/db.js";
@@ -62,6 +63,7 @@ app.use('/api/project_user',projectUserRoutes );
 app.use('/api/tool',toolRoutes );
 app.use('/api/documentChunk', documentChunkRoutes );
 app.use('/api/knowledge_document', knowledgeDocumentRoutes );
+app.use('/api/rag', ragRoutes );
 //END OF NEW ROUTES
 
 // app.use("/projects", projectRoutes);

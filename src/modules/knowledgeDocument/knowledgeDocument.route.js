@@ -32,6 +32,13 @@ router.get(
 );
 
 router.get(
+    '/project/:project_id',
+    auth.authenticate,
+    knowledgeDocumentController.getKnowledgeDocumentByProjectId
+);
+
+
+router.get(
     '/:id',
     auth.authenticate,
     knowledgeDocumentController.getKnowledgeDocument

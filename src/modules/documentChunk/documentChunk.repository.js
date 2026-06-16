@@ -1,15 +1,17 @@
 // modules/documentChunk/documentChunk.repository.js
 
+import { where } from 'sequelize';
+import { sequelize } from '../../database/db.js';
 import { models } from '../../database/db.js';
 
-const { DocumentChunk } = models;
+const { DocumentChunks } = models;
 
 export async function createDocumentChunk(payload) {
-    return DocumentChunk.create(payload);
+    return DocumentChunks.create(payload);
 }
 
 export async function updateDocumentChunk(id, payload) {
-    const [affectedRows] = await DocumentChunk.update(
+    const [affectedRows] = await DocumentChunks.update(
         payload,
         {
             where: { id },
@@ -20,13 +22,21 @@ export async function updateDocumentChunk(id, payload) {
 }
 
 export async function deleteDocumentChunk(id) {
-    return DocumentChunk.destroy({
+    return DocumentChunks.destroy({
         where: { id },
     });
 }
 
 export async function getDocumentChunkById(id) {
-    return DocumentChunk.findByPk(id);
+    return DocumentChunks.findByPk(id);
+}
+
+export async function getDocumentChunkByDocumentId(id) {
+    return DocumentChunks.findAll({
+        where : {
+            document_id : id
+        }
+    });
 }
 
 export async function getDocumentChunks(filters = {}) {
@@ -40,8 +50,36 @@ export async function getDocumentChunks(filters = {}) {
         where.project_id = filters.project_id;
     }
 
-    return DocumentChunk.findAll({
+    return DocumentChunks.findAll({
         where,
         order: [['chunk_index', 'ASC']],
     });
+}
+
+// documentChunk.repository.js
+export async function similaritySearch(embedding, project_id, limit = 5) {
+    const vector = `[${embedding.join(',')}]`;
+
+    const results = await sequelize.query(
+        `
+        SELECT
+            dc.id,
+            dc.document_id,
+            dc.content,
+            dc.chunk_index,
+            1 - (dc.embedding <=> :embedding::vector) AS similarity
+        FROM document_chunks dc
+        INNER JOIN knowledge_documents kd ON kd.id = dc.document_id
+        WHERE kd.project_id = :project_id
+          AND dc.embedding IS NOT NULL
+        ORDER BY dc.embedding <=> :embedding::vector
+        LIMIT :limit
+        `,
+        {
+            replacements: { embedding: vector, project_id, limit },
+            type: sequelize.QueryTypes.SELECT,
+        }
+    );
+
+    return results;
 }

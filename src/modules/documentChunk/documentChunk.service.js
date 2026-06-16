@@ -1,5 +1,6 @@
 // modules/documentChunk/documentChunk.service.js
 
+import { embedText } from '../../../lib/embedder.js';
 import * as documentChunkRepository from './documentChunk.repository.js';
 
 export async function createDocumentChunk(payload) {
@@ -74,4 +75,39 @@ export async function getDocumentChunkById(id) {
         throw new Error('Document chunk id is required');
     }
     return documentChunkRepository.getDocumentChunkById(id);
+}
+
+export async function getDocumentChunkByDocumentId(id) {
+    if (!id) {
+        throw new Error('Document id is required');
+    }
+    return documentChunkRepository.getDocumentChunkByDocumentId(id);
+}
+
+
+export async function chunkDocument(document_id, content, project_id) {
+    const chunks = splitIntoChunks(content);
+
+    for (const [index, chunkText] of chunks.entries()) {
+        const embedding = await embedText(chunkText);
+
+        await documentChunkRepository.createDocumentChunk({
+            document_id,
+            project_id,
+            content: chunkText,
+            embedding,
+            chunk_index: index,
+        });
+    }
+}
+
+function splitIntoChunks(text, chunkSize = 500) {
+    const words = text.split(/\s+/);
+    const chunks = [];
+
+    for (let i = 0; i < words.length; i += chunkSize) {
+        chunks.push(words.slice(i, i + chunkSize).join(' '));
+    }
+
+    return chunks;
 }

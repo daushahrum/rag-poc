@@ -1,6 +1,7 @@
 // modules/knowledgeDocument/knowledgeDocument.controller.js
 
 import * as knowledgeDocumentService from './knowledgeDocument.service.js';
+import * as documentChunkService from '../documentChunk/documentChunk.service.js';
 
 export async function createKnowledgeDocument(req, res) {
     try {
@@ -58,6 +59,35 @@ export async function listKnowledgeDocument(req, res) {
         const knowledgeDocuments = await knowledgeDocumentService.getKnowledgeDocuments(req.query);
 
         return res.json(knowledgeDocuments);
+    } catch (error) {
+        return res.status(400).json({
+            message: error.message,
+        });
+    }
+}
+
+export async function getKnowledgeDocumentByProjectId(req, res) {
+    try {
+        const documents =
+            await knowledgeDocumentService.getKnowledgeDocumentByProjectId(
+                req.params.project_id
+            );
+
+        const result = await Promise.all(
+            documents.map(async (document) => {
+                const chunks =
+                    await documentChunkService.getDocumentChunkByDocumentId(
+                        document.id
+                    );
+
+                return {
+                    ...document.toJSON(),
+                    chunks,
+                };
+            })
+        );
+
+        return res.json(result);
     } catch (error) {
         return res.status(400).json({
             message: error.message,

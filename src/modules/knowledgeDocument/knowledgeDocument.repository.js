@@ -2,14 +2,14 @@
 
 import { models } from '../../database/db.js';
 
-const { KnowledgeDocument } = models;
+const { KnowledgeDocuments } = models;
 
 export async function createKnowledgeDocument(payload) {
-    return KnowledgeDocument.create(payload);
+    return KnowledgeDocuments.create(payload);
 }
 
 export async function updateKnowledgeDocument(id, payload) {
-    const [affectedRows] = await KnowledgeDocument.update(
+    const [affectedRows] = await KnowledgeDocuments.update(
         payload,
         {
             where: { id },
@@ -19,14 +19,22 @@ export async function updateKnowledgeDocument(id, payload) {
     return affectedRows;
 }
 
-export async function deleteKnowledgeDocument(id) {
-    return KnowledgeDocument.destroy({
+export async function deletes(id) {
+    return KnowledgeDocuments.destroy({
         where: { id },
     });
 }
 
 export async function getKnowledgeDocumentById(id) {
-    return KnowledgeDocument.findByPk(id);
+    return KnowledgeDocuments.findByPk(id);
+}
+
+export async function getKnowledgeDocumentByProjectId(project_id) {
+    return KnowledgeDocuments.findAll({
+        where : {
+            project_id : project_id
+        }
+    });
 }
 
 export async function getKnowledgeDocuments(filters = {}) {
@@ -36,5 +44,5 @@ export async function getKnowledgeDocuments(filters = {}) {
         where.project_id = filters.project_id;
     }
 
-    return KnowledgeDocument.findAll({ where });
+    return KnowledgeDocuments.findAll({ where });
 }

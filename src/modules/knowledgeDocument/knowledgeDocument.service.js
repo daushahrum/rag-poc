@@ -1,13 +1,14 @@
 // modules/knowledgeDocument/knowledgeDocument.service.js
 
 import * as knowledgeDocumentRepository from './knowledgeDocument.repository.js';
+import * as documentChunkService from '../documentChunk/documentChunk.service.js';
 
 export async function createKnowledgeDocument(payload) {
     if (!payload || typeof payload !== 'object') {
         throw new Error('Knowledge document payload is required');
     }
 
-    const { title, project_id } = payload;
+    const { title, project_id, content } = payload;
 
     if (!title) {
         throw new Error('Knowledge document title is required');
@@ -17,11 +18,16 @@ export async function createKnowledgeDocument(payload) {
         throw new Error('Knowledge document project_id is required');
     }
 
-    const knowledgeDocumentToCreate = {
-        ...payload,
-    };
+    if (!content) {
+        throw new Error('Knowledge document content is required');
+    }
+    const { content: _, ...knowledgeDocumentToCreate } = payload;
 
-    return knowledgeDocumentRepository.createKnowledgeDocument(knowledgeDocumentToCreate);
+    const document = await knowledgeDocumentRepository.createKnowledgeDocument(knowledgeDocumentToCreate);
+
+    await documentChunkService.chunkDocument(document.id, content, project_id);
+
+    return document;
 }
 
 export async function deleteKnowledgeDocument(id) {
@@ -58,6 +64,14 @@ export async function updateKnowledgeDocument(payload) {
 export async function getKnowledgeDocuments(filters = {}) {
     return knowledgeDocumentRepository.getKnowledgeDocuments(filters);
 }
+
+export async function getKnowledgeDocumentByProjectId(project_id) {
+    if (!project_id) {
+        throw new Error('Project id is required');
+    }
+    return knowledgeDocumentRepository.getKnowledgeDocumentByProjectId(project_id);
+}
+
 
 export async function getKnowledgeDocumentById(id) {
     if (!id) {

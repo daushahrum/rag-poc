@@ -1,22 +1,7 @@
 import { DataTypes } from 'sequelize';
-
-function registerVectorType(sequelize) {
-  if (!sequelize.constructor.DataTypes.VECTOR) {
-    sequelize.constructor.DataTypes.VECTOR = class VECTOR extends DataTypes.ABSTRACT {
-      constructor(dimensions) {
-        super();
-        this._dimensions = dimensions;
-      }
-      toSql() {
-        return this._dimensions ? `vector(${this._dimensions})` : 'vector';
-      }
-    };
-  }
-  return sequelize.constructor.DataTypes.VECTOR;
-}
+import 'pgvector/sequelize';
 
 export default function DocumentChunksModel(sequelize) {
-  const VECTOR = registerVectorType(sequelize); // ← call it first, get the type back
 
   return sequelize.define(
     'DocumentChunks',
@@ -31,7 +16,10 @@ export default function DocumentChunksModel(sequelize) {
         },
       },
       content: { type: DataTypes.TEXT, allowNull: false },
-      embedding: { type: new VECTOR(1536), allowNull: true },
+      embedding: {
+        type: DataTypes.VECTOR(1536),
+        allowNull: true,
+      },
       chunk_index: { type: DataTypes.INTEGER, allowNull: false },
     },
     {
