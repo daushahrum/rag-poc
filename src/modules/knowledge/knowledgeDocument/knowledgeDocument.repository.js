@@ -1,6 +1,6 @@
 // modules/knowledgeDocument/knowledgeDocument.repository.js
 
-import { models } from '../../database/db.js';
+import { models } from '../../../database/db.js';
 
 const { KnowledgeDocuments } = models;
 

@@ -3,7 +3,7 @@
 import { Router } from 'express';
 import * as knowledgeDocumentController from './knowledgeDocument.controller.js';
 
-import * as auth from '../../middleware/authenticate.js';
+import * as auth from '../../../middleware/authenticate.js';
 
 const router = Router();
 

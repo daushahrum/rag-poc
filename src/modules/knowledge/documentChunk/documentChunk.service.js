@@ -1,6 +1,6 @@
 // modules/documentChunk/documentChunk.service.js
 
-import { embedText } from '../../../lib/embedder.js';
+import { embedText } from '../../../../lib/embedder.js';
 import * as documentChunkRepository from './documentChunk.repository.js';
 
 export async function createDocumentChunk(payload) {

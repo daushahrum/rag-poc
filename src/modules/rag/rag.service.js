@@ -1,7 +1,7 @@
 // modules/rag/rag.service.js
 
 import { embedText } from '../../../lib/embedder.js';
-import * as documentChunkRepository from '../documentChunk/documentChunk.repository.js';
+import * as documentChunkRepository from '../knowledge/documentChunk/documentChunk.repository.js';
 
 export async function retrieve(query, project_id, limit = 5) {
     if (!query) {

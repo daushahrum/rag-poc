@@ -27,8 +27,8 @@ import userRoutes from './src/modules/user/user.route.js';
 import projectRoutes from './src/modules/project/project.route.js';
 import projectUserRoutes from './src/modules/projectUser/projectUser.route.js';
 import toolRoutes from './src/modules/tool/tool.route.js';
-import documentChunkRoutes from './src/modules/documentChunk/documentChunk.route.js';
-import knowledgeDocumentRoutes from './src/modules/knowledgeDocument/knowledgeDocument.route.js';
+import documentChunkRoutes from './src/modules/knowledge/documentChunk/documentChunk.route.js';
+import knowledgeDocumentRoutes from './src/modules/knowledge/knowledgeDocument/knowledgeDocument.route.js';
 import ragRoutes from './src/modules/rag/rag.route.js';
 //END OF NEW RESTRUCTURED
 

@@ -1,8 +1,8 @@
 // modules/documentChunk/documentChunk.repository.js
 
 import { where } from 'sequelize';
-import { sequelize } from '../../database/db.js';
-import { models } from '../../database/db.js';
+import { sequelize } from '../../../database/db.js';
+import { models } from '../../../database/db.js';
 
 const { DocumentChunks } = models;
 
