@@ -2,14 +2,14 @@
 
 import { models } from '../../../database/db.js';
 
-const { ChatSession } = models;
+const { ChatSessions } = models;
 
 export async function createChatSession(payload) {
-    return ChatSession.create(payload);
+    return ChatSessions.create(payload);
 }
 
 export async function updateChatSession(id, payload) {
-    const [affectedRows] = await ChatSession.update(
+    const [affectedRows] = await ChatSessions.update(
         payload,
         {
             where: { id },
@@ -20,13 +20,13 @@ export async function updateChatSession(id, payload) {
 }
 
 export async function deleteChatSession(id) {
-    return ChatSession.destroy({
+    return ChatSessions.destroy({
         where: { id },
     });
 }
 
 export async function getChatSessionById(id) {
-    return ChatSession.findByPk(id);
+    return ChatSessions.findByPk(id);
 }
 
 export async function getChatSessions(filters = {}) {
@@ -44,7 +44,7 @@ export async function getChatSessions(filters = {}) {
         where.project_user_id = filters.project_user_id;
     }
 
-    return ChatSession.findAll({
+    return ChatSessions.findAll({
         where,
         order: [['created_at', 'DESC']],
     });

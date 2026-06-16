@@ -50,3 +50,9 @@ export async function getTools(filters = {}) {
 
     return Tool.findAll({ where });
 }
+
+export async function getToolByName(tool_name, project_id) {
+    return Tool.findOne({
+        where: { tool_name, project_id, is_enabled: true },
+    });
+}

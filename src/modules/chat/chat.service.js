@@ -9,7 +9,7 @@ import * as chatMessageService from './chatMessages/chatMessage.service.js';
 import * as toolRepository from '../tool/tool.repository.js';
 import * as projectEnvironmentRepository from '../project/projectEnvironment/projectEnvironment.repository.js';
 
-export async function sendMessage(session_id, message) {
+export async function sendMessage(session_id, message, userToken = null) {
     if (!session_id) {
         throw new Error('session_id is required');
     }
@@ -27,20 +27,31 @@ export async function sendMessage(session_id, message) {
 
     const { project_id, environment_id } = session;
 
-    // 2. Save the user's message
+    // 2. Check if this is the first message in the session (before saving it)
+    const existingMessages = await chatMessageRepository.getChatMessages({ session_id });
+    const isFirstMessage = existingMessages.length === 0;
+
+    // 3. Save the user's message
     await chatMessageService.createChatMessage({
         session_id,
         role: 'user',
         content: message,
     });
 
-    // 3. Load conversation history for this session
+    // 4. Auto-generate topic from the first message (fire-and-forget, doesn't block the response)
+    if (isFirstMessage && !session.topic) {
+        generateAndSaveTopic(session_id, message).catch((err) => {
+            console.error('Failed to generate chat topic:', err.message);
+        });
+    }
+
+    // 5. Load conversation history for this session
     const history = await chatMessageRepository.getChatMessages({ session_id });
 
-    // 4. Retrieve RAG context relevant to this message
+    // 6. Retrieve RAG context relevant to this message
     const { context } = await buildContext(message, project_id);
 
-    // 5. Load available tools for this project (for the schema description in system prompt)
+    // 7. Load available tools for this project (for the schema description in system prompt)
     const availableTools = await toolRepository.getTools({ project_id, is_enabled: true });
 
     const toolCatalog = availableTools.map((t) => ({
@@ -53,19 +64,19 @@ export async function sendMessage(session_id, message) {
         body_schema: t.body_schema,
     }));
 
-    // 6. Build system prompt
+    // 8. Build system prompt
     const systemPrompt = buildSystemPrompt(context, toolCatalog);
 
-    // 7. Build message list for OpenAI
+    // 9. Build message list for OpenAI
     const messages = [
         { role: 'system', content: systemPrompt },
         ...history.map((m) => ({ role: m.role, content: m.content })),
     ];
 
-    // 8. First completion call
+    // 10. First completion call
     let assistantMessage = await chatCompletion(messages);
 
-    // 9. Handle tool calls if present
+    // 11. Handle tool calls if present
     if (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0) {
         messages.push(assistantMessage);
 
@@ -75,7 +86,8 @@ export async function sendMessage(session_id, message) {
             const toolResult = await executeBackendTool(
                 args,
                 project_id,
-                environment_id
+                environment_id,
+                userToken
             );
 
             messages.push({
@@ -85,11 +97,11 @@ export async function sendMessage(session_id, message) {
             });
         }
 
-        // 10. Second completion call with tool results injected
+        // 12. Second completion call with tool results injected
         assistantMessage = await chatCompletion(messages);
     }
 
-    // 11. Save assistant's final response
+    // 13. Save assistant's final response
     const savedMessage = await chatMessageService.createChatMessage({
         session_id,
         role: 'assistant',
@@ -97,6 +109,23 @@ export async function sendMessage(session_id, message) {
     });
 
     return savedMessage;
+}
+
+async function generateAndSaveTopic(session_id, firstMessage) {
+    const topicMessages = [
+        {
+            role: 'system',
+            content: 'Generate a short topic title (max 6 words) summarizing this user message. Respond with only the title text, no quotes or punctuation at the end.',
+        },
+        { role: 'user', content: firstMessage },
+    ];
+
+    const response = await chatCompletion(topicMessages);
+    const topic = response.content?.trim();
+
+    if (topic) {
+        await chatSessionRepository.updateChatSession(session_id, { topic });
+    }
 }
 
 function buildSystemPrompt(context, toolCatalog) {
@@ -115,7 +144,7 @@ ${JSON.stringify(toolCatalog, null, 2)}
 `;
 }
 
-async function executeBackendTool(args, project_id, environment_id) {
+async function executeBackendTool(args, project_id, environment_id, userToken) {
     const { action, payload } = args;
 
     const tool = await toolRepository.getToolByName(action, project_id);
@@ -140,10 +169,17 @@ async function executeBackendTool(args, project_id, environment_id) {
 
     const url = `${environment.base_url}${path}`;
 
+    // If the caller passed their own token (external user), forward it so Liniq
+    // applies that user's actual role-based permissions. Otherwise fall back to
+    // the environment's configured service credential (e.g. for portal admins).
+    const headers = userToken
+        ? { 'Content-Type': 'application/json', Authorization: userToken }
+        : buildAuthHeaders(environment);
+
     try {
         const response = await fetch(url, {
             method: tool.method || 'GET',
-            headers: buildAuthHeaders(environment),
+            headers,
             body: tool.method !== 'GET' ? JSON.stringify(payload) : undefined,
         });
 

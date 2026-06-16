@@ -2,20 +2,20 @@
 
 import { models } from '../../../database/db.js';
 
-const { ChatMessage } = models;
+const { ChatMessages } = models;
 
 export async function createChatMessage(payload) {
-    return ChatMessage.create(payload);
+    return ChatMessages.create(payload);
 }
 
 export async function deleteChatMessage(id) {
-    return ChatMessage.destroy({
+    return ChatMessages.destroy({
         where: { id },
     });
 }
 
 export async function getChatMessageById(id) {
-    return ChatMessage.findByPk(id);
+    return ChatMessages.findByPk(id);
 }
 
 export async function getChatMessages(filters = {}) {
@@ -29,7 +29,7 @@ export async function getChatMessages(filters = {}) {
         where.role = filters.role;
     }
 
-    return ChatMessage.findAll({
+    return ChatMessages.findAll({
         where,
         order: [['created_at', 'ASC']],
     });

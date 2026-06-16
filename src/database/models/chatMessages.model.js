@@ -15,8 +15,7 @@ export default function ChatMessagesModel(sequelize) {
             },
             role: { type: DataTypes.TEXT, allowNull: false },
             content: { type: DataTypes.TEXT, allowNull: false },
-            created_at: { type: DataTypes.DATE, allowNull: true, defaultValue: DataTypes.NOW },
-            project_id: { type: DataTypes.BIGINT, allowNull: true },
+            created_at: { type: DataTypes.DATE, allowNull: true, defaultValue: DataTypes.NOW }
         },
         {
             tableName: 'chat_messages',
