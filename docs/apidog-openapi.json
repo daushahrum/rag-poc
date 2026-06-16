@@ -1,0 +1,251 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "RAG POC Module API",
+    "version": "1.0.0"
+  },
+  "servers": [
+    { "url": "http://localhost:3000" }
+  ],
+  "tags": [
+    { "name": "Auth" },
+    { "name": "Users" },
+    { "name": "Projects" },
+    { "name": "Project Environments" },
+    { "name": "Project Users" },
+    { "name": "Chat Sessions" },
+    { "name": "Chat Messages" },
+    { "name": "Tools" },
+    { "name": "Knowledge Documents" },
+    { "name": "Document Chunks" },
+    { "name": "RAG" }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": { "message": { "type": "string" } }
+      },
+      "IdBody": {
+        "type": "object",
+        "required": ["id"],
+        "properties": { "id": { "type": "string" } }
+      },
+      "StatusMessage": {
+        "type": "object",
+        "properties": { "message": { "type": "string" } }
+      },
+      "LoginRequest": {
+        "type": "object",
+        "required": ["id", "password"],
+        "properties": {
+          "id": { "type": "string" },
+          "password": { "type": "string", "format": "password" }
+        }
+      },
+      "ChangePasswordRequest": {
+        "type": "object",
+        "required": ["id", "old_password", "new_password"],
+        "properties": {
+          "id": { "type": "string" },
+          "old_password": { "type": "string", "format": "password" },
+          "new_password": { "type": "string", "format": "password" }
+        }
+      },
+      "User": {
+        "type": "object",
+        "required": ["id", "password", "role", "name", "email", "mobile", "project_id"],
+        "properties": {
+          "id": { "type": "string" },
+          "password": { "type": "string", "format": "password" },
+          "role": { "type": "string" },
+          "name": { "type": "string" },
+          "email": { "type": "string", "format": "email" },
+          "mobile": { "type": "string" },
+          "project_id": { "type": "string" },
+          "active": { "type": "boolean" },
+          "is_developer": { "type": "boolean" }
+        }
+      },
+      "Project": {
+        "type": "object",
+        "required": ["code", "name"],
+        "properties": {
+          "id": { "type": "integer", "format": "int64", "readOnly": true },
+          "code": { "type": "string" },
+          "name": { "type": "string" },
+          "is_active": { "type": "boolean" },
+          "project_key_hash": { "type": "string", "readOnly": true }
+        }
+      },
+      "ProjectEnvironment": {
+        "type": "object",
+        "required": ["project_id", "environment", "base_url"],
+        "properties": {
+          "id": { "type": "string" },
+          "project_id": { "type": "integer", "format": "int64" },
+          "environment": { "type": "string" },
+          "base_url": { "type": "string" },
+          "auth_type": { "type": "string", "default": "none" },
+          "auth_config": { "type": "object", "additionalProperties": true },
+          "is_active": { "type": "boolean" }
+        }
+      },
+      "ProjectUser": {
+        "type": "object",
+        "required": ["project_id", "external_user_id"],
+        "properties": {
+          "id": { "type": "string" },
+          "project_id": { "type": "integer", "format": "int64" },
+          "external_user_id": { "type": "string" },
+          "name": { "type": "string" },
+          "user_type": { "type": "string", "default": "external" }
+        }
+      },
+      "ChatSession": {
+        "type": "object",
+        "required": ["project_id", "environment_id"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid", "readOnly": true },
+          "project_id": { "type": "integer", "format": "int64" },
+          "environment_id": { "type": "string" },
+          "topic": { "type": "string" },
+          "created_at": { "type": "string", "format": "date-time", "readOnly": true }
+        }
+      },
+      "ChatMessage": {
+        "type": "object",
+        "required": ["session_id", "role", "content"],
+        "properties": {
+          "id": { "type": "integer", "format": "int64", "readOnly": true },
+          "session_id": { "type": "string", "format": "uuid" },
+          "role": { "type": "string", "enum": ["user", "assistant", "system"] },
+          "content": { "type": "string" },
+          "project_id": { "type": "integer", "format": "int64" },
+          "created_at": { "type": "string", "format": "date-time", "readOnly": true }
+        }
+      },
+      "Tool": {
+        "type": "object",
+        "required": ["project_id", "tool_name", "endpoint"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid", "readOnly": true },
+          "project_id": { "type": "integer", "format": "int64" },
+          "tool_name": { "type": "string" },
+          "description": { "type": "string" },
+          "endpoint": { "type": "string" },
+          "method": { "type": "string", "default": "GET" },
+          "path_params": { "type": "object", "additionalProperties": true },
+          "query_params": { "type": "object", "additionalProperties": true },
+          "body_schema": { "type": "object", "additionalProperties": true },
+          "example_payload": { "type": "object", "additionalProperties": true },
+          "response_schema": { "type": "object", "additionalProperties": true },
+          "version": { "type": "string", "default": "1.0.0" },
+          "is_enabled": { "type": "boolean" }
+        }
+      },
+      "KnowledgeDocument": {
+        "type": "object",
+        "required": ["title", "project_id"],
+        "properties": {
+          "id": { "type": "integer", "format": "int64", "readOnly": true },
+          "title": { "type": "string" },
+          "project_id": { "type": "integer", "format": "int64" },
+          "content": { "type": "string", "writeOnly": true },
+          "chunks": { "type": "array", "items": { "$ref": "#/components/schemas/DocumentChunk" } }
+        }
+      },
+      "DocumentChunk": {
+        "type": "object",
+        "required": ["document_id", "content", "chunk_index", "project_id"],
+        "properties": {
+          "id": { "type": "integer", "format": "int64", "readOnly": true },
+          "document_id": { "type": "integer", "format": "int64" },
+          "project_id": { "type": "integer", "format": "int64" },
+          "content": { "type": "string" },
+          "embedding": { "type": "array", "items": { "type": "number" } },
+          "chunk_index": { "type": "integer" },
+          "similarity": { "type": "number", "readOnly": true }
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Bad request",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "Unauthorized": {
+        "description": "Unauthorized",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      }
+    }
+  },
+  "security": [{ "bearerAuth": [] }],
+  "paths": {
+    "/api/auth/login": { "post": { "tags": ["Auth"], "security": [], "summary": "Login", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LoginRequest" } } } }, "responses": { "200": { "description": "OK" }, "401": { "$ref": "#/components/responses/Unauthorized" } } } },
+    "/api/auth/change-password": { "post": { "tags": ["Auth"], "summary": "Change password", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ChangePasswordRequest" } } } }, "responses": { "200": { "description": "OK" }, "401": { "$ref": "#/components/responses/Unauthorized" } } } },
+
+    "/api/user/create": { "post": { "tags": ["Users"], "summary": "Create user", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/User" } } } }, "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+    "/api/user/update": { "post": { "tags": ["Users"], "summary": "Update user", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/User" } } } }, "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+    "/api/user/delete": { "post": { "tags": ["Users"], "summary": "Delete user", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/IdBody" } } } }, "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+    "/api/user/list": { "get": { "tags": ["Users"], "summary": "List users", "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+    "/api/user/{id}": { "get": { "tags": ["Users"], "summary": "Get user", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }], "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+
+    "/api/project/create": { "post": { "tags": ["Projects"], "summary": "Create project", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Project" } } } }, "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+    "/api/project/update": { "post": { "tags": ["Projects"], "summary": "Update project", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Project" } } } }, "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+    "/api/project/delete": { "post": { "tags": ["Projects"], "summary": "Delete project", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/IdBody" } } } }, "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+    "/api/project/list": { "get": { "tags": ["Projects"], "summary": "List projects", "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+    "/api/project/{id}": { "get": { "tags": ["Projects"], "summary": "Get project", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }], "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+    "/api/project/create_environment": { "post": { "tags": ["Project Environments"], "summary": "Create project environment legacy route", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProjectEnvironment" } } } }, "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+    "/api/project/environment_list/{project_id}": { "get": { "tags": ["Project Environments"], "summary": "List environments by project legacy route", "parameters": [{ "name": "project_id", "in": "path", "required": true, "schema": { "type": "integer" } }], "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+    "/api/project/tools/{project_id}": { "get": { "tags": ["Tools"], "summary": "List tools by project", "parameters": [{ "name": "project_id", "in": "path", "required": true, "schema": { "type": "integer" } }], "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+
+    "/api/project/environments/create": { "post": { "tags": ["Project Environments"], "summary": "Create project environment", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProjectEnvironment" } } } }, "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+    "/api/project/environments/update": { "post": { "tags": ["Project Environments"], "summary": "Update project environment", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProjectEnvironment" } } } }, "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+    "/api/project/environments/delete": { "post": { "tags": ["Project Environments"], "summary": "Delete project environment", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/IdBody" } } } }, "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+    "/api/project/environments/list": { "get": { "tags": ["Project Environments"], "summary": "List project environments", "parameters": [{ "name": "project_id", "in": "query", "schema": { "type": "integer" } }, { "name": "environment", "in": "query", "schema": { "type": "string" } }, { "name": "is_active", "in": "query", "schema": { "type": "boolean" } }], "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+    "/api/project/environments/project/{project_id}": { "get": { "tags": ["Project Environments"], "summary": "List project environments by project", "parameters": [{ "name": "project_id", "in": "path", "required": true, "schema": { "type": "integer" } }], "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+    "/api/project/environments/{id}": { "get": { "tags": ["Project Environments"], "summary": "Get project environment", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }], "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+
+    "/api/project/users/create": { "post": { "tags": ["Project Users"], "summary": "Create project user", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProjectUser" } } } }, "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+    "/api/project/users/update": { "post": { "tags": ["Project Users"], "summary": "Update project user", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProjectUser" } } } }, "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+    "/api/project/users/delete": { "post": { "tags": ["Project Users"], "summary": "Delete project user", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/IdBody" } } } }, "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+    "/api/project/users/list": { "get": { "tags": ["Project Users"], "summary": "List project users", "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+    "/api/project/users/{id}": { "get": { "tags": ["Project Users"], "summary": "Get project user", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }], "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+
+    "/api/chat/sessions/create": { "post": { "tags": ["Chat Sessions"], "summary": "Create chat session", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ChatSession" } } } }, "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+    "/api/chat/sessions/delete": { "post": { "tags": ["Chat Sessions"], "summary": "Delete chat session", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/IdBody" } } } }, "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+    "/api/chat/sessions/list": { "get": { "tags": ["Chat Sessions"], "summary": "List chat sessions", "parameters": [{ "name": "project_id", "in": "query", "schema": { "type": "integer" } }, { "name": "environment_id", "in": "query", "schema": { "type": "string" } }, { "name": "project_user_id", "in": "query", "schema": { "type": "string" } }], "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+    "/api/chat/sessions/{id}": { "get": { "tags": ["Chat Sessions"], "summary": "Get chat session", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+
+    "/api/chat/messages/create": { "post": { "tags": ["Chat Messages"], "summary": "Create chat message", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ChatMessage" } } } }, "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+    "/api/chat/messages/delete": { "post": { "tags": ["Chat Messages"], "summary": "Delete chat message", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/IdBody" } } } }, "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+    "/api/chat/messages/list": { "get": { "tags": ["Chat Messages"], "summary": "List chat messages", "parameters": [{ "name": "session_id", "in": "query", "schema": { "type": "string", "format": "uuid" } }, { "name": "role", "in": "query", "schema": { "type": "string", "enum": ["user", "assistant", "system"] } }], "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+    "/api/chat/messages/{id}": { "get": { "tags": ["Chat Messages"], "summary": "Get chat message", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }], "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+
+    "/api/tool/create": { "post": { "tags": ["Tools"], "summary": "Create tool", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Tool" } } } }, "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+    "/api/tool/update": { "post": { "tags": ["Tools"], "summary": "Update tool", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Tool" } } } }, "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+    "/api/tool/delete": { "post": { "tags": ["Tools"], "summary": "Delete tool", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/IdBody" } } } }, "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+    "/api/tool/list": { "get": { "tags": ["Tools"], "summary": "List tools", "parameters": [{ "name": "project_id", "in": "query", "schema": { "type": "integer" } }, { "name": "is_enabled", "in": "query", "schema": { "type": "boolean" } }], "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+    "/api/tool/{id}": { "get": { "tags": ["Tools"], "summary": "Get tool", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+
+    "/api/knowledge_document/create": { "post": { "tags": ["Knowledge Documents"], "summary": "Create knowledge document and chunks", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/KnowledgeDocument" } } } }, "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+    "/api/knowledge_document/update": { "post": { "tags": ["Knowledge Documents"], "summary": "Update knowledge document", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/KnowledgeDocument" } } } }, "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+    "/api/knowledge_document/delete": { "post": { "tags": ["Knowledge Documents"], "summary": "Delete knowledge document", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/IdBody" } } } }, "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+    "/api/knowledge_document/list": { "get": { "tags": ["Knowledge Documents"], "summary": "List knowledge documents", "parameters": [{ "name": "project_id", "in": "query", "schema": { "type": "integer" } }], "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+    "/api/knowledge_document/project/{project_id}": { "get": { "tags": ["Knowledge Documents"], "summary": "List knowledge documents with chunks by project", "parameters": [{ "name": "project_id", "in": "path", "required": true, "schema": { "type": "integer" } }], "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+    "/api/knowledge_document/{id}": { "get": { "tags": ["Knowledge Documents"], "summary": "Get knowledge document", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }], "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+
+    "/api/documentChunk/create": { "post": { "tags": ["Document Chunks"], "summary": "Create document chunk", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DocumentChunk" } } } }, "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+    "/api/documentChunk/update": { "post": { "tags": ["Document Chunks"], "summary": "Update document chunk", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DocumentChunk" } } } }, "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+    "/api/documentChunk/delete": { "post": { "tags": ["Document Chunks"], "summary": "Delete document chunk", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/IdBody" } } } }, "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+    "/api/documentChunk/list": { "get": { "tags": ["Document Chunks"], "summary": "List document chunks", "parameters": [{ "name": "document_id", "in": "query", "schema": { "type": "integer" } }, { "name": "project_id", "in": "query", "schema": { "type": "integer" } }], "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+    "/api/documentChunk/{id}": { "get": { "tags": ["Document Chunks"], "summary": "Get document chunk", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }], "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+
+    "/api/rag/retrieve": { "get": { "tags": ["RAG"], "summary": "Retrieve similar document chunks", "parameters": [{ "name": "query", "in": "query", "required": true, "schema": { "type": "string" } }, { "name": "project_id", "in": "query", "required": true, "schema": { "type": "integer" } }, { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 5 } }], "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } }
+  },
+  "x-apidog-note": "Generated from routes mounted in app.js and route files under src/modules."
+}

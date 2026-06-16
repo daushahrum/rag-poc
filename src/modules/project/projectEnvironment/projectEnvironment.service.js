@@ -1,7 +1,7 @@
 // modules/projectEnvironment/projectEnvironment.service.js
 
 import * as projectEnvironmentRepository from './projectEnvironment.repository.js';
-import * as projectRepository from '../project/project.repository.js';
+import * as projectRepository from '../project.repository.js';
 
 export async function createProjectEnvironment(payload) {
     if (!payload || typeof payload !== 'object') {

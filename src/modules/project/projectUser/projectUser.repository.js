@@ -1,4 +1,4 @@
-import { models } from '../../database/db.js';
+import { models } from '../../../database/db.js';
 
 const { ProjectUser } = models;
 

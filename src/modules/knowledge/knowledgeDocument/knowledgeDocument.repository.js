@@ -19,7 +19,7 @@ export async function updateKnowledgeDocument(id, payload) {
     return affectedRows;
 }
 
-export async function deletes(id) {
+export async function deleteKnowledgeDocument(id) {
     return KnowledgeDocuments.destroy({
         where: { id },
     });

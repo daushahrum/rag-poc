@@ -3,6 +3,7 @@
 import * as projectUserRepository from './projectUser.repository.js';
 
 export async function createProjectUser(payload) {
+
     const {
         project_id,
         external_user_id,
@@ -23,8 +24,7 @@ export async function deleteProjectUser(id) {
     return projectUserRepository.deleteProjectUser(id);
 }
 
-export async function updateProjectUser(payload) {
-    const id = payload.id;
+export async function updateProjectUser(id, payload) {
 
     if (!id) {
         throw new Error('Project User ID is required');

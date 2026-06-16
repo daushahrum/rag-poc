@@ -3,7 +3,7 @@
 import { Router } from 'express';
 import * as projectEnvironmentController from './projectEnvironment.controller.js';
 
-import * as auth from '../../middleware/authenticate.js';
+import * as auth from '../../../middleware/authenticate.js';
 
 const router = Router();
 
@@ -37,8 +37,8 @@ router.get(
     projectEnvironmentController.getProjectEnvironment
 );
 
-router.getProjectEnvironmentList(
-    '/:projectId',
+router.get(
+    '/project/:project_id',
     auth.authenticate,
     projectEnvironmentController.getProjectEnvironments
 );

@@ -2,12 +2,17 @@
 
 import { Router } from 'express';
 import * as projectController from './project.controller.js';
-import * as projectEnvironmentController from '../projectEnvironment/projectEnvironment.controller.js';
+import projectEnvironmentRoutes from './projectEnvironment/projectEnvironment.route.js';
+import projectUserRoutes from './projectUser/projectUser.route.js';
+import * as projectEnvironmentController from './projectEnvironment/projectEnvironment.controller.js';
 import * as toolController from '../tool/tool.controller.js';
 
 import * as auth from '../../middleware/authenticate.js'
 
 const router = Router();
+
+router.use('/environments', projectEnvironmentRoutes);
+router.use('/users', projectUserRoutes);
 
 router.post(
     '/create',

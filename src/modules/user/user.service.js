@@ -3,7 +3,7 @@
 import bcrypt from 'bcrypt';
 
 import * as userRepository from './user.repository.js';
-import * as projectUserRepository from '../projectUser/projectUser.repository.js';
+import * as projectUserRepository from '../project/projectUser/projectUser.repository.js';
 import * as projectRepository from '../project/project.repository.js';
 
 export async function createUser(payload) {

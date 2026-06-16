@@ -1,7 +1,7 @@
 // modules/projectEnvironment/projectEnvironment.repository.js
 
 import { where } from 'sequelize';
-import { models } from '../../database/db.js';
+import { models } from '../../../database/db.js';
 
 const { ProjectEnvironment } = models;
 
