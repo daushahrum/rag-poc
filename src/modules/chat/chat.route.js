@@ -11,17 +11,22 @@ import { verifyProjectKey } from '../../middleware/verifyProjectKey.js';
 
 const router = Router();
 
+const markPortal = (req, res, next) => { req.routeSource = 'portal'; next(); };
+const markPublic = (req, res, next) => { req.routeSource = 'public'; next(); };
+
 router.use('/sessions', chatSessionRoutes);
 router.use('/messages', chatMessageRoutes);
 
 router.post(
     '/portal/send',
+    markPortal,
     auth.authenticate,
     chatController.sendMessage
 );
 
 router.post(
     '/send',
+    markPublic,
     verifyProjectKey,
     chatController.sendMessage
 );

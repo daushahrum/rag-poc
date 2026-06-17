@@ -9,13 +9,17 @@ import * as chatMessageService from './chatMessages/chatMessage.service.js';
 import * as toolRepository from '../tool/tool.repository.js';
 import * as projectEnvironmentRepository from '../project/projectEnvironment/projectEnvironment.repository.js';
 
-export async function sendMessage(session_id, message, userToken = null) {
+export async function sendMessage(session_id, message, userToken, isPortalAdmin) {
     if (!session_id) {
         throw new Error('session_id is required');
     }
 
     if (!message) {
         throw new Error('message is required');
+    }
+
+    if (!isPortalAdmin && !userToken){
+        throw new Error('Session token is required');
     }
 
     // 1. Load session (need project_id + environment_id)
@@ -25,7 +29,15 @@ export async function sendMessage(session_id, message, userToken = null) {
         throw new Error('Chat session not found');
     }
 
-    const { project_id, environment_id } = session;
+const { project_id, environment_id } = session;
+
+    // If isPortalAdmin, use the environment's auth_config token instead of user token
+    if (isPortalAdmin) {
+        const environment = await projectEnvironmentRepository.getProjectEnvironmentById(environment_id);
+        if (environment && environment.auth_config?.token) {
+            userToken = environment.auth_config.token;
+        }
+    }
 
     // 2. Check if this is the first message in the session (before saving it)
     const existingMessages = await chatMessageRepository.getChatMessages({ session_id });
@@ -167,26 +179,66 @@ async function executeBackendTool(args, project_id, environment_id, userToken) {
         }
     }
 
-    const url = `${environment.base_url}${path}`;
+const url = `${environment.base_url}${path}`;
 
     // If the caller passed their own token (external user), forward it so Liniq
     // applies that user's actual role-based permissions. Otherwise fall back to
     // the environment's configured service credential (e.g. for portal admins).
     const headers = userToken
-        ? { 'Content-Type': 'application/json', Authorization: userToken }
+        ? { 'Content-Type': 'application/json', Authorization: _buildUserToken(userToken, environment) }
         : buildAuthHeaders(environment);
 
-    try {
+// Console log the tool execution details
+    console.log('========== Tool Execution ==========');
+    console.log('Tool Name:', action);
+    console.log('Method:', tool.method || 'GET');
+    console.log('URL:', url);
+    console.log('Payload:', JSON.stringify(payload, null, 2));
+    console.log('Headers:', JSON.stringify(headers, null, 2));
+    console.log('=================================');
+
+try {
         const response = await fetch(url, {
             method: tool.method || 'GET',
             headers,
             body: tool.method !== 'GET' ? JSON.stringify(payload) : undefined,
         });
 
+        // Check if response is OK (status 200-299)
+        if (!response.ok) {
+            // Try to parse error as JSON, fallback to plain text
+            const contentType = response.headers.get('content-type') || '';
+            let errorData;
+            if (contentType.includes('application/json')) {
+                try {
+                    errorData = await response.json();
+                } catch {
+                    errorData = await response.text();
+                }
+            } else {
+                errorData = await response.text();
+            }
+            
+            console.log('Tool Error:', {
+                status: response.status,
+                statusText: response.statusText,
+                error: errorData
+            });
+            
+            return { 
+                error: `Tool '${action}' returned HTTP ${response.status}: ${response.statusText}`,
+                status: response.status,
+                details: errorData
+            };
+        }
+
         const data = await response.json();
+        console.log('Tool Response:', JSON.stringify(data, null, 2));
         return data;
     } catch (error) {
-        return { error: `Failed to call tool '${action}': ${error.message}` };
+        const errorResult = { error: `Failed to call tool '${action}': ${error.message}` };
+        console.log('Tool Error:', errorResult);
+        return errorResult;
     }
 }
 
@@ -202,4 +254,20 @@ function buildAuthHeaders(environment) {
     }
 
     return headers;
+}
+
+function _buildUserToken(userToken, environment) {
+    if (environment.auth_type === 'bearer' && userToken.toLowerCase().startsWith('bearer ')) {
+        return userToken;
+    }
+    
+    if (environment.auth_type === 'api_key' && userToken.length > 0) {
+        return userToken;
+    }
+    
+    if (environment.auth_type === 'bearer') {
+        return `Bearer ${userToken}`;
+    }
+    
+    return userToken;
 }
