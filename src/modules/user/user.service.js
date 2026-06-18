@@ -52,7 +52,6 @@ export async function createUser(payload) {
         id: `${project.code}_${payload.id}`,
         project_id: payload.project_id,
         external_user_id: payload.id,
-        name: payload.name,
         user_type: 'portal',
     });
 

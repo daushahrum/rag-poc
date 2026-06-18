@@ -36,8 +36,12 @@ export async function updateProjectUser(id, payload) {
     );
 }
 
-export async function getProjectUsers() {
-    return projectUserRepository.getProjectUsers();
+export async function getProjectUsers(filters = {}) {
+    return projectUserRepository.getProjectUsers(filters);
+}
+
+export async function getProjectUser(filters = {}) {
+    return projectUserRepository.getProjectUser(filters);
 }
 
 export async function getProjectUserById(id) {

@@ -19,12 +19,6 @@ export default function ProjectUserModel(sequelize) {
                 type: DataTypes.TEXT,
                 allowNull: false,
             },
-
-            name: {
-                type: DataTypes.TEXT,
-                allowNull: true,
-            },
-
             user_type: {
                 type: DataTypes.TEXT,
                 allowNull: false,

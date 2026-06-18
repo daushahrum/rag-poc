@@ -27,6 +27,24 @@ export async function getProjectUserById(id) {
     return ProjectUser.findByPk(id);
 }
 
-export async function getProjectUsers() {
-    return ProjectUser.findAll();
+export async function getProjectUser(filters = {}) {
+    console.log('finding project user', filters)
+    return ProjectUser.findOne({
+        where: filters,
+    });
+}
+
+export async function getProjectUsers(filters = {}) {
+    return ProjectUser.findAll({
+        where: filters,
+    });
+}
+
+export async function getProjectUserByExternalUserId(projectId, externalUserId) {
+    return ProjectUser.findOne({
+        where: {
+            project_id: projectId,
+            external_user_id: externalUserId,
+        },
+    });
 }
