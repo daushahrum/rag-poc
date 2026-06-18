@@ -41,20 +41,18 @@ const knowledgeEditorContent = document.querySelector("#knowledgeEditorContent")
 const saveKnowledgeButton = document.querySelector("#saveKnowledgeButton");
 const deleteKnowledgeButton = document.querySelector("#deleteKnowledgeButton");
 const knowledgeCenterStatus = document.querySelector("#knowledgeCenterStatus");
+const logoutButton = document.querySelector("#logoutButton");
 
 let sessionId = null;
 let sessions = [];
 let knowledgeDocuments = [];
 let selectedKnowledgeId = null;
 
-import { supabase } from './auth.js';
+import { getToken, getAuthHeaders, clearAuth, isAuthenticated } from './auth.js';
 
-const {
-  data: { session },
-} = await supabase.auth.getSession();
-
-if (!session) {
-  window.location.href = '/login.html';
+// Check authentication
+if (!isAuthenticated()) {
+    window.location.href = '/login.html';
 }
 
 let randomGreetingMessages = [
@@ -300,177 +298,202 @@ function resizeInput() {
 }
 
 async function sendMessage(message) {
-  if (!sessionId) {
-    await startSession();
-  }
+    if (!sessionId) {
+        await startSession();
+    }
 
-  const response = await fetch("/chat", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      sessionId,
-      message,
-    }),
-  });
+    const response = await fetch("/api/chat/portal/send", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            ...getAuthHeaders(),
+        },
+        body: JSON.stringify({
+            session_id: sessionId,
+            message,
+        }),
+    });
 
-  if (!response.ok) {
-    const data = await response.json().catch(() => ({}));
-    throw new Error(data.error ?? "The assistant could not answer right now.");
-  }
+    if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error ?? "The assistant could not answer right now.");
+    }
 
-  return response.json();
+    return response.json();
 }
 
 async function fetchSessions() {
-  const response = await fetch("/sessions");
+    const response = await fetch("/api/chat/sessions/list", {
+        headers: getAuthHeaders(),
+    });
 
-  if (!response.ok) {
-    const data = await response.json().catch(() => ({}));
-    throw new Error(data.error ?? "Could not load chat history.");
-  }
+    if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error ?? "Could not load chat history.");
+    }
 
-  const data = await response.json();
-  return data.sessions ?? [];
+    const data = await response.json();
+    return data.sessions ?? [];
 }
 
 async function fetchSessionMessages(nextSessionId) {
-  const response = await fetch(`/sessions/${encodeURIComponent(nextSessionId)}/messages`);
+    const response = await fetch(`/api/chat/sessions/${encodeURIComponent(nextSessionId)}`, {
+        headers: getAuthHeaders(),
+    });
 
-  if (!response.ok) {
-    const data = await response.json().catch(() => ({}));
-    throw new Error(data.error ?? "Could not load that chat.");
-  }
+    if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error ?? "Could not load that chat.");
+    }
 
-  const data = await response.json();
-  return data.messages ?? [];
+    const data = await response.json();
+    return data.messages ?? [];
 }
 
 async function createProject(name, code) {
-  const response = await fetch("/projects", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      name,
-      code,
-    }),
-  });
+    const response = await fetch("/api/project/create", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            ...getAuthHeaders(),
+        },
+        body: JSON.stringify({
+            name,
+            code,
+        }),
+    });
 
-  const data = await response.json().catch(() => ({}));
+    const data = await response.json().catch(() => ({}));
 
-  if (!response.ok) {
-    throw new Error(data.error ?? "Could not create project.");
-  }
+    if (!response.ok) {
+        throw new Error(data.error ?? "Could not create project.");
+    }
 
-  return data.project;
+    return data.project;
 }
 
 async function ingestKnowledge(content) {
-  const response = await fetch("/ingest", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      title: knowledgeTitleInput.value.trim(),
-      content,
-    }),
-  });
+    const response = await fetch("/api/knowledge_document/create", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            ...getAuthHeaders(),
+        },
+        body: JSON.stringify({
+            title: knowledgeTitleInput.value.trim(),
+            content,
+        }),
+    });
 
-  if (!response.ok) {
-    const data = await response.json().catch(() => ({}));
-    throw new Error(data.error ?? "Could not ingest knowledge.");
-  }
+    if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error ?? "Could not ingest knowledge.");
+    }
 
-  return response.json();
+    return response.json();
 }
 
 async function fetchKnowledgeDocuments() {
-  const response = await fetch("/knowledge");
+    const response = await fetch("/api/knowledge_document/list", {
+        headers: getAuthHeaders(),
+    });
 
-  if (!response.ok) {
-    const data = await response.json().catch(() => ({}));
-    throw new Error(data.error ?? "Could not load knowledge documents.");
-  }
+    if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error ?? "Could not load knowledge documents.");
+    }
 
-  const data = await response.json();
-  return data.documents ?? [];
+    const data = await response.json();
+    return data.documents ?? [];
 }
 
 async function fetchKnowledgeDocument(documentId) {
-  const response = await fetch(`/knowledge/${encodeURIComponent(documentId)}`);
+    const response = await fetch(`/api/knowledge_document/${encodeURIComponent(documentId)}`, {
+        headers: getAuthHeaders(),
+    });
 
-  if (!response.ok) {
-    const data = await response.json().catch(() => ({}));
-    throw new Error(data.error ?? "Could not load knowledge document.");
-  }
+    if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error ?? "Could not load knowledge document.");
+    }
 
-  const data = await response.json();
-  return data.document;
+    const data = await response.json();
+    return data.document;
 }
 
 async function updateKnowledgeDocument(documentId, payload) {
-  const response = await fetch(`/knowledge/${encodeURIComponent(documentId)}`, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
+    const response = await fetch(`/api/knowledge_document/update`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            ...getAuthHeaders(),
+        },
+        body: JSON.stringify({
+            id: documentId,
+            ...payload,
+        }),
+    });
 
-  if (!response.ok) {
-    const data = await response.json().catch(() => ({}));
-    throw new Error(data.error ?? "Could not update knowledge document.");
-  }
+    if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error ?? "Could not update knowledge document.");
+    }
 
-  return response.json();
+    return response.json();
 }
 
 async function deleteKnowledgeDocument(documentId) {
-  const response = await fetch(`/knowledge/${encodeURIComponent(documentId)}`, {
-    method: "DELETE",
-  });
+    const response = await fetch(`/api/knowledge_document/delete`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            ...getAuthHeaders(),
+        },
+        body: JSON.stringify({ id: documentId }),
+    });
 
-  if (!response.ok) {
-    const data = await response.json().catch(() => ({}));
-    throw new Error(data.error ?? "Could not delete knowledge document.");
-  }
+    if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error ?? "Could not delete knowledge document.");
+    }
 
-  return response.json();
+    return response.json();
 }
 
 async function ingestDocumentFile(file) {
-  const formData = new FormData();
-  formData.append("document", file);
+    const formData = new FormData();
+    formData.append("document", file);
 
-  const response = await fetch("/ingest/document", {
-    method: "POST",
-    body: formData,
-  });
+    const response = await fetch("/api/knowledge_document/create", {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: formData,
+    });
 
-  if (!response.ok) {
-    const data = await response.json().catch(() => ({}));
-    throw new Error(data.error ?? "Could not ingest document.");
-  }
+    if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error ?? "Could not ingest document.");
+    }
 
-  return response.json();
+    return response.json();
 }
 
 async function startSession() {
-  const response = await fetch("/sessions", {
-    method: "POST",
-  });
+    const response = await fetch("/api/chat/sessions/create", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            ...getAuthHeaders(),
+        },
+    });
 
-  if (!response.ok) {
-    throw new Error("Could not start a new chat session.");
-  }
+    if (!response.ok) {
+        throw new Error("Could not start a new chat session.");
+    }
 
-  const data = await response.json();
-  sessionId = data.sessionId;
-  await refreshSessions();
+    const data = await response.json();
+    sessionId = data.sessionId;
+    await refreshSessions();
 }
 
 async function refreshSessions() {
@@ -970,13 +993,7 @@ clearKnowledgeEditor();
 resizeInput();
 initializeChat();
 
-
-logoutButton.addEventListener(
-  'click',
-  async () => {
-    await supabase.auth.signOut()
-
-    window.location.href =
-      '/login.html'
-  }
-)
+logoutButton.addEventListener('click', () => {
+    clearAuth();
+    window.location.href = '/login';
+});

@@ -1,31 +1,73 @@
-import { supabase } from './auth.js'
+import { setAuth, getToken, isAuthenticated } from './auth.js';
 
-const form = document.getElementById('loginForm')
+// Redirect if already authenticated
+if (isAuthenticated()) {
+    window.location.href = '/';
+}
 
-form.addEventListener('submit', async (e) => {
-  e.preventDefault()
-  console.log('Login form submitted');
+const form = document.getElementById('loginForm');
+const submitBtn = document.getElementById('submitBtn');
+const errorMsg = document.getElementById('errorMsg');
 
-  const email = document.getElementById('email').value
-  const password = document.getElementById('password').value
+function showError(msg) {
+    errorMsg.textContent = msg;
+    errorMsg.classList.add('visible');
+}
 
-  console.log('Email:', email);
+function clearError() {
+    errorMsg.textContent = '';
+    errorMsg.classList.remove('visible');
+}
 
-  try {
-    const { error, data } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
-    console.log('Supabase response:', { error, data });
+function setLoading(on) {
+    submitBtn.disabled = on;
+    submitBtn.classList.toggle('loading', on);
+    if (!on) submitBtn.textContent = 'Sign in';
+}
 
-    if (error) {
-      alert(error.message)
-      return
+async function login(email, password) {
+    const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            id: email,
+            password: password,
+        }),
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+        throw new Error(data.message || 'Login failed');
     }
 
-    window.location.href = '/'
-  } catch (err) {
-    console.error('Unexpected error:', err);
-    alert('Unexpected error: ' + err.message)
-  }
-})
+    return data;
+}
+
+form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    clearError();
+
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+
+    if (!email || !password) {
+        showError('Please fill in all fields.');
+        return;
+    }
+
+    setLoading(true);
+
+    try {
+        const data = await login(email, password);
+        setAuth(data.token, data.user);
+        window.location.href = '/';
+    } catch (err) {
+        console.error('Login error:', err);
+        showError(err.message || 'Invalid email or password.');
+    } finally {
+        setLoading(false);
+    }
+});

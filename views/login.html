@@ -448,59 +448,6 @@
     </div>
   </div>
 
-  <script type="module">
-    import { supabase } from './js/auth.js'
-
-    const form = document.getElementById('loginForm')
-    const submitBtn = document.getElementById('submitBtn')
-    const errorMsg = document.getElementById('errorMsg')
-
-    function showError(msg) {
-      errorMsg.textContent = msg
-      errorMsg.classList.add('visible')
-    }
-
-    function clearError() {
-      errorMsg.textContent = ''
-      errorMsg.classList.remove('visible')
-    }
-
-    function setLoading(on) {
-      submitBtn.disabled = on
-      submitBtn.classList.toggle('loading', on)
-      if (!on) submitBtn.textContent = 'Sign in'
-    }
-
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault()
-      clearError()
-
-      const email = document.getElementById('email').value.trim()
-      const password = document.getElementById('password').value
-
-      if (!email || !password) {
-        showError('Please fill in all fields.')
-        return
-      }
-
-      setLoading(true)
-
-      try {
-        const { error } = await supabase.auth.signInWithPassword({ email, password })
-
-        if (error) {
-          showError(error.message)
-          return
-        }
-
-        window.location.href = '/'
-      } catch (err) {
-        console.error('Unexpected error:', err)
-        showError('Something went wrong. Please try again.')
-      } finally {
-        setLoading(false)
-      }
-    })
-  </script>
+<script type="module" src="/js/login.js"></script>
 </body>
 </html>
