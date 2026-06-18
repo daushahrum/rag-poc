@@ -15,14 +15,18 @@ export async function createChatSession(payload, isPortalAdmin = false) {
         project_id,
         project_code,
         environment_id,
-        project_user_id,
+        user_id,
     } = payload;
 
     if (!environment_id) {
         throw new Error("Chat session environment_id is required");
     }
 
-    // Resolve project first
+    if (!user_id) {
+        throw new Error("Chat session user_id is required");
+    }
+
+    // Resolve project
     if (!project_id) {
         if (!project_code) {
             throw new Error("Either project_id or project_code is required");
@@ -37,30 +41,38 @@ export async function createChatSession(payload, isPortalAdmin = false) {
         project_id = project.id;
     }
 
-    // Find existing user
-    let projectUser = await projectUserRepository.getProjectUser({
-        external_user_id: project_user_id,
-    });
+    let resolvedProjectUserId;
 
-    // Create if not exists
-    if (!projectUser) {
-        projectUser = await projectUserRepository.createProjectUser({
-            id: `${project_code}_${project_user_id}`,
-            project_id,
-            external_user_id: project_user_id,
-            user_type: "external",
+    if (!isPortalAdmin) {
+        let projectUser = await projectUserRepository.getProjectUser({
+            external_user_id: user_id,
         });
 
-        console.log("created project user:", projectUser.id);
+        if (!projectUser) {
+            projectUser = await projectUserRepository.createProjectUser({
+                id: `${project_code}_${user_id}`,
+                project_id,
+                external_user_id: user_id,
+                user_type: "external",
+            });
+
+            console.log("created project user:", projectUser.id);
+        } else {
+            console.log("user registered:", projectUser.id);
+        }
+
+        // Store actual project_users.id in chat_sessions
+        resolvedProjectUserId = projectUser.id;
     } else {
-        console.log("user registered:", projectUser.id);
+        let portal_user_project_id = await projectUserRepository.getProjectUser({external_user_id:user_id});
+        console.log(portal_user_project_id)
+        resolvedProjectUserId = portal_user_project_id.id;
     }
 
-    // Reuse empty session
     const emptySession = await chatSessionRepository.findEmptySession(
         project_id,
         environment_id,
-        projectUser.id
+        resolvedProjectUserId
     );
 
     if (emptySession) {
@@ -68,20 +80,14 @@ export async function createChatSession(payload, isPortalAdmin = false) {
         return emptySession;
     }
 
-    console.log(
-        "creating new chat session with isPortalAdmin:",
-        isPortalAdmin
-    );
-
     const chatSessionToCreate = {
-        ...payload,
         id: randomUUID(),
         project_id,
-
-        project_user_id: projectUser.id,
+        environment_id,
+        project_user_id: resolvedProjectUserId,
     };
 
-    console.log("chatSessionToCreate:", chatSessionToCreate);
+    console.log("creating chat session:", chatSessionToCreate);
 
     return await chatSessionRepository.createChatSession(
         chatSessionToCreate
