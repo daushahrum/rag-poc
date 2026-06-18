@@ -7,7 +7,7 @@ import chatMessageRoutes from './chatMessages/chatMessage.route.js';
 import * as auth from '../../middleware/authenticate.js';
 
 import * as chatController from './chat.controller.js';
-import { verifyProjectKey } from '../../middleware/verifyProjectKey.js';
+import { verifyProjectAndSessionKey, verifyProjectKey } from '../../middleware/verifyProjectKey.js';
 
 const router = Router();
 
@@ -27,7 +27,7 @@ router.post(
 router.post(
     '/send',
     markPublic,
-    verifyProjectKey,
+    verifyProjectAndSessionKey,
     chatController.sendMessage
 );
 

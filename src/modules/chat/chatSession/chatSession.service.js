@@ -3,7 +3,7 @@
 import { randomUUID } from 'crypto';
 import * as chatSessionRepository from './chatSession.repository.js';
 
-export async function createChatSession(payload) {
+export async function createChatSession(payload, isPortalAdmin = false) {
     if (!payload || typeof payload !== 'object') {
         throw new Error('Chat session payload is required');
     }
@@ -17,6 +17,8 @@ export async function createChatSession(payload) {
     if (!environment_id) {
         throw new Error('Chat session environment_id is required');
     }
+
+    console.log('creating chat session with isPortalAdmin:', isPortalAdmin);
 
     const chatSessionToCreate = {
         ...payload,

@@ -8,7 +8,12 @@ export async function createChatSession(req, res) {
             ...req.body,
         };
 
-        const chatSession = await chatSessionService.createChatSession(payload);
+        const routeSource = req.routeSource || (req.headers.authorization ? 'portal' : 'public');
+        const isPortalAdmin = routeSource === 'portal';
+
+        console.log('calling createChatSession with\nrouteSource:', routeSource, '\nisPortalAdmin:', isPortalAdmin);
+
+        const chatSession = await chatSessionService.createChatSession(payload, isPortalAdmin);
 
         return res.json(chatSession);
     } catch (error) {

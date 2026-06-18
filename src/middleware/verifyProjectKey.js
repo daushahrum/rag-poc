@@ -3,7 +3,11 @@
 import * as projectRepository from '../modules/project/project.repository.js';
 import * as chatSessionRepository from '../modules/chat/chatSession/chatSession.repository.js';
 
-export async function verifyProjectKey(req, res, next) {
+/**
+ * Verify both project key and session key.
+ * Requires x-project-key header and session_id in body.
+ */
+export async function verifyProjectAndSessionKey(req, res, next) {
     try {
         const projectKey = req.headers['x-project-key'];
         const { session_id } = req.body;
@@ -38,6 +42,44 @@ export async function verifyProjectKey(req, res, next) {
 
         req.project = project;
         req.chatSession = session;
+        next();
+    } catch (error) {
+        return res.status(400).json({ message: error.message });
+    }
+}
+
+/**
+ * Verify project key only.
+ * Requires x-project-key header and project_id in body.
+ */
+export async function verifyProjectKey(req, res, next) {
+    try {
+        const projectKey = req.headers['x-project-key'];
+        const { project_id } = req.body;
+
+        if (!projectKey) {
+            return res.status(401).json({ message: 'Project key is required' });
+        }
+
+        if (!project_id) {
+            return res.status(400).json({ message: 'project_id is required' });
+        }
+
+        const project = await projectRepository.getProjectById(project_id);
+
+        if (!project) {
+            return res.status(404).json({ message: 'Project not found' });
+        }
+
+        if (project.project_key_hash !== projectKey) {
+            return res.status(401).json({ message: 'Invalid project key' });
+        }
+
+        if (!project.is_active) {
+            return res.status(403).json({ message: 'Project is not active' });
+        }
+
+        req.project = project;
         next();
     } catch (error) {
         return res.status(400).json({ message: error.message });
