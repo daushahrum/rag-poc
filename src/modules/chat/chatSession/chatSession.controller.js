@@ -11,6 +11,10 @@ export async function createChatSession(req, res) {
         const routeSource = req.routeSource || (req.headers.authorization ? 'portal' : 'public');
         const isPortalAdmin = routeSource === 'portal';
 
+        if (isPortalAdmin && req.token) {
+            payload.user_id = req.token.id;
+        }
+
         console.log('calling createChatSession with\nrouteSource:', routeSource, '\nisPortalAdmin:', isPortalAdmin);
 
         const chatSession = await chatSessionService.createChatSession(payload, isPortalAdmin);

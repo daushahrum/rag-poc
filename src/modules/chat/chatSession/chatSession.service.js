@@ -2,26 +2,42 @@
 
 import { randomUUID } from 'crypto';
 import * as chatSessionRepository from './chatSession.repository.js';
+import * as projectRepository from '../../../modules/project/project.repository.js';
+import * as projectUserRepository from '../../../modules/project/projectUser/projectUser.repository.js';
 
 export async function createChatSession(payload, isPortalAdmin = false) {
     if (!payload || typeof payload !== 'object') {
         throw new Error('Chat session payload is required');
     }
 
-    const { project_id, environment_id } = payload;
-
-    if (!project_id) {
-        throw new Error('Chat session project_id is required');
-    }
+    let { project_id, project_code, environment_id, project_user_id } = payload;
 
     if (!environment_id) {
         throw new Error('Chat session environment_id is required');
     }
 
-    console.log('creating chat session with isPortalAdmin:', isPortalAdmin);
+    if (!isPortalAdmin && project_code) {
+        const project = await projectRepository.getProjectByCode(project_code);
+        if (!project) {
+            throw new Error('Project not found');
+        }
+        project_id = project.id;
+    } else if (!project_id) {
+        throw new Error('Chat session project_id is required');
+    }
+
+    const emptySession = await chatSessionRepository.findEmptySession(project_id, environment_id, project_user_id);
+    if (emptySession) {
+        console.log('reusing empty chat session:', emptySession.id);
+        return emptySession;
+    }
+
+    console.log('creating new chat session with isPortalAdmin:', isPortalAdmin);
 
     const chatSessionToCreate = {
         ...payload,
+        project_id,
+        project_user_id: project_user_id,
         id: randomUUID(),
     };
 

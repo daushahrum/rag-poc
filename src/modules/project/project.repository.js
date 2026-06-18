@@ -27,6 +27,12 @@ export async function getProjectById(id) {
     return Project.findByPk(id);
 }
 
+export async function getProjectByCode(code) {
+    return Project.findOne({
+        where: { code },
+    });
+}
+
 export async function getProjects() {
     return Project.findAll();
 }

@@ -50,22 +50,22 @@ export async function verifyProjectAndSessionKey(req, res, next) {
 
 /**
  * Verify project key only.
- * Requires x-project-key header and project_id in body.
+ * Requires x-project-key header and project_code in body.
  */
 export async function verifyProjectKey(req, res, next) {
     try {
         const projectKey = req.headers['x-project-key'];
-        const { project_id } = req.body;
+        const { project_code } = req.body;
 
         if (!projectKey) {
             return res.status(401).json({ message: 'Project key is required' });
         }
 
-        if (!project_id) {
-            return res.status(400).json({ message: 'project_id is required' });
+        if (!project_code) {
+            return res.status(400).json({ message: 'project_code is required' });
         }
 
-        const project = await projectRepository.getProjectById(project_id);
+        const project = await projectRepository.getProjectByCode(project_code);
 
         if (!project) {
             return res.status(404).json({ message: 'Project not found' });

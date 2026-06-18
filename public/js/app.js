@@ -48,7 +48,7 @@ let sessions = [];
 let knowledgeDocuments = [];
 let selectedKnowledgeId = null;
 
-import { getToken, getAuthHeaders, clearAuth, isAuthenticated } from './auth.js';
+import { getToken, getAuthHeaders, clearAuth, isAuthenticated, getUser } from './auth.js';
 
 // Check authentication
 if (!isAuthenticated()) {
@@ -478,21 +478,58 @@ async function ingestDocumentFile(file) {
     return response.json();
 }
 
+async function fetchProjectEnvironments(projectId) {
+    const response = await fetch(`/api/project/environment_list/${encodeURIComponent(projectId)}`, {
+        headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error ?? "Could not load project environments.");
+    }
+
+    const data = await response.json();
+    return data.environments ?? [];
+}
+
 async function startSession() {
-    const response = await fetch("/api/chat/sessions/create", {
+    const user = getUser();
+    if (!user || !user.project_id) {
+        throw new Error("User project information not found. Please log in again.");
+    }
+
+    let environments;
+    try {
+        environments = await fetchProjectEnvironments(user.project_id);
+    } catch (error) {
+        throw new Error("Could not load project environments: " + error.message);
+    }
+
+    if (!environments || environments.length === 0) {
+        throw new Error("No environments found for your project. Please create one first.");
+    }
+
+    const defaultEnvironment = environments[0];
+
+    const response = await fetch("/api/chat/sessions/portal/create", {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
             ...getAuthHeaders(),
         },
+        body: JSON.stringify({
+            project_id: user.project_id,
+            environment_id: defaultEnvironment.id,
+        }),
     });
 
     if (!response.ok) {
-        throw new Error("Could not start a new chat session.");
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error ?? "Could not start a new chat session.");
     }
 
     const data = await response.json();
-    sessionId = data.sessionId;
+    sessionId = data.id;
     await refreshSessions();
 }
 
