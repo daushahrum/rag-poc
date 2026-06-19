@@ -5,7 +5,7 @@
 import { getAuthHeaders, clearAuth, isAuthenticated, getUser } from '../auth.js';
 
 import { sendMessage, fetchSessions, fetchSessionMessages, createChatSession } from '../api/chat.api.js';
-import { createProject, fetchProjectEnvironments } from '../api/project.api.js';
+import { createProject, fetchProjectEnvironments, getProjectUser } from '../api/project.api.js';
 import {
     ingestKnowledge,
     fetchKnowledgeDocuments,
@@ -155,10 +155,14 @@ async function startSession() {
 async function refreshSessions() {
     const user = getUser();
 
+    const project_user_id = await getProjectUser(user.id);
+
+    console.log('project_user_id', project_user_id.id)
+
     sessions = await fetchSessions({
-        project_id: user?.project_id,
+        project_id: user.project_id,
+        project_user_id: project_user_id.id,
         environment_id: selectedEnvironmentId,
-        project_user_id: user?.project_user_id,
     });
 
     renderHistory();

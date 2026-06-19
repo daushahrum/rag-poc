@@ -30,14 +30,17 @@ export async function sendMessage(sessionId, message) {
 
 export async function fetchSessions({
     project_id,
-    environment_id,
     project_user_id,
+    environment_id,
 } = {}) {
     const params = new URLSearchParams();
 
     if (project_id) params.set('project_id', project_id);
-    if (environment_id) params.set('environment_id', environment_id);
     if (project_user_id) params.set('project_user_id', project_user_id);
+    if (environment_id) params.set('environment_id', environment_id);
+
+    //call project api
+
 
     const query = params.toString();
     const url = query ? `/api/chat/sessions/list?${query}` : '/api/chat/sessions/list';
