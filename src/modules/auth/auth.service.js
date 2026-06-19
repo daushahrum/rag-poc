@@ -4,6 +4,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 
 import * as authRepository from './auth.repository.js';
+import * as projectUserRepository from '../project/projectUser/projectUser.repository.js';
 import * as textValidators from '../../utils/textValidators.js';
 
 export async function login(id, password) {
@@ -24,11 +25,14 @@ export async function login(id, password) {
         throw new Error('Invalid password');
     }
 
+    let project_user_id = await projectUserRepository.getProjectUser({external_user_id: id}).id;
+
     const token = jwt.sign(
         {
             id: user.id,
             role: user.role,
-            project_id: user.project_id
+            project_id: user.project_id,
+            project_user_id: project_user_id
         },
         process.env.JWT_SECRET,
         {}

@@ -56,10 +56,10 @@ export async function fetchSessionMessages(sessionId) {
     return data.messages ?? [];
 }
 
-export async function createChatSession(projectId, environmentId) {
+export async function createChatSession(user, environmentId) {
     const payload = {
-        project_id: projectId,
-        project_user_id: "liniq_ADM2101",
+        project_id: user.project_id,
+        project_user_id: user.project_user_id,
         environment_id: environmentId,
     };
 

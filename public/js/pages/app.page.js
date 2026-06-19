@@ -115,7 +115,7 @@ async function startSession() {
     }
 
     const defaultEnvironment = environments[0];
-    const data = await createChatSession(user.project_id, defaultEnvironment.id);
+    const data = await createChatSession(user, defaultEnvironment.id);
     sessionId = data.id;
     await refreshSessions();
 }
