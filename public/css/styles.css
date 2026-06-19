@@ -1,5 +1,6 @@
 :root {
   color-scheme: light;
+  --sidebar-width: 272px;
   --bg: #f7f7f8;
   --sidebar: #ffffff;
   --sidebar-soft: #f2f3f5;
@@ -60,7 +61,7 @@ button:disabled {
 /* ── Layout ── */
 .app-shell {
   display: grid;
-  grid-template-columns: 272px minmax(0, 1fr);
+  grid-template-columns: var(--sidebar-width) 5px minmax(0, 1fr);
   height: 100vh;
   min-height: 100vh;
   overflow: hidden;
@@ -78,8 +79,116 @@ button:disabled {
   padding: 12px 10px;
   overflow-y: auto;
   background: var(--sidebar);
-  border-right: 1px solid var(--border);
   color: var(--sidebar-text);
+  /* border-right removed — resizer div acts as the separator */
+}
+
+/* ── Sidebar resize handle ── */
+.sidebar-resizer {
+  position: relative;
+  width: 5px;
+  height: 100vh;
+  cursor: col-resize;
+  background: var(--border);
+  transition: background 0.15s ease;
+  flex-shrink: 0;
+  z-index: 5;
+  /* Widen the hit area without growing the visual stripe */
+}
+
+.sidebar-resizer::before {
+  content: '';
+  position: absolute;
+  inset: 0 -6px;        /* extend clickable zone 6px left & right */
+  cursor: col-resize;
+}
+
+.sidebar-resizer:hover,
+.sidebar-resizer.is-dragging {
+  background: var(--accent);
+}
+
+/* ── Collapsed sidebar (icon-only) ── */
+.sidebar.collapsed {
+  align-items: center;
+  padding-left: 4px;
+  padding-right: 4px;
+  overflow-x: hidden;
+}
+
+/* ── Fade + shrink labels out when collapsed ── */
+
+/* Inline-style labels: fade + shrink horizontally */
+.sidebar.collapsed .btn-label,
+.sidebar.collapsed .brand > div:last-child {
+  max-width: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Block-style labels: fade + shrink vertically */
+.sidebar.collapsed .section-label,
+.sidebar.collapsed .history-title,
+.sidebar.collapsed .history-meta,
+.sidebar.collapsed .history-empty {
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  pointer-events: none;
+}
+
+/* Centre-align the brand mark */
+.sidebar.collapsed .brand {
+  justify-content: center;
+  padding-left: 0;
+  padding-right: 0;
+  border-bottom-color: transparent;
+}
+
+/* Centre-align buttons and shrink padding */
+.sidebar.collapsed .new-chat,
+.sidebar.collapsed .developer-menu-button {
+  justify-content: center;
+  padding: 9px 0;
+  width: 100%;
+}
+
+/* History items show only a thin accent bar when collapsed */
+.sidebar.collapsed .history-item {
+  justify-content: center;
+  padding: 8px 0;
+  min-height: 10px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--border);
+  margin-bottom: 2px;
+  pointer-events: none;   /* can't meaningfully click when collapsed */
+}
+
+/* Section gap still exists but takes no visual space */
+.sidebar.collapsed .sidebar-section {
+  width: 100%;
+  margin-top: 4px;
+}
+
+/* ── Sidebar label transition base styles ── */
+
+/* Button text labels — fade + shrink horizontally */
+.btn-label {
+  overflow: hidden;
+  white-space: nowrap;
+  max-width: 200px;
+  opacity: 1;
+  transition: opacity 0.22s ease-in-out, max-width 0.28s ease-in-out;
+}
+
+/* Brand text block (ANDI / Knowledge chatbot) — same horizontal shrink */
+.brand > div:last-child {
+  overflow: hidden;
+  max-width: 200px;
+  opacity: 1;
+  transition: opacity 0.22s ease-in-out, max-width 0.28s ease-in-out;
 }
 
 .brand {
@@ -213,6 +322,10 @@ button:disabled {
   letter-spacing: 0.05em;
   text-transform: uppercase;
   padding: 6px 10px 4px;
+  overflow: hidden;
+  max-height: 3em;
+  transition: opacity 0.16s ease-in-out, max-height 0.22s ease-in-out,
+              padding-top 0.22s ease-in-out, padding-bottom 0.22s ease-in-out;
 }
 
 /* ── History list ── */
@@ -264,6 +377,9 @@ button:disabled {
   font-size: 13px;
   font-weight: 600;
   color: inherit;
+  overflow: hidden;
+  max-height: 2.5em;
+  transition: opacity 0.16s ease-in-out, max-height 0.22s ease-in-out;
 }
 
 .history-meta {
@@ -271,6 +387,9 @@ button:disabled {
   font-weight: 500;
   color: var(--sidebar-muted);
   margin-top: 1px;
+  overflow: hidden;
+  max-height: 2em;
+  transition: opacity 0.16s ease-in-out, max-height 0.22s ease-in-out;
 }
 
 .history-empty {
@@ -278,6 +397,10 @@ button:disabled {
   padding: 8px 10px;
   color: var(--sidebar-muted);
   font-size: 12px;
+  overflow: hidden;
+  max-height: 3em;
+  transition: opacity 0.16s ease-in-out, max-height 0.22s ease-in-out,
+              padding-top 0.22s ease-in-out, padding-bottom 0.22s ease-in-out;
 }
 
 /* ── Chat panel ── */
@@ -621,7 +744,7 @@ button:disabled {
   top: 0;
   right: 0;
   bottom: 0;
-  left: 272px;
+  left: calc(var(--sidebar-width) + 5px);   /* sidebar + resizer width */
   z-index: 30;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
@@ -1047,6 +1170,10 @@ button:disabled {
     grid-template-columns: 1fr;
     height: auto;
     overflow: visible;
+  }
+
+  .sidebar-resizer {
+    display: none;   /* drag-resize is not meaningful on narrow viewports */
   }
 
   .sidebar {

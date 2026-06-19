@@ -263,6 +263,15 @@ function setKnowledgeEditorDisabled(disabled) {
 
 // ─── Drawer helpers ───────────────────────────────────────────────────────────
 
+function closeAllPanels() {
+    projectDrawer.classList.remove('open');
+    projectDrawer.setAttribute('aria-hidden', 'true');
+    ingestDrawer.classList.remove('open');
+    ingestDrawer.setAttribute('aria-hidden', 'true');
+    knowledgeCenter.classList.remove('open');
+    knowledgeCenter.setAttribute('aria-hidden', 'true');
+}
+
 function closeIngestMenu() {
     ingestDrawer.classList.remove('open');
     ingestDrawer.setAttribute('aria-hidden', 'true');
@@ -368,6 +377,11 @@ newChatButton.addEventListener('click', async () => {
 // ─── Event listeners: project drawer ─────────────────────────────────────────
 
 openProjectButton.addEventListener('click', () => {
+    if (projectDrawer.classList.contains('open')) {
+        closeProjectMenu();
+        return;
+    }
+    closeAllPanels();
     projectDrawer.classList.add('open');
     projectDrawer.setAttribute('aria-hidden', 'false');
     projectNameInput.focus();
@@ -421,6 +435,11 @@ copyProjectKeyButton.addEventListener('click', async () => {
 // ─── Event listeners: ingest drawer ──────────────────────────────────────────
 
 openIngestButton.addEventListener('click', () => {
+    if (ingestDrawer.classList.contains('open')) {
+        closeIngestMenu();
+        return;
+    }
+    closeAllPanels();
     ingestDrawer.classList.add('open');
     ingestDrawer.setAttribute('aria-hidden', 'false');
     knowledgeInput.focus();
@@ -487,6 +506,11 @@ uploadDocumentButton.addEventListener('click', async () => {
 // ─── Event listeners: knowledge center ───────────────────────────────────────
 
 openKnowledgeButton.addEventListener('click', async () => {
+    if (knowledgeCenter.classList.contains('open')) {
+        closeKnowledgeCenter();
+        return;
+    }
+    closeAllPanels();
     knowledgeCenter.classList.add('open');
     knowledgeCenter.setAttribute('aria-hidden', 'false');
     knowledgeCenterStatus.textContent = 'Loading documents...';
