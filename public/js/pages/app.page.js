@@ -87,6 +87,7 @@ let sessionId = null;
 let sessions = [];
 let knowledgeDocuments = [];
 let selectedKnowledgeId = null;
+let selectedEnvironmentId = null;
 
 // ─── Chat rendering ───────────────────────────────────────────────────────────
 
@@ -115,13 +116,21 @@ async function startSession() {
     }
 
     const defaultEnvironment = environments[0];
+    selectedEnvironmentId = defaultEnvironment.id;
     const data = await createChatSession(user, defaultEnvironment.id);
     sessionId = data.id;
     await refreshSessions();
 }
 
 async function refreshSessions() {
-    sessions = await fetchSessions();
+    const user = getUser();
+
+    sessions = await fetchSessions({
+        project_id: user?.project_id,
+        environment_id: selectedEnvironmentId,
+        project_user_id: user?.project_user_id,
+    });
+
     renderHistory();
 }
 

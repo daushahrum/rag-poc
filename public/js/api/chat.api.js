@@ -28,8 +28,21 @@ export async function sendMessage(sessionId, message) {
     return response.json();
 }
 
-export async function fetchSessions() {
-    const response = await fetch('/api/chat/sessions/list', {
+export async function fetchSessions({
+    project_id,
+    environment_id,
+    project_user_id,
+} = {}) {
+    const params = new URLSearchParams();
+
+    if (project_id) params.set('project_id', project_id);
+    if (environment_id) params.set('environment_id', environment_id);
+    if (project_user_id) params.set('project_user_id', project_user_id);
+
+    const query = params.toString();
+    const url = query ? `/api/chat/sessions/list?${query}` : '/api/chat/sessions/list';
+
+    const response = await fetch(url, {
         headers: getAuthHeaders(),
     });
 
@@ -39,7 +52,12 @@ export async function fetchSessions() {
     }
 
     const data = await response.json();
-    return data.sessions ?? [];
+    const sessions = Array.isArray(data) ? data : (data.sessions ?? []);
+
+    return sessions.map((session) => ({
+        ...session,
+        title: session.title ?? session.topic ?? 'Untitled chat',
+    }));
 }
 
 export async function fetchSessionMessages(sessionId) {
