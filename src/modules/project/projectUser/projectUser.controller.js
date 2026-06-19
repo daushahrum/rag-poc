@@ -63,11 +63,24 @@ export async function listProjectUsers(req, res) {
     }
 }
 
+export async function findProjectUser(req, res) {
+    try {
+        const projectUsers =
+            await projectUserService.getProjectUser(req.query);
+
+        return res.json(projectUsers);
+    } catch (error) {
+        return res.status(400).json({
+            message: error.message,
+        });
+    }
+}
+
 export async function getProjectUser(req, res) {
     try {
         const projectUser =
-            await projectUserService.getProjectUserById(
-                req.params.id
+            await projectUserService.getProjectUser(
+                req.query
             );
 
         return res.json(projectUser);

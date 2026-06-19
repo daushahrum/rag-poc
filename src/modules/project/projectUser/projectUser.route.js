@@ -32,6 +32,12 @@ router.get(
 );
 
 router.get(
+    '/find',
+    auth.authenticate,
+    projectUserController.findProjectUser
+);
+
+router.get(
     '/:id',
     auth.authenticate,
     projectUserController.getProjectUser
