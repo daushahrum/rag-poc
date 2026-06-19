@@ -28,8 +28,21 @@ export async function sendMessage(sessionId, message) {
     return response.json();
 }
 
-export async function fetchSessions() {
-    const response = await fetch('/api/chat/sessions/list', {
+export async function fetchSessions({
+    project_id,
+    environment_id,
+    project_user_id,
+} = {}) {
+    const params = new URLSearchParams();
+
+    if (project_id) params.set('project_id', project_id);
+    if (environment_id) params.set('environment_id', environment_id);
+    if (project_user_id) params.set('project_user_id', project_user_id);
+
+    const query = params.toString();
+    const url = query ? `/api/chat/sessions/list?${query}` : '/api/chat/sessions/list';
+
+    const response = await fetch(url, {
         headers: getAuthHeaders(),
     });
 
@@ -39,27 +52,32 @@ export async function fetchSessions() {
     }
 
     const data = await response.json();
-    return data.sessions ?? [];
+    const sessions = Array.isArray(data) ? data : (data.sessions ?? []);
+
+    return sessions.map((session) => ({
+        ...session,
+        title: session.title ?? session.topic ?? 'New chat',
+    }));
 }
 
 export async function fetchSessionMessages(sessionId) {
-    const response = await fetch(`/api/chat/sessions/${encodeURIComponent(sessionId)}`, {
+    const response = await fetch(`/api/chat/messages/list?session_id=${encodeURIComponent(sessionId)}`, {
         headers: getAuthHeaders(),
     });
 
     if (!response.ok) {
         const data = await response.json().catch(() => ({}));
-        throw new Error(data.error ?? 'Could not load that chat.');
+throw new Error(data.error ?? 'Could not load that chat.');
     }
 
     const data = await response.json();
-    return data.messages ?? [];
+    return data ?? [];
 }
 
-export async function createChatSession(projectId, environmentId) {
+export async function createChatSession(user, environmentId) {
     const payload = {
-        project_id: projectId,
-        project_user_id: "liniq_ADM2101",
+        project_id: user.project_id,
+        project_user_id: user.project_user_id,
         environment_id: environmentId,
     };
 
