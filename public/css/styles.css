@@ -336,6 +336,25 @@ button:disabled {
   gap: 2px;
 }
 
+.history-loading {
+  display: flex;
+  justify-content: center;
+  padding: 14px 0;
+}
+
+.history-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 .history-item {
   display: flex;
   flex-direction: column;
