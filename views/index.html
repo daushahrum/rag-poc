@@ -66,11 +66,23 @@
         </header>
 
         <div class="messages" id="messages" aria-live="polite">
-          <article class="message assistant">
-            <div class="bubble">
-              <p>Hello. Ask me anything from your ingested documents.</p>
+          <div class="welcome-screen">
+            <div class="welcome-row">
+              <p class="welcome-greeting">Hello. Ask me anything from your ingested documents.</p>
             </div>
-          </article>
+            <div class="welcome-cards">
+              <button class="welcome-card" type="button" onclick="document.getElementById('openIngestButton').click()">
+                <i class="bi bi-database-down"></i>
+                <span class="welcome-card-title">Ingest new knowledge</span>
+                <span class="welcome-card-subtitle">Teach ANDI new information on specific projects.</span>
+              </button>
+              <button class="welcome-card" type="button" onclick="document.getElementById('openProjectButton').click()">
+                <i class="bi bi-folder-plus"></i>
+                <span class="welcome-card-title">Create new project</span>
+                <span class="welcome-card-subtitle">Establish new projects for ANDI to explore on.</span>
+              </button>
+            </div>
+          </div>
         </div>
 
         <form class="composer" id="chatForm">

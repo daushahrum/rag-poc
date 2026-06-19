@@ -458,6 +458,84 @@ button:disabled {
   font-size: 12px;
 }
 
+/* ── Welcome screen ── */
+.welcome-screen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  padding: 40px 24px;
+  text-align: center;
+}
+
+.welcome-row {
+  display: flex;
+  justify-content: center;
+}
+
+.welcome-greeting {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.45;
+}
+
+.welcome-cards {
+  display: flex;
+  flex-direction: row;
+  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.welcome-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 180px;
+  min-height: 100px;
+  padding: 20px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.welcome-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 4px 14px rgba(0, 180, 216, 0.14);
+  background: var(--surface);
+}
+
+.welcome-card i {
+  font-size: 26px;
+  color: var(--accent);
+}
+
+.welcome-card-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.welcome-card-subtitle {
+  font-size: 11.5px;
+  font-weight: 400;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
 /* ── Messages ── */
 .messages {
   display: flex;

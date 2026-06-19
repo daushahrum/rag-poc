@@ -93,7 +93,37 @@ let selectedEnvironmentId = null;
 
 function renderWelcomeMessage() {
     messages.innerHTML = '';
-    messages.append(createMessage('assistant', getRandomGreeting()));
+
+    const screen = document.createElement('div');
+    screen.className = 'welcome-screen';
+
+    // Greeting row
+    const row = document.createElement('div');
+    row.className = 'welcome-row';
+    const greeting = document.createElement('p');
+    greeting.className = 'welcome-greeting';
+    greeting.textContent = getRandomGreeting();
+    row.append(greeting);
+
+    // Action cards row
+    const cards = document.createElement('div');
+    cards.className = 'welcome-cards';
+
+    const ingestCard = document.createElement('button');
+    ingestCard.className = 'welcome-card';
+    ingestCard.type = 'button';
+    ingestCard.innerHTML = '<i class="bi bi-database-down"></i><span class="welcome-card-title">Ingest new knowledge</span><span class="welcome-card-subtitle">Teach ANDI new information on specific projects.</span>';
+    ingestCard.addEventListener('click', () => openIngestButton.click());
+
+    const projectCard = document.createElement('button');
+    projectCard.className = 'welcome-card';
+    projectCard.type = 'button';
+    projectCard.innerHTML = '<i class="bi bi-folder-plus"></i><span class="welcome-card-title">Create new project</span><span class="welcome-card-subtitle">Establish new projects for ANDI to explore on.</span>';
+    projectCard.addEventListener('click', () => openProjectButton.click());
+
+    cards.append(ingestCard, projectCard);
+    screen.append(row, cards);
+    messages.append(screen);
 }
 
 // ─── Session management ──────────────────────────────────────────────────────
