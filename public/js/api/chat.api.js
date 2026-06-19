@@ -54,22 +54,47 @@ export async function fetchSessionMessages(sessionId) {
 }
 
 export async function createChatSession(projectId, environmentId) {
+    const payload = {
+        project_id: projectId,
+        project_user_id: "liniq_ADM2101",
+        environment_id: environmentId,
+    };
+
+    const headers = {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+    };
+
+    // Equivalent curl
+    const curl = [
+        `curl -X POST "${window.location.origin}/api/chat/sessions/portal/create"`,
+        ...Object.entries(headers).map(
+            ([key, value]) => `-H "${key}: ${value}"`
+        ),
+        `-d '${JSON.stringify(payload)}'`,
+    ].join(' ');
+
+    console.log('[createChatSession] CURL:');
+    console.log(curl);
+
     const response = await fetch('/api/chat/sessions/portal/create', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            ...getAuthHeaders(),
-        },
-        body: JSON.stringify({
-            project_id: projectId,
-            environment_id: environmentId,
-        }),
+        headers,
+        body: JSON.stringify(payload),
     });
 
+    const responseBody = await response.clone().json().catch(async () => {
+        return await response.clone().text();
+    });
+
+    console.log('[createChatSession] Status:', response.status);
+    console.log('[createChatSession] Response:', responseBody);
+
     if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.error ?? 'Could not start a new chat session.');
+        throw new Error(
+            responseBody?.error ?? 'Could not start a new chat session.'
+        );
     }
 
-    return response.json();
+    return responseBody;
 }

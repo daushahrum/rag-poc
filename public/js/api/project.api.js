@@ -24,7 +24,7 @@ export async function createProject(name, code) {
 }
 
 export async function fetchProjectEnvironments(projectId) {
-    const response = await fetch(`/api/project/environment_list/${encodeURIComponent(projectId)}`, {
+    const response = await fetch(`/api/project/environments/project/${encodeURIComponent(projectId)}`, {
         headers: getAuthHeaders(),
     });
 
@@ -34,5 +34,5 @@ export async function fetchProjectEnvironments(projectId) {
     }
 
     const data = await response.json();
-    return data.environments ?? [];
+    return Array.isArray(data) ? data : (data.environments ?? []);
 }
