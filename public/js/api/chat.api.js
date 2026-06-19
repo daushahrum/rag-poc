@@ -56,22 +56,22 @@ export async function fetchSessions({
 
     return sessions.map((session) => ({
         ...session,
-        title: session.title ?? session.topic ?? 'Untitled chat',
+        title: session.title ?? session.topic ?? 'New chat',
     }));
 }
 
 export async function fetchSessionMessages(sessionId) {
-    const response = await fetch(`/api/chat/sessions/${encodeURIComponent(sessionId)}`, {
+    const response = await fetch(`/api/chat/messages/list?session_id=${encodeURIComponent(sessionId)}`, {
         headers: getAuthHeaders(),
     });
 
     if (!response.ok) {
         const data = await response.json().catch(() => ({}));
-        throw new Error(data.error ?? 'Could not load that chat.');
+throw new Error(data.error ?? 'Could not load that chat.');
     }
 
     const data = await response.json();
-    return data.messages ?? [];
+    return data ?? [];
 }
 
 export async function createChatSession(user, environmentId) {
