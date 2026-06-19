@@ -5,6 +5,7 @@
 import { getAuthHeaders } from '../auth.js';
 
 export async function sendMessage(sessionId, message) {
+    const TAG = '[chat.api.js sendMessage]';
     const response = await fetch('/api/chat/portal/send', {
         method: 'POST',
         headers: {
@@ -16,6 +17,8 @@ export async function sendMessage(sessionId, message) {
             message,
         }),
     });
+    // console.log(TAG, 'response.json: ', response.json)
+    // console.log(TAG, 'response.body: ', response.body)
 
     if (!response.ok) {
         const data = await response.json().catch(() => ({}));

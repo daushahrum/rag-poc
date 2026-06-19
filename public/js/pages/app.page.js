@@ -313,6 +313,7 @@ async function initializeChat() {
 // ─── Event listeners: chat form ───────────────────────────────────────────────
 
 form.addEventListener('submit', async (event) => {
+    const TAG = '[form submit]';
     event.preventDefault();
 
     const message = input.value.trim();
@@ -330,7 +331,8 @@ form.addEventListener('submit', async (event) => {
 
     try {
         const data = await sendMessage(sessionId, message);
-        typing.replaceWith(createMessage('assistant', data.answer, data.sources));
+        console.log(TAG, 'data: ', data)
+        typing.replaceWith(createMessage('assistant', data.content, data.sources));
         await refreshSessions();
     } catch (error) {
         typing.replaceWith(createMessage('assistant', error.message));

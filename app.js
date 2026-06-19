@@ -62,11 +62,13 @@ app.get("/sessions/:id/messages", auth.authenticate, async (req, res, next) => {
 
 // Chat endpoint - use portal/send for authenticated users
 app.post("/chat", auth.authenticate, async (req, res) => {
+  const TAG = '[auth.authenticate]';
   const { sessionId, message } = req.body;
   req.body = {
     session_id: sessionId,
     message: message
   };
+  // console.log(TAG, 'body: ', body)
   // Set routeSource to indicate this is from portal (authenticated user)
   req.routeSource = 'portal';
   return chatController.sendMessage(req, res);
