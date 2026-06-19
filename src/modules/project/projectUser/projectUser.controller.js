@@ -80,7 +80,7 @@ export async function getProjectUser(req, res) {
     try {
         const projectUser =
             await projectUserService.getProjectUser(
-                req.query
+                { id: req.params.id }
             );
 
         return res.json(projectUser);

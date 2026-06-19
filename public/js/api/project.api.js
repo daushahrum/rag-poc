@@ -36,3 +36,17 @@ export async function fetchProjectEnvironments(projectId) {
     const data = await response.json();
     return Array.isArray(data) ? data : (data.environments ?? []);
 }
+
+export async function getProjectUser(userId) {
+    const response = await fetch(`/api/project/users/find?external_user_id=${encodeURIComponent(userId)}`, {
+        headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error ?? 'Could not load project user.');
+    }
+
+    const data = await response.json();
+    return data;
+}
