@@ -11,14 +11,15 @@
     <main class="app-shell">
       <aside class="sidebar" aria-label="Chat navigation">
         <div class="brand">
-          <div class="brand-mark" aria-hidden="true">A</div>
-          <div>
-            <h1>ANDI</h1>
-            <p>Knowledge chatbot</p>
-          </div>
+          <button class="brand-logo-button" id="sidebarLogoButton" type="button" aria-label="Expand sidebar">
+            <span class="brand-mark" aria-hidden="true">A</span>
+          </button>
+          <button class="sidebar-collapse-button" id="sidebarCollapseButton" type="button" aria-label="Collapse sidebar">
+            <i class="bi bi-layout-sidebar-inset-reverse"></i>
+          </button>
         </div>
 
-        <button class="new-chat" id="newChatButton" type="button">
+        <button class="developer-menu-button new-chat" id="newChatButton" type="button">
           <i class="bi bi-plus-lg"></i>
           <span class="btn-label">New chat</span>
         </button>
@@ -46,6 +47,13 @@
             </div>
           </div>
         </div>
+
+        <div class="sidebar-footer">
+          <button class="developer-menu-button" id="settingsButton" type="button">
+            <i class="bi bi-gear"></i>
+            <span class="btn-label">Settings</span>
+          </button>
+        </div>
       </aside>
 
       <div class="sidebar-resizer" aria-hidden="true"></div>
@@ -60,9 +68,14 @@
             <h2>ANDI</h2>
             <p>Ask questions across your ingested knowledge.</p>
           </div>
-          <button class="logout-button" id="logoutButton" type="button">
-            Logout
-          </button>
+          <div class="header-actions">
+            <button class="logout-button" id="logoutButton" type="button">
+              <span>Logout</span>
+            </button>
+            <button class="profile-button" id="profileButton" type="button" aria-label="Profile">
+              <i class="bi bi-person-circle" aria-hidden="true"></i>
+            </button>
+          </div>
         </header>
 
         <div class="messages" id="messages" aria-live="polite">
@@ -272,15 +285,31 @@
     <!-- Sidebar drag-to-resize -->
     <script>
       (function () {
+        var COLLAPSED_W = 80;
         var MIN_W   = 80;
         var MAX_W   = 520;
+        var DEFAULT_W = 272;
         var root    = document.documentElement;
         var resizer = document.querySelector('.sidebar-resizer');
         var sidebar = document.querySelector('.sidebar');
+        var logoButton = document.getElementById('sidebarLogoButton');
+        var collapseButton = document.getElementById('sidebarCollapseButton');
+        var lastExpandedWidth = DEFAULT_W;
 
         function applyWidth(w) {
           root.style.setProperty('--sidebar-width', w + 'px');
           sidebar.classList.toggle('collapsed', w <= (MIN_W+50));
+          if (w > (MIN_W + 50)) {
+            lastExpandedWidth = w;
+          }
+        }
+
+        function expandSidebar() {
+          applyWidth(Math.max(DEFAULT_W, lastExpandedWidth));
+        }
+
+        function collapseSidebar() {
+          applyWidth(COLLAPSED_W);
         }
 
         resizer.addEventListener('mousedown', function (e) {
@@ -313,6 +342,28 @@
           document.addEventListener('mousemove', onMove);
           document.addEventListener('mouseup',   onUp);
         });
+
+        collapseButton.addEventListener('click', function () {
+          if (window.innerWidth <= 767) {
+            sidebar.classList.remove('sidebar-open');
+            document.getElementById('sidebarOverlay').classList.remove('active');
+            return;
+          }
+
+          collapseSidebar();
+        });
+
+        logoButton.addEventListener('click', function () {
+          if (window.innerWidth <= 767) {
+            return;
+          }
+
+          if (sidebar.classList.contains('collapsed')) {
+            expandSidebar();
+          }
+        });
+
+        applyWidth(parseInt(getComputedStyle(root).getPropertyValue('--sidebar-width'), 10) || DEFAULT_W);
       })();
     </script>
 

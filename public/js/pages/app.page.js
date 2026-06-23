@@ -88,6 +88,48 @@ let sessions = [];
 let knowledgeDocuments = [];
 let selectedKnowledgeId = null;
 let selectedEnvironmentId = null;
+let sidebarSelection = {
+    type: 'new-chat',
+    value: null,
+};
+
+const developerMenuButtons = {
+    project: openProjectButton,
+    ingest: openIngestButton,
+    knowledge: openKnowledgeButton,
+};
+
+function setSidebarSelection(type, value = null) {
+    sidebarSelection = { type, value };
+    renderSidebarSelection();
+}
+
+function renderSidebarSelection() {
+    newChatButton.classList.toggle('active', sidebarSelection.type === 'new-chat');
+    newChatButton.setAttribute('aria-current', sidebarSelection.type === 'new-chat' ? 'true' : 'false');
+
+    Object.entries(developerMenuButtons).forEach(([key, button]) => {
+        const isActive = sidebarSelection.type === 'developer' && sidebarSelection.value === key;
+        button.classList.toggle('active', isActive);
+        button.setAttribute('aria-current', isActive ? 'true' : 'false');
+    });
+
+    const historyButtons = historyList.querySelectorAll('.history-item');
+    historyButtons.forEach((button) => {
+        const isActive = sidebarSelection.type === 'session' && button.dataset.sessionId === String(sidebarSelection.value);
+        button.classList.toggle('active', isActive);
+        button.setAttribute('aria-current', isActive ? 'true' : 'false');
+    });
+}
+
+function restorePrimarySidebarSelection() {
+    if (sessionId) {
+        setSidebarSelection('session', sessionId);
+        return;
+    }
+
+    setSidebarSelection('new-chat');
+}
 
 // ─── Chat rendering ───────────────────────────────────────────────────────────
 
@@ -169,9 +211,13 @@ async function refreshSessions() {
 }
 
 async function loadSession(nextSessionId) {
-    if (nextSessionId === sessionId) return;
+    if (nextSessionId === sessionId) {
+        setSidebarSelection('session', nextSessionId);
+        return;
+    }
 
     sessionId = nextSessionId;
+    setSidebarSelection('session', nextSessionId);
     renderHistory();
     messages.innerHTML = '';
     messages.append(createTypingMessage());
@@ -214,8 +260,7 @@ function renderHistory() {
         const button = document.createElement('button');
         button.className = 'history-item';
         button.type = 'button';
-        button.classList.toggle('active', session.id === sessionId);
-        button.setAttribute('aria-current', session.id === sessionId ? 'true' : 'false');
+        button.dataset.sessionId = String(session.id);
 
         const title = document.createElement('span');
         title.className = 'history-title';
@@ -226,6 +271,8 @@ function renderHistory() {
 
         historyList.append(button);
     }
+
+    renderSidebarSelection();
 }
 
 // ─── Knowledge center ─────────────────────────────────────────────────────────
@@ -318,18 +365,21 @@ function closeAllPanels() {
 function closeIngestMenu() {
     ingestDrawer.classList.remove('open');
     ingestDrawer.setAttribute('aria-hidden', 'true');
+    restorePrimarySidebarSelection();
     openIngestButton.focus();
 }
 
 function closeProjectMenu() {
     projectDrawer.classList.remove('open');
     projectDrawer.setAttribute('aria-hidden', 'true');
+    restorePrimarySidebarSelection();
     openProjectButton.focus();
 }
 
 function closeKnowledgeCenter() {
     knowledgeCenter.classList.remove('open');
     knowledgeCenter.setAttribute('aria-hidden', 'true');
+    restorePrimarySidebarSelection();
     openKnowledgeButton.focus();
 }
 
@@ -407,6 +457,7 @@ input.addEventListener('keydown', (event) => {
 // ─── Event listeners: new chat ────────────────────────────────────────────────
 
 newChatButton.addEventListener('click', async () => {
+    setSidebarSelection('new-chat');
     renderWelcomeMessage();
 
     try {
@@ -425,6 +476,7 @@ openProjectButton.addEventListener('click', () => {
         return;
     }
     closeAllPanels();
+    setSidebarSelection('developer', 'project');
     projectDrawer.classList.add('open');
     projectDrawer.setAttribute('aria-hidden', 'false');
     projectNameInput.focus();
@@ -483,6 +535,7 @@ openIngestButton.addEventListener('click', () => {
         return;
     }
     closeAllPanels();
+    setSidebarSelection('developer', 'ingest');
     ingestDrawer.classList.add('open');
     ingestDrawer.setAttribute('aria-hidden', 'false');
     knowledgeInput.focus();
@@ -554,6 +607,7 @@ openKnowledgeButton.addEventListener('click', async () => {
         return;
     }
     closeAllPanels();
+    setSidebarSelection('developer', 'knowledge');
     knowledgeCenter.classList.add('open');
     knowledgeCenter.setAttribute('aria-hidden', 'false');
     knowledgeCenterStatus.textContent = 'Loading documents...';
@@ -651,4 +705,5 @@ logoutButton.addEventListener('click', () => {
 
 clearKnowledgeEditor();
 resizeTextarea(input);
+renderSidebarSelection();
 initializeChat();

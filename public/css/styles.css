@@ -13,8 +13,8 @@
   --text: #111827;
   --muted: #6b7280;
   --accent: #00b4d8;
-  --accent-dark: #0077b6;
-  --accent-light: #90e0ef;
+  --accent-dark: #0EA5E9;
+  --accent-light: #E7F5FB;
   --danger: #b42318;
   --user: #e9eefc;
   --assistant: #ffffff;
@@ -73,7 +73,7 @@ button:disabled {
   top: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 0;
   height: 100vh;
   min-height: 0;
   /* padding: 12px 10px; */
@@ -81,6 +81,12 @@ button:disabled {
   background: var(--sidebar);
   color: var(--sidebar-text);
   /* border-right removed — resizer div acts as the separator */
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
 }
 
 /* ── Sidebar resize handle ── */
@@ -120,7 +126,7 @@ button:disabled {
 
 /* Inline-style labels: fade + shrink horizontally */
 .sidebar.collapsed .btn-label,
-.sidebar.collapsed .brand > div:last-child {
+.sidebar.collapsed .sidebar-collapse-button {
   max-width: 0;
   opacity: 0;
   pointer-events: none;
@@ -141,13 +147,9 @@ button:disabled {
 /* Centre-align the brand mark */
 .sidebar.collapsed .brand {
   justify-content: center;
-  padding-left: 0;
-  padding-right: 0;
-  border-bottom-color: transparent;
 }
 
 /* Centre-align buttons and shrink padding */
-.sidebar.collapsed .new-chat,
 .sidebar.collapsed .developer-menu-button {
   justify-content: center;
   /* padding: 9px 0; */
@@ -184,21 +186,44 @@ button:disabled {
   transition: opacity 0.22s ease-in-out, max-width 0.28s ease-in-out;
 }
 
-/* Brand text block (ANDI / Knowledge chatbot) — same horizontal shrink */
-.brand > div:last-child {
-  overflow: hidden;
-  max-width: 200px;
-  opacity: 1;
-  transition: opacity 0.22s ease-in-out, max-width 0.28s ease-in-out;
-}
-
 .brand {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 8px 12px;
-  margin-bottom: 4px;
+  justify-content: space-between;
+  min-height: 60px;
+  padding: 12px 16px;
   border-bottom: 1px solid var(--border);
+}
+
+.brand-logo-button,
+.sidebar-collapse-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  transition: background 0.12s ease, color 0.12s ease,
+              opacity 0.22s ease-in-out, max-width 0.28s ease-in-out;
+}
+
+.brand-logo-button:hover,
+.sidebar-collapse-button:hover {
+  background: var(--surface-soft);
+  color: var(--text);
+}
+
+.sidebar-collapse-button {
+  flex-shrink: 0;
+  overflow: hidden;
+  max-width: 36px;
+}
+
+.sidebar-collapse-button i {
+  font-size: 18px;
 }
 
 .brand-mark,
@@ -218,8 +243,6 @@ button:disabled {
   color: #ffffff;
 }
 
-.brand h1,
-.brand p,
 .chat-header h2,
 .chat-header p,
 .section-label,
@@ -235,21 +258,7 @@ button:disabled {
   margin: 0;
 }
 
-.brand h1 {
-  font-size: 15px;
-  font-weight: 700;
-  line-height: 1.2;
-  color: var(--text);
-}
-
-.brand p {
-  color: var(--muted);
-  font-size: 11px;
-  margin-top: 1px;
-}
-
 /* ── Sidebar buttons ── */
-.new-chat,
 .developer-menu-button,
 .history-item,
 .ingest-button,
@@ -264,40 +273,21 @@ button:disabled {
   transition: background 0.12s ease, color 0.12s ease;
 }
 
-.new-chat,
 .developer-menu-button {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 9px 18px;
+  padding: 11px 18px;
   background: transparent;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 400;
   color: var(--sidebar-text);
 }
 
-.new-chat {
-  background: var(--accent);
-  color: #ffffff;
-  font-weight: 700;
-  margin-bottom: 6px;
-  /* box-shadow: 0 1px 3px rgba(16, 163, 127, 0.25); */
-}
-
-.new-chat:hover {
-  background: var(--accent-dark);
-  color: #ffffff;
-}
-
-.new-chat i,
 .developer-menu-button i {
   flex-shrink: 0;
   font-size: 18px;
   /* opacity: 0.85; */
-}
-
-.new-chat i {
-  color: #ffffff;
 }
 
 .developer-menu-button i {
@@ -309,10 +299,31 @@ button:disabled {
   color: var(--text);
 }
 
+.developer-menu-button.active {
+  position: relative;
+  background: var(--accent-light);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.developer-menu-button.active::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 3px;
+  height: 100%;
+  background: var(--accent);
+}
+
+.developer-menu-button.active i {
+  color: var(--accent);
+}
+
 /* ── Sidebar section ── */
 .sidebar-section {
   display: grid;
-  gap: 4px;
+  gap: 0;
   min-height: 0;
   margin-top: 8px;
 }
@@ -333,7 +344,7 @@ button:disabled {
 /* ── History list ── */
 .history-list {
   display: grid;
-  gap: 2px;
+  gap: 0;
 }
 
 .history-loading {
@@ -361,7 +372,7 @@ button:disabled {
   align-items: flex-start;
   width: 100%;
   min-height: 38px;
-  padding: 8px 18px;
+  padding: 10px 18px;
   background: transparent;
   color: var(--sidebar-text);
   border: none;
@@ -375,13 +386,28 @@ button:disabled {
 }
 
 .history-item.active {
+  position: relative;
   background: var(--sidebar-active);
   color: var(--text);
 }
 
+.history-item.active::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 3px;
+  height: 100%;
+  background: var(--sidebar-muted);
+}
+
 .history-item.active .history-title,
 .history-item.active .history-meta {
-  color: var(--text);
+  color: inherit;
+}
+
+.history-item.active .history-meta {
+  color: var(--sidebar-muted);
 }
 
 .history-title,
@@ -395,16 +421,20 @@ button:disabled {
 }
 
 .history-title {
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 400;
   color: inherit;
   overflow: hidden;
   max-height: 2.5em;
   transition: opacity 0.16s ease-in-out, max-height 0.22s ease-in-out;
 }
 
+.history-item.active .history-title {
+  font-weight: 600;
+}
+
 .history-meta {
-  font-size: 11px;
+  font-size: 14x;
   font-weight: 500;
   color: var(--sidebar-muted);
   margin-top: 1px;
@@ -443,6 +473,12 @@ button:disabled {
   padding: 12px 24px;
   border-bottom: 1px solid var(--border);
   background: var(--surface);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .chat-header h2 {
@@ -766,6 +802,24 @@ button:disabled {
   transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
 }
 
+.profile-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+.profile-button i {
+  font-size: 18px;
+}
+
+.profile-button:hover,
 .logout-button:hover {
   background: var(--surface-soft);
   color: var(--text);
