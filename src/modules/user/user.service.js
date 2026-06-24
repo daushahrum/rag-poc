@@ -22,6 +22,10 @@ export async function createUser(payload) {
     if (!id) {
         throw new Error('User ID is required');
     }
+    
+    if (!role) {
+        throw new Error('User role is required');
+    }
 
     if (!password) {
         throw new Error('Password is required');
@@ -31,7 +35,6 @@ export async function createUser(payload) {
         throw new Error('Email is required');
     }
 
-    // hash password
     const hash = await bcrypt.hash(password, 10);
 
     const project = await projectRepository.getProjectById(
@@ -48,12 +51,14 @@ export async function createUser(payload) {
         active: true,
     });
 
-    await projectUserRepository.createProjectUser({
-        id: `${project.code}_${payload.id}`,
-        project_id: payload.project_id,
-        external_user_id: payload.id,
-        user_type: 'portal',
-    });
+    if(role == 'project_owner'){
+        await projectUserRepository.createProjectUser({
+            id: `${project.code}_${payload.id}`,
+            project_id: payload.project_id,
+            external_user_id: payload.id,
+            user_type: 'portal',
+        });
+    }
 
     return user;
 }

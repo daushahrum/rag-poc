@@ -5,7 +5,6 @@
 import { getAuthHeaders } from '../auth.js';
 
 export async function sendMessage(sessionId, message) {
-    const TAG = '[chat.api.js sendMessage]';
     const response = await fetch('/api/chat/portal/send', {
         method: 'POST',
         headers: {
@@ -17,9 +16,6 @@ export async function sendMessage(sessionId, message) {
             message,
         }),
     });
-    // console.log(TAG, 'response.json: ', response.json)
-    // console.log(TAG, 'response.body: ', response.body)
-
     if (!response.ok) {
         const data = await response.json().catch(() => ({}));
         throw new Error(data.error ?? 'The assistant could not answer right now.');
@@ -84,35 +80,18 @@ export async function createChatSession(user, environmentId) {
         environment_id: environmentId,
     };
 
-    const headers = {
-        'Content-Type': 'application/json',
-        ...getAuthHeaders(),
-    };
-
-    // Equivalent curl
-    const curl = [
-        `curl -X POST "${window.location.origin}/api/chat/sessions/portal/create"`,
-        ...Object.entries(headers).map(
-            ([key, value]) => `-H "${key}: ${value}"`
-        ),
-        `-d '${JSON.stringify(payload)}'`,
-    ].join(' ');
-
-    console.log('[createChatSession] CURL:');
-    console.log(curl);
-
     const response = await fetch('/api/chat/sessions/portal/create', {
         method: 'POST',
-        headers,
+        headers: {
+            'Content-Type': 'application/json',
+            ...getAuthHeaders(),
+        },
         body: JSON.stringify(payload),
     });
 
     const responseBody = await response.clone().json().catch(async () => {
         return await response.clone().text();
     });
-
-    console.log('[createChatSession] Status:', response.status);
-    console.log('[createChatSession] Response:', responseBody);
 
     if (!response.ok) {
         throw new Error(

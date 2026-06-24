@@ -39,3 +39,31 @@ export function authenticate(
             });
     }
 }
+
+export function authorizeAdminCreation(
+    req,
+    res,
+    next
+) {
+    const requestedRole = String(req.body?.role ?? '')
+        .trim()
+        .toLowerCase();
+
+    if (requestedRole !== 'admin') {
+        return next();
+    }
+
+    const creatorRole = String(req.token?.role ?? '')
+        .trim()
+        .toLowerCase();
+
+    if (creatorRole !== 'admin') {
+        return res
+            .status(403)
+            .json({
+                message: 'Only admins can create admin users',
+            });
+    }
+
+    next();
+}

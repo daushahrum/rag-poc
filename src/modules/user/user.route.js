@@ -16,6 +16,7 @@ const router = express.Router();
 router.post(
     '/create',
     auth.authenticate,
+    auth.authorizeAdminCreation,
     userController.createUser
 );
 

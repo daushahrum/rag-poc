@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ANDI Chat</title>
+    <link rel="icon" href="/assets/icons/andi_favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/css/styles.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
   </head>
@@ -12,35 +13,53 @@
       <aside class="sidebar" aria-label="Chat navigation">
         <div class="brand">
           <button class="brand-logo-button" id="sidebarLogoButton" type="button" aria-label="Expand sidebar">
-            <span class="brand-mark" aria-hidden="true">A</span>
+            <img class="brand-mark" src="/assets/icons/andi_icon_main.svg" alt="" aria-hidden="true" />
           </button>
           <button class="sidebar-collapse-button" id="sidebarCollapseButton" type="button" aria-label="Collapse sidebar">
             <i class="bi bi-layout-sidebar-inset-reverse"></i>
           </button>
         </div>
 
-        <button class="developer-menu-button new-chat" id="newChatButton" type="button">
-          <i class="bi bi-plus-lg"></i>
-          <span class="btn-label">New chat</span>
-        </button>
+        <nav class="role-menu" id="roleMenu" aria-label="Role navigation">
+          <button class="developer-menu-button new-chat" id="newChatButton" type="button" data-menu-role="project-owner fallback">
+            <i class="bi bi-plus-lg"></i>
+            <span class="btn-label">New Chat</span>
+          </button>
+          <button class="developer-menu-button" id="myProjectButton" type="button" data-menu-role="project-owner">
+            <i class="bi bi-folder"></i>
+            <span class="btn-label">My Project</span>
+          </button>
+          <button class="developer-menu-button" id="analyticsButton" type="button" data-menu-role="project-owner">
+            <i class="bi bi-bar-chart"></i>
+            <span class="btn-label">Analytics</span>
+          </button>
 
-        <button class="developer-menu-button" id="openProjectButton" type="button">
-          <i class="bi bi-folder-plus"></i>
-          <span class="btn-label">Create project</span>
-        </button>
+          <button class="developer-menu-button" id="adminDashboardButton" type="button" data-menu-role="admin">
+            <i class="bi bi-grid"></i>
+            <span class="btn-label">Dashboard</span>
+          </button>
+          <button class="developer-menu-button" id="adminProjectsButton" type="button" data-menu-role="admin">
+            <i class="bi bi-folder"></i>
+            <span class="btn-label">Projects</span>
+          </button>
+          <button class="developer-menu-button" id="adminUsersButton" type="button" data-menu-role="admin">
+            <i class="bi bi-people"></i>
+            <span class="btn-label">Users</span>
+          </button>
+          <button class="developer-menu-button" id="adminChatButton" type="button" data-menu-role="admin">
+            <i class="bi bi-chat-dots"></i>
+            <span class="btn-label">Chat</span>
+          </button>
+        </nav>
 
-        <button class="developer-menu-button" id="openIngestButton" type="button">
-          <i class="bi bi-database-down"></i>
-          <span class="btn-label">Ingest knowledge</span>
-        </button>
-
-        <button class="developer-menu-button" id="openKnowledgeButton" type="button">
-          <i class="bi bi-book"></i>
-          <span class="btn-label">Knowledge center</span>
-        </button>
+        <div class="sidebar-legacy-actions" hidden>
+          <button id="openProjectButton" type="button">Create project</button>
+          <button id="openIngestButton" type="button">Ingest knowledge</button>
+          <button id="openKnowledgeButton" type="button">Knowledge center</button>
+        </div>
 
         <div class="sidebar-section">
-          <p class="section-label">Chats</p>
+          <p class="section-label" id="historySectionLabel">Chats</p>
           <div class="history-list" id="historyList" aria-live="polite">
             <div class="history-loading" aria-label="Loading chats">
               <div class="history-spinner"></div>
@@ -48,7 +67,7 @@
           </div>
         </div>
 
-        <div class="sidebar-footer">
+        <div class="sidebar-footer" hidden>
           <button class="developer-menu-button" id="settingsButton" type="button">
             <i class="bi bi-gear"></i>
             <span class="btn-label">Settings</span>
@@ -65,8 +84,14 @@
             <i class="bi bi-list"></i>
           </button>
           <div class="chat-context">
+            <div class="admin-project-field" id="adminProjectField" hidden>
+              <label class="sr-only" for="projectSelect">Project</label>
+              <select id="projectSelect" aria-label="Project">
+                <option value="">Choose project</option>
+              </select>
+            </div>
             <h2 id="projectName">Loading project...</h2>
-            <div class="environment-field">
+            <div class="environment-field" id="environmentField">
               <label class="sr-only" for="environmentSelect">Environment</label>
               <select id="environmentSelect" aria-label="Environment" disabled>
                 <option value="">Loading environments...</option>
@@ -85,6 +110,7 @@
 
         <div class="messages" id="messages" aria-live="polite">
           <div class="welcome-screen">
+            <img class="welcome-icon" src="/assets/icons/andi_icon_main.svg" alt="" aria-hidden="true" />
             <div class="welcome-row">
               <p class="welcome-greeting">Hello. Ask me anything from your ingested documents.</p>
             </div>
@@ -303,7 +329,13 @@
         var lastExpandedWidth = DEFAULT_W;
 
         function applyWidth(w) {
+          var collapseProgress = Math.max(0, Math.min(1, ((MIN_W + 50) - w) / 50));
+          var iconInset = 18 + (13 * collapseProgress);
+          var brandInset = 16 + (6 * collapseProgress);
+
           root.style.setProperty('--sidebar-width', w + 'px');
+          root.style.setProperty('--collapsed-icon-inset', iconInset + 'px');
+          root.style.setProperty('--collapsed-brand-inset', brandInset + 'px');
           sidebar.classList.toggle('collapsed', w <= (MIN_W+50));
           collapseButton.setAttribute('aria-expanded', String(w > (MIN_W + 50)));
           logoButton.setAttribute('aria-expanded', String(w > (MIN_W + 50)));

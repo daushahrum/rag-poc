@@ -2,10 +2,24 @@
  * App Page — handles views/index.html (main chat interface)
  */
 
-import { getAuthHeaders, clearAuth, isAuthenticated, getUser } from '../auth.js';
+import {
+    getAuthHeaders,
+    clearAuth,
+    getCurrentUser,
+    isAuthenticated,
+    isAdmin,
+    isProjectOwner,
+} from '../auth.js';
 
 import { sendMessage, fetchSessions, fetchSessionMessages, createChatSession } from '../api/chat.api.js';
-import { createProject, fetchProject, fetchProjectEnvironments, getProjectUser } from '../api/project.api.js';
+import {
+    createProject,
+    fetchProject,
+    fetchProjects,
+    fetchProjectEnvironments,
+    getProjectUser,
+} from '../api/project.api.js';
+import { createUser } from '../api/user.api.js';
 import {
     ingestKnowledge,
     fetchKnowledgeDocuments,
@@ -30,11 +44,24 @@ if (!isAuthenticated()) {
 
 const form                  = document.querySelector('#chatForm');
 const input                 = document.querySelector('#messageInput');
+const sendButton            = form.querySelector('.send-button');
 const messages              = document.querySelector('#messages');
 const newChatButton         = document.querySelector('#newChatButton');
 const historyList           = document.querySelector('#historyList');
 const projectName           = document.querySelector('#projectName');
+const projectSelect         = document.querySelector('#projectSelect');
+const adminProjectField     = document.querySelector('#adminProjectField');
+const environmentField      = document.querySelector('#environmentField');
 const environmentSelect     = document.querySelector('#environmentSelect');
+const roleMenu              = document.querySelector('#roleMenu');
+const sidebarSection        = document.querySelector('.sidebar-section');
+const historySectionLabel   = document.querySelector('#historySectionLabel');
+const myProjectButton       = document.querySelector('#myProjectButton');
+const analyticsButton       = document.querySelector('#analyticsButton');
+const adminDashboardButton  = document.querySelector('#adminDashboardButton');
+const adminProjectsButton   = document.querySelector('#adminProjectsButton');
+const adminUsersButton      = document.querySelector('#adminUsersButton');
+const adminChatButton       = document.querySelector('#adminChatButton');
 
 // Project drawer
 const openProjectButton     = document.querySelector('#openProjectButton');
@@ -92,9 +119,34 @@ let selectedKnowledgeId = null;
 let selectedEnvironmentId = null;
 let projectUserId = null;
 let environments = [];
+let projects = [];
+let activeProjectId = null;
+let activeProjectName = '';
+const currentUser = getCurrentUser();
+const roleMode = isAdmin() ? 'admin' : (isProjectOwner() ? 'project-owner' : 'fallback');
+const DEFAULT_COMPOSER_PLACEHOLDER = 'Ask anything';
+const NO_ENVIRONMENT_PLACEHOLDER = 'No environments found for this project';
+
+function setComposerEnabled(enabled) {
+    input.disabled = !enabled;
+    sendButton.disabled = !enabled;
+    input.placeholder = enabled
+        ? DEFAULT_COMPOSER_PLACEHOLDER
+        : NO_ENVIRONMENT_PLACEHOLDER;
+}
 let sidebarSelection = {
-    type: 'new-chat',
+    type: 'menu',
     value: null,
+};
+
+const roleMenuButtons = {
+    'new-chat': newChatButton,
+    'my-project': myProjectButton,
+    analytics: analyticsButton,
+    dashboard: adminDashboardButton,
+    projects: adminProjectsButton,
+    users: adminUsersButton,
+    chat: adminChatButton,
 };
 
 const developerMenuButtons = {
@@ -109,8 +161,18 @@ function setSidebarSelection(type, value = null) {
 }
 
 function renderSidebarSelection() {
-    newChatButton.classList.toggle('active', sidebarSelection.type === 'new-chat');
-    newChatButton.setAttribute('aria-current', sidebarSelection.type === 'new-chat' ? 'true' : 'false');
+    Object.entries(roleMenuButtons).forEach(([key, button]) => {
+        const isActive = (
+            sidebarSelection.type === 'menu'
+            && sidebarSelection.value === key
+        ) || (
+            roleMode === 'admin'
+            && key === 'chat'
+            && sidebarSelection.type === 'session'
+        );
+        button.classList.toggle('active', isActive);
+        button.setAttribute('aria-current', isActive ? 'page' : 'false');
+    });
 
     Object.entries(developerMenuButtons).forEach(([key, button]) => {
         const isActive = sidebarSelection.type === 'developer' && sidebarSelection.value === key;
@@ -132,7 +194,14 @@ function restorePrimarySidebarSelection() {
         return;
     }
 
-    setSidebarSelection('new-chat');
+    setSidebarSelection('menu', roleMode === 'admin' ? 'chat' : 'new-chat');
+}
+
+function renderRoleMenu() {
+    roleMenu.querySelectorAll('[data-menu-role]').forEach((button) => {
+        const allowedRoles = button.dataset.menuRole.split(/\s+/);
+        button.hidden = !allowedRoles.includes(roleMode);
+    });
 }
 
 // ─── Chat rendering ───────────────────────────────────────────────────────────
@@ -143,6 +212,13 @@ function renderWelcomeMessage() {
     const screen = document.createElement('div');
     screen.className = 'welcome-screen';
 
+    const welcomeIcon = document.createElement('img');
+    welcomeIcon.className = 'welcome-icon';
+    welcomeIcon.src = '/assets/icons/andi_icon_main.svg';
+    welcomeIcon.alt = '';
+    welcomeIcon.setAttribute('aria-hidden', 'true');
+    screen.append(welcomeIcon);
+
     // Greeting row
     const row = document.createElement('div');
     row.className = 'welcome-row';
@@ -151,41 +227,353 @@ function renderWelcomeMessage() {
     greeting.textContent = getRandomGreeting();
     row.append(greeting);
 
-    // Action cards row
-    const cards = document.createElement('div');
-    cards.className = 'welcome-cards';
+    screen.append(row);
 
-    const ingestCard = document.createElement('button');
-    ingestCard.className = 'welcome-card';
-    ingestCard.type = 'button';
-    ingestCard.innerHTML = '<i class="bi bi-database-down"></i><span class="welcome-card-title">Ingest new knowledge</span><span class="welcome-card-subtitle">Teach ANDI new information on specific projects.</span>';
-    ingestCard.addEventListener('click', () => openIngestButton.click());
+    if (roleMode === 'project-owner') {
+        const cards = document.createElement('div');
+        cards.className = 'welcome-cards';
 
-    const projectCard = document.createElement('button');
-    projectCard.className = 'welcome-card';
-    projectCard.type = 'button';
-    projectCard.innerHTML = '<i class="bi bi-folder-plus"></i><span class="welcome-card-title">Create new project</span><span class="welcome-card-subtitle">Establish new projects for ANDI to explore on.</span>';
-    projectCard.addEventListener('click', () => openProjectButton.click());
+        const ingestCard = document.createElement('button');
+        ingestCard.className = 'welcome-card';
+        ingestCard.type = 'button';
+        ingestCard.innerHTML = '<i class="bi bi-database-down"></i><span class="welcome-card-title">Ingest new knowledge</span><span class="welcome-card-subtitle">Teach ANDI new information on specific projects.</span>';
+        ingestCard.addEventListener('click', () => openIngestButton.click());
 
-    cards.append(ingestCard, projectCard);
-    screen.append(row, cards);
+        const projectCard = document.createElement('button');
+        projectCard.className = 'welcome-card';
+        projectCard.type = 'button';
+        projectCard.innerHTML = '<i class="bi bi-folder-plus"></i><span class="welcome-card-title">Create new project</span><span class="welcome-card-subtitle">Establish new projects for ANDI to explore on.</span>';
+        projectCard.addEventListener('click', () => openProjectButton.click());
+
+        cards.append(ingestCard, projectCard);
+        screen.append(cards);
+    }
+
     messages.append(screen);
+}
+
+function renderPlaceholder(title, description) {
+    closeAllPanels();
+    form.hidden = true;
+    sidebarSection.hidden = true;
+    adminProjectField.hidden = true;
+    environmentField.hidden = true;
+    messages.innerHTML = '';
+
+    const screen = document.createElement('div');
+    screen.className = 'placeholder-screen';
+
+    const content = document.createElement('div');
+    const heading = document.createElement('h2');
+    heading.textContent = title;
+    const copy = document.createElement('p');
+    copy.textContent = description;
+
+    content.append(heading, copy);
+    screen.append(content);
+    messages.append(screen);
+}
+
+function createFormField(labelText, control) {
+    const field = document.createElement('label');
+    field.className = 'create-user-field';
+
+    const label = document.createElement('span');
+    label.textContent = labelText;
+
+    field.append(label, control);
+    return field;
+}
+
+function createInput(name, type, placeholder, autocomplete) {
+    const input = document.createElement('input');
+    input.name = name;
+    input.type = type;
+    input.placeholder = placeholder;
+    input.autocomplete = autocomplete;
+    input.required = true;
+    return input;
+}
+
+async function renderCreateUserScreen() {
+    if (roleMode !== 'admin') return;
+
+    closeAllPanels();
+    form.hidden = true;
+    sidebarSection.hidden = true;
+    adminProjectField.hidden = true;
+    environmentField.hidden = true;
+    messages.innerHTML = '';
+
+    const screen = document.createElement('div');
+    screen.className = 'create-user-screen';
+
+    const header = document.createElement('div');
+    header.className = 'create-user-header';
+    const eyebrow = document.createElement('p');
+    eyebrow.className = 'section-label';
+    eyebrow.textContent = 'User management';
+    const heading = document.createElement('h2');
+    heading.textContent = 'Create user';
+    const description = document.createElement('p');
+    description.textContent = 'Add an administrator or project owner and assign their project access.';
+    header.append(eyebrow, heading, description);
+
+    const userForm = document.createElement('form');
+    userForm.className = 'create-user-form';
+
+    const fields = document.createElement('div');
+    fields.className = 'create-user-grid';
+
+    const nameInput = createInput('name', 'text', 'Full name', 'name');
+    const usernameInput = createInput('username', 'text', 'Username', 'username');
+    const emailInput = createInput('email', 'email', 'name@example.com', 'email');
+    const mobileInput = createInput('mobile', 'tel', 'Mobile number', 'tel');
+    const passwordInput = createInput('password', 'password', 'Temporary password', 'new-password');
+    passwordInput.minLength = 8;
+
+    const roleSelect = document.createElement('select');
+    roleSelect.name = 'role';
+    roleSelect.required = true;
+    roleSelect.innerHTML = `
+        <option value="project_owner">Project Owner</option>
+        <option value="admin">Admin</option>
+    `;
+
+    const projectSelectInput = document.createElement('select');
+    projectSelectInput.name = 'project_id';
+    projectSelectInput.required = true;
+    projectSelectInput.disabled = true;
+    projectSelectInput.innerHTML = '<option value="">Loading projects...</option>';
+
+    fields.append(
+        createFormField('Name', nameInput),
+        createFormField('Username', usernameInput),
+        createFormField('Email', emailInput),
+        createFormField('Mobile', mobileInput),
+        createFormField('Role', roleSelect),
+        createFormField('Project', projectSelectInput),
+        createFormField('Temporary password', passwordInput),
+    );
+
+    const actions = document.createElement('div');
+    actions.className = 'create-user-actions';
+    const status = document.createElement('p');
+    status.className = 'create-user-status';
+    status.setAttribute('role', 'status');
+    const submit = document.createElement('button');
+    submit.className = 'create-user-submit';
+    submit.type = 'submit';
+    submit.textContent = 'Create user';
+    actions.append(status, submit);
+
+    userForm.append(fields, actions);
+    screen.append(header, userForm);
+    messages.append(screen);
+
+    try {
+        if (projects.length === 0) {
+            projects = await fetchProjects();
+        }
+
+        projectSelectInput.innerHTML = '<option value="">Select project</option>';
+        for (const project of projects) {
+            const option = document.createElement('option');
+            option.value = project.id;
+            option.textContent = project.name || project.code || `Project ${project.id}`;
+            projectSelectInput.append(option);
+        }
+
+        projectSelectInput.disabled = projects.length === 0;
+        if (projects.length === 0) {
+            status.textContent = 'Create a project before adding users.';
+            status.classList.add('error');
+        }
+    } catch (error) {
+        projectSelectInput.innerHTML = '<option value="">Projects unavailable</option>';
+        status.textContent = error.message;
+        status.classList.add('error');
+    }
+
+    userForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        status.textContent = '';
+        status.className = 'create-user-status';
+        submit.disabled = true;
+        submit.textContent = 'Creating...';
+
+        try {
+            await createUser({
+                id: usernameInput.value.trim(),
+                name: nameInput.value.trim(),
+                email: emailInput.value.trim(),
+                mobile: mobileInput.value.trim(),
+                password: passwordInput.value,
+                role: roleSelect.value,
+                project_id: projectSelectInput.value,
+            });
+
+            userForm.reset();
+            status.textContent = 'User created successfully.';
+            status.classList.add('success');
+            nameInput.focus();
+        } catch (error) {
+            status.textContent = error.message;
+            status.classList.add('error');
+        } finally {
+            submit.disabled = false;
+            submit.textContent = 'Create user';
+        }
+    });
+
+    nameInput.focus();
+}
+
+function renderCreateProjectScreen() {
+    if (roleMode !== 'admin') return;
+
+    closeAllPanels();
+    form.hidden = true;
+    sidebarSection.hidden = true;
+    adminProjectField.hidden = true;
+    environmentField.hidden = true;
+    messages.innerHTML = '';
+
+    const screen = document.createElement('div');
+    screen.className = 'create-user-screen';
+
+    const header = document.createElement('div');
+    header.className = 'create-user-header';
+    const eyebrow = document.createElement('p');
+    eyebrow.className = 'section-label';
+    eyebrow.textContent = 'Project management';
+    const heading = document.createElement('h2');
+    heading.textContent = 'Create project';
+    const description = document.createElement('p');
+    description.textContent = 'Set up a project workspace for environments, knowledge, users, and chat.';
+    header.append(eyebrow, heading, description);
+
+    const projectCreationForm = document.createElement('form');
+    projectCreationForm.className = 'create-user-form';
+
+    const fields = document.createElement('div');
+    fields.className = 'create-user-grid';
+    const nameInput = createInput('name', 'text', 'Project name', 'organization');
+    const codeInput = createInput('code', 'text', 'e.g. acme-support', 'off');
+    codeInput.pattern = '[a-z0-9]+(?:-[a-z0-9]+)*';
+    codeInput.title = 'Use lowercase letters, numbers, and single hyphens.';
+
+    const codeField = createFormField('Project code', codeInput);
+    const codeHint = document.createElement('small');
+    codeHint.className = 'create-field-hint';
+    codeHint.textContent = 'Lowercase letters, numbers, and hyphens only.';
+    codeField.append(codeHint);
+
+    fields.append(
+        createFormField('Project name', nameInput),
+        codeField,
+    );
+
+    const actions = document.createElement('div');
+    actions.className = 'create-user-actions';
+    const status = document.createElement('p');
+    status.className = 'create-user-status';
+    status.setAttribute('role', 'status');
+    const submit = document.createElement('button');
+    submit.className = 'create-user-submit';
+    submit.type = 'submit';
+    submit.textContent = 'Create project';
+    actions.append(status, submit);
+
+    const result = document.createElement('div');
+    result.className = 'create-project-result';
+    result.hidden = true;
+
+    projectCreationForm.append(fields, actions);
+    screen.append(header, projectCreationForm, result);
+    messages.append(screen);
+
+    codeInput.addEventListener('input', () => {
+        codeInput.value = codeInput.value
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '');
+    });
+
+    projectCreationForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        status.textContent = '';
+        status.className = 'create-user-status';
+        result.hidden = true;
+        submit.disabled = true;
+        submit.textContent = 'Creating...';
+
+        try {
+            const project = await createProject(
+                nameInput.value.trim(),
+                codeInput.value.trim(),
+            );
+
+            projects = [
+                project,
+                ...projects.filter((item) => String(item.id) !== String(project.id)),
+            ];
+
+            result.replaceChildren();
+            const resultIcon = document.createElement('span');
+            resultIcon.className = 'create-project-result-icon';
+            resultIcon.setAttribute('aria-hidden', 'true');
+            resultIcon.innerHTML = '<i class="bi bi-check-lg"></i>';
+            const resultCopy = document.createElement('div');
+            const resultName = document.createElement('strong');
+            resultName.textContent = project.name;
+            const resultCode = document.createElement('span');
+            resultCode.textContent = project.code;
+            resultCopy.append(resultName, resultCode);
+            result.append(resultIcon, resultCopy);
+            result.hidden = false;
+            projectCreationForm.reset();
+            status.textContent = 'Project created successfully.';
+            status.classList.add('success');
+            nameInput.focus();
+        } catch (error) {
+            status.textContent = error.message;
+            status.classList.add('error');
+        } finally {
+            submit.disabled = false;
+            submit.textContent = 'Create project';
+        }
+    });
+
+    nameInput.focus();
+}
+
+function showChatSurface() {
+    closeAllPanels();
+    form.hidden = false;
+    sidebarSection.hidden = false;
+    environmentField.hidden = false;
+    historySectionLabel.textContent = 'Chats';
 }
 
 // ─── Session management ──────────────────────────────────────────────────────
 
 async function startSession() {
-    const user = getUser();
-    if (!user || !user.project_id) {
+    if (!currentUser || !activeProjectId) {
         throw new Error('User project information not found. Please log in again.');
     }
 
     if (!selectedEnvironmentId) {
-        throw new Error('No environments found for your project. Please create one first.');
+        setComposerEnabled(false);
+        return null;
     }
 
     const data = await createChatSession(
-        { ...user, project_user_id: projectUserId ?? user.project_user_id },
+        {
+            ...currentUser,
+            project_id: activeProjectId,
+            project_user_id: projectUserId ?? currentUser.project_user_id,
+        },
         selectedEnvironmentId
     );
     sessionId = data.id;
@@ -193,17 +581,15 @@ async function startSession() {
 }
 
 async function refreshSessions() {
-    const user = getUser();
-
-    if (!user?.project_id || !selectedEnvironmentId) {
+    if (!activeProjectId || !selectedEnvironmentId) {
         sessions = [];
         renderHistory();
         return;
     }
 
     sessions = await fetchSessions({
-        project_id: user.project_id,
-        project_user_id: projectUserId ?? user.project_user_id,
+        project_id: activeProjectId,
+        project_user_id: projectUserId ?? currentUser?.project_user_id,
         environment_id: selectedEnvironmentId,
     });
 
@@ -411,6 +797,7 @@ function renderEnvironmentOptions() {
         environmentSelect.append(option);
         environmentSelect.disabled = true;
         selectedEnvironmentId = null;
+        setComposerEnabled(false);
         return;
     }
 
@@ -428,24 +815,47 @@ function renderEnvironmentOptions() {
         : environments[0].id;
     environmentSelect.value = selectedEnvironmentId;
     environmentSelect.disabled = false;
+    setComposerEnabled(true);
 }
 
-async function initializeProjectContext() {
-    const user = getUser();
-    if (!user?.project_id) {
+function resetChatState() {
+    sessionId = null;
+    sessions = [];
+    setSidebarSelection('menu', roleMode === 'admin' ? 'chat' : 'new-chat');
+    renderHistory();
+    renderWelcomeMessage();
+}
+
+async function loadEnvironmentsForProject(projectId) {
+    selectedEnvironmentId = null;
+    environmentSelect.innerHTML = '<option value="">Loading environments...</option>';
+    environmentSelect.disabled = true;
+    setComposerEnabled(false);
+
+    environments = await fetchProjectEnvironments(projectId);
+    renderEnvironmentOptions();
+}
+
+async function initializeProjectOwnerContext() {
+    if (!currentUser?.project_id) {
         projectName.textContent = 'Project unavailable';
         environmentSelect.innerHTML = '<option value="">No project</option>';
         throw new Error('User project information not found. Please log in again.');
     }
 
+    activeProjectId = currentUser.project_id;
+    adminProjectField.hidden = true;
+    projectName.hidden = false;
+
     const [projectResult, environmentsResult, projectUserResult] = await Promise.allSettled([
-        fetchProject(user.project_id),
-        fetchProjectEnvironments(user.project_id),
-        getProjectUser(user.id),
+        fetchProject(activeProjectId),
+        fetchProjectEnvironments(activeProjectId),
+        getProjectUser(currentUser.id),
     ]);
 
     const project = projectResult.status === 'fulfilled' ? projectResult.value : null;
-    projectName.textContent = project?.name || 'Project unavailable';
+    activeProjectName = project?.name || 'Project unavailable';
+    projectName.textContent = activeProjectName;
 
     if (environmentsResult.status === 'rejected') {
         environmentSelect.innerHTML = '<option value="">Environments unavailable</option>';
@@ -455,13 +865,76 @@ async function initializeProjectContext() {
 
     environments = environmentsResult.value;
     const projectUser = projectUserResult.status === 'fulfilled' ? projectUserResult.value : null;
-    projectUserId = projectUser?.id ?? user.project_user_id ?? null;
+    projectUserId = projectUser?.id ?? currentUser.project_user_id ?? null;
     renderEnvironmentOptions();
 }
 
-async function initializeChat() {
+function renderProjectOptions() {
+    projectSelect.innerHTML = '<option value="">Choose project</option>';
+
+    for (const project of projects) {
+        const option = document.createElement('option');
+        option.value = project.id;
+        option.textContent = project.name || project.code || `Project ${project.id}`;
+        projectSelect.append(option);
+    }
+
+    projectSelect.value = activeProjectId ?? '';
+}
+
+async function initializeAdminChat() {
+    showChatSurface();
+    setSidebarSelection('menu', 'chat');
+    adminProjectField.hidden = false;
+    projectName.hidden = true;
+    projectSelect.disabled = true;
+    environmentSelect.disabled = true;
+
     try {
-        await initializeProjectContext();
+        if (projects.length === 0) {
+            projects = await fetchProjects();
+        }
+
+        activeProjectId = projects.some(
+            (project) => String(project.id) === String(activeProjectId)
+        )
+            ? activeProjectId
+            : (projects[0]?.id ?? null);
+
+        renderProjectOptions();
+
+        if (!activeProjectId) {
+            environmentSelect.innerHTML = '<option value="">No projects available</option>';
+            resetChatState();
+            messages.append(createMessage('assistant', 'No projects are available for Admin Chat.'));
+            return;
+        }
+
+        projectUserId ??= currentUser?.project_user_id ?? null;
+        if (!projectUserId && currentUser?.id) {
+            const projectUser = await getProjectUser(currentUser.id);
+            projectUserId = projectUser?.id ?? null;
+        }
+
+        await loadEnvironmentsForProject(activeProjectId);
+        await refreshSessions();
+        renderWelcomeMessage();
+        await startSession();
+    } catch (error) {
+        renderWelcomeMessage();
+        messages.append(createMessage('assistant', error.message));
+    } finally {
+        projectSelect.disabled = projects.length === 0;
+        environmentSelect.disabled = environments.length === 0;
+    }
+}
+
+async function initializeProjectOwnerChat() {
+    showChatSurface();
+    setSidebarSelection('menu', 'new-chat');
+
+    try {
+        await initializeProjectOwnerContext();
         await refreshSessions();
         renderWelcomeMessage();
         await startSession();
@@ -471,10 +944,24 @@ async function initializeChat() {
     }
 }
 
+function initializeRoleView() {
+    renderRoleMenu();
+
+    if (roleMode === 'admin') {
+        adminProjectField.hidden = true;
+        projectName.hidden = false;
+        projectName.textContent = 'Dashboard';
+        setSidebarSelection('menu', 'dashboard');
+        renderPlaceholder('Dashboard', 'Admin dashboard is coming soon.');
+        return;
+    }
+
+    initializeProjectOwnerChat();
+}
+
 // ─── Event listeners: chat form ───────────────────────────────────────────────
 
 form.addEventListener('submit', async (event) => {
-    const TAG = '[form submit]';
     event.preventDefault();
 
     const message = input.value.trim();
@@ -488,17 +975,16 @@ form.addEventListener('submit', async (event) => {
     messages.append(typing);
     scrollToBottom(messages);
 
-    form.querySelector('button').disabled = true;
+    sendButton.disabled = true;
 
     try {
         const data = await sendMessage(sessionId, message);
-        console.log(TAG, 'data: ', data)
         typing.replaceWith(createMessage('assistant', data.content, data.sources));
         await refreshSessions();
     } catch (error) {
         typing.replaceWith(createMessage('assistant', error.message));
     } finally {
-        form.querySelector('button').disabled = false;
+        sendButton.disabled = !selectedEnvironmentId;
         input.focus();
         scrollToBottom(messages);
     }
@@ -513,11 +999,40 @@ input.addEventListener('keydown', (event) => {
     }
 });
 
+projectSelect.addEventListener('change', async () => {
+    activeProjectId = projectSelect.value || null;
+    selectedEnvironmentId = null;
+    environments = [];
+    resetChatState();
+
+    if (!activeProjectId) {
+        environmentSelect.innerHTML = '<option value="">Choose a project first</option>';
+        environmentSelect.disabled = true;
+        return;
+    }
+
+    projectSelect.disabled = true;
+    try {
+        await loadEnvironmentsForProject(activeProjectId);
+        await refreshSessions();
+
+        if (selectedEnvironmentId) {
+            await startSession();
+        }
+
+        input.focus();
+    } catch (error) {
+        messages.append(createMessage('assistant', error.message));
+    } finally {
+        projectSelect.disabled = false;
+    }
+});
+
 environmentSelect.addEventListener('change', async () => {
     selectedEnvironmentId = environmentSelect.value || null;
     sessionId = null;
     sessions = [];
-    setSidebarSelection('new-chat');
+    setSidebarSelection('menu', roleMode === 'admin' ? 'chat' : 'new-chat');
     renderHistory();
     renderWelcomeMessage();
 
@@ -538,15 +1053,66 @@ environmentSelect.addEventListener('change', async () => {
 // ─── Event listeners: new chat ────────────────────────────────────────────────
 
 newChatButton.addEventListener('click', async () => {
-    setSidebarSelection('new-chat');
+    showChatSurface();
+    adminProjectField.hidden = true;
+    projectName.hidden = false;
+    projectName.textContent = activeProjectName || 'Loading project...';
+    setSidebarSelection('menu', 'new-chat');
     renderWelcomeMessage();
 
     try {
+        if (!activeProjectId) {
+            await initializeProjectOwnerContext();
+        }
         await startSession();
         input.focus();
     } catch (error) {
         messages.append(createMessage('assistant', error.message));
     }
+});
+
+myProjectButton.addEventListener('click', () => {
+    projectName.hidden = false;
+    adminProjectField.hidden = true;
+    projectName.textContent = 'My Project';
+    setSidebarSelection('menu', 'my-project');
+    renderPlaceholder('My Project', 'Project management is coming soon.');
+});
+
+analyticsButton.addEventListener('click', () => {
+    projectName.hidden = false;
+    adminProjectField.hidden = true;
+    projectName.textContent = 'Analytics';
+    setSidebarSelection('menu', 'analytics');
+    renderPlaceholder('Analytics', 'Project analytics are coming soon.');
+});
+
+adminDashboardButton.addEventListener('click', () => {
+    projectName.hidden = false;
+    adminProjectField.hidden = true;
+    projectName.textContent = 'Dashboard';
+    setSidebarSelection('menu', 'dashboard');
+    renderPlaceholder('Dashboard', 'Admin dashboard is coming soon.');
+});
+
+adminProjectsButton.addEventListener('click', () => {
+    projectName.hidden = false;
+    adminProjectField.hidden = true;
+    projectName.textContent = 'Projects';
+    setSidebarSelection('menu', 'projects');
+    renderCreateProjectScreen();
+});
+
+adminUsersButton.addEventListener('click', () => {
+    projectName.hidden = false;
+    adminProjectField.hidden = true;
+    projectName.textContent = 'Users';
+    setSidebarSelection('menu', 'users');
+    renderCreateUserScreen();
+});
+
+adminChatButton.addEventListener('click', () => {
+    initializeAdminChat();
 });
 
 // ─── Event listeners: project drawer ─────────────────────────────────────────
@@ -786,5 +1352,5 @@ logoutButton.addEventListener('click', () => {
 
 clearKnowledgeEditor();
 resizeTextarea(input);
-renderSidebarSelection();
-initializeChat();
+renderRoleMenu();
+initializeRoleView();

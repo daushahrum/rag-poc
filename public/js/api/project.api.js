@@ -17,10 +17,10 @@ export async function createProject(name, code) {
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-        throw new Error(data.error ?? 'Could not create project.');
+        throw new Error(data.error ?? data.message ?? 'Could not create project.');
     }
 
-    return data.project;
+    return data.project ?? data;
 }
 
 export async function fetchProjectEnvironments(projectId) {
@@ -48,6 +48,20 @@ export async function fetchProject(projectId) {
     }
 
     return response.json();
+}
+
+export async function fetchProjects() {
+    const response = await fetch('/api/project/list', {
+        headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error ?? data.message ?? 'Could not load projects.');
+    }
+
+    const data = await response.json();
+    return Array.isArray(data) ? data : (data.projects ?? []);
 }
 
 export async function getProjectUser(userId) {
