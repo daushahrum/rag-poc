@@ -37,6 +37,19 @@ export async function fetchProjectEnvironments(projectId) {
     return Array.isArray(data) ? data : (data.environments ?? []);
 }
 
+export async function fetchProject(projectId) {
+    const response = await fetch(`/api/project/${encodeURIComponent(projectId)}`, {
+        headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error ?? data.message ?? 'Could not load project details.');
+    }
+
+    return response.json();
+}
+
 export async function getProjectUser(userId) {
     const response = await fetch(`/api/project/users/find?external_user_id=${encodeURIComponent(userId)}`, {
         headers: getAuthHeaders(),

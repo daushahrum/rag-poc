@@ -1,6 +1,7 @@
 // modules/chatSession/chatSession.controller.js
 
 import * as chatSessionService from './chatSession.service.js';
+import * as projectUserService from '../../project/projectUser/projectUser.service.js';
 
 export async function createChatSession(req, res) {
     try {
@@ -61,7 +62,36 @@ export async function deleteChatSession(req, res) {
 
 export async function listChatSession(req, res) {
     try {
-        const chatSessions = await chatSessionService.getChatSessions(req.query);
+        const routeSource = req.routeSource || (req.headers.authorization ? 'portal' : 'public');
+        const filters = {
+            ...req.query,
+        };
+
+        if (routeSource === 'public') {
+            if (!req.project) {
+                throw new Error('Project context is required');
+            }
+
+            if (!filters.user_id) {
+                throw new Error('user_id is required');
+            }
+
+            const projectUser = await projectUserService.getProjectUserByExternalUserId(
+                req.project.id,
+                filters.user_id,
+            );
+
+            if (!projectUser) {
+                return res.json([]);
+            }
+
+            filters.project_id = req.project.id;
+            filters.project_user_id = projectUser.id;
+            delete filters.user_id;
+            delete filters.project_code;
+        }
+
+        const chatSessions = await chatSessionService.getChatSessions(filters);
 
         return res.json(chatSessions);
     } catch (error) {

@@ -64,9 +64,14 @@
           <button class="mobile-menu-button" id="mobileMenuButton" type="button" aria-label="Open navigation menu">
             <i class="bi bi-list"></i>
           </button>
-          <div>
-            <h2>ANDI</h2>
-            <p>Ask questions across your ingested knowledge.</p>
+          <div class="chat-context">
+            <h2 id="projectName">Loading project...</h2>
+            <div class="environment-field">
+              <label class="sr-only" for="environmentSelect">Environment</label>
+              <select id="environmentSelect" aria-label="Environment" disabled>
+                <option value="">Loading environments...</option>
+              </select>
+            </div>
           </div>
           <div class="header-actions">
             <button class="logout-button" id="logoutButton" type="button">
@@ -105,7 +110,7 @@
               id="messageInput"
               name="message"
               rows="1"
-              placeholder="Message ANDI"
+              placeholder="Ask anything"
               autocomplete="off"
             ></textarea>
             <button class="send-button" type="submit" aria-label="Send message">
@@ -291,6 +296,7 @@
         var DEFAULT_W = 272;
         var root    = document.documentElement;
         var resizer = document.querySelector('.sidebar-resizer');
+        var shell = document.querySelector('.app-shell');
         var sidebar = document.querySelector('.sidebar');
         var logoButton = document.getElementById('sidebarLogoButton');
         var collapseButton = document.getElementById('sidebarCollapseButton');
@@ -299,6 +305,8 @@
         function applyWidth(w) {
           root.style.setProperty('--sidebar-width', w + 'px');
           sidebar.classList.toggle('collapsed', w <= (MIN_W+50));
+          collapseButton.setAttribute('aria-expanded', String(w > (MIN_W + 50)));
+          logoButton.setAttribute('aria-expanded', String(w > (MIN_W + 50)));
           if (w > (MIN_W + 50)) {
             lastExpandedWidth = w;
           }
@@ -321,6 +329,7 @@
             10
           );
 
+          shell.classList.add('sidebar-resizing');
           resizer.classList.add('is-dragging');
           document.body.style.cursor     = 'col-resize';
           document.body.style.userSelect = 'none';
@@ -332,6 +341,7 @@
           }
 
           function onUp() {
+            shell.classList.remove('sidebar-resizing');
             resizer.classList.remove('is-dragging');
             document.body.style.cursor     = '';
             document.body.style.userSelect = '';
@@ -350,7 +360,7 @@
             return;
           }
 
-          collapseSidebar();
+          window.requestAnimationFrame(collapseSidebar);
         });
 
         logoButton.addEventListener('click', function () {
@@ -359,7 +369,7 @@
           }
 
           if (sidebar.classList.contains('collapsed')) {
-            expandSidebar();
+            window.requestAnimationFrame(expandSidebar);
           }
         });
 

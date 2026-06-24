@@ -5,7 +5,7 @@
 import { getAuthHeaders, clearAuth, isAuthenticated, getUser } from '../auth.js';
 
 import { sendMessage, fetchSessions, fetchSessionMessages, createChatSession } from '../api/chat.api.js';
-import { createProject, fetchProjectEnvironments, getProjectUser } from '../api/project.api.js';
+import { createProject, fetchProject, fetchProjectEnvironments, getProjectUser } from '../api/project.api.js';
 import {
     ingestKnowledge,
     fetchKnowledgeDocuments,
@@ -33,6 +33,8 @@ const input                 = document.querySelector('#messageInput');
 const messages              = document.querySelector('#messages');
 const newChatButton         = document.querySelector('#newChatButton');
 const historyList           = document.querySelector('#historyList');
+const projectName           = document.querySelector('#projectName');
+const environmentSelect     = document.querySelector('#environmentSelect');
 
 // Project drawer
 const openProjectButton     = document.querySelector('#openProjectButton');
@@ -88,6 +90,8 @@ let sessions = [];
 let knowledgeDocuments = [];
 let selectedKnowledgeId = null;
 let selectedEnvironmentId = null;
+let projectUserId = null;
+let environments = [];
 let sidebarSelection = {
     type: 'new-chat',
     value: null,
@@ -176,20 +180,14 @@ async function startSession() {
         throw new Error('User project information not found. Please log in again.');
     }
 
-    let environments;
-    try {
-        environments = await fetchProjectEnvironments(user.project_id);
-    } catch (error) {
-        throw new Error('Could not load project environments: ' + error.message);
-    }
-
-    if (!environments || environments.length === 0) {
+    if (!selectedEnvironmentId) {
         throw new Error('No environments found for your project. Please create one first.');
     }
 
-    const defaultEnvironment = environments[0];
-    selectedEnvironmentId = defaultEnvironment.id;
-    const data = await createChatSession(user, defaultEnvironment.id);
+    const data = await createChatSession(
+        { ...user, project_user_id: projectUserId ?? user.project_user_id },
+        selectedEnvironmentId
+    );
     sessionId = data.id;
     await refreshSessions();
 }
@@ -197,13 +195,15 @@ async function startSession() {
 async function refreshSessions() {
     const user = getUser();
 
-    const project_user_id = await getProjectUser(user.id);
-
-    console.log('project_user_id', project_user_id.id)
+    if (!user?.project_id || !selectedEnvironmentId) {
+        sessions = [];
+        renderHistory();
+        return;
+    }
 
     sessions = await fetchSessions({
         project_id: user.project_id,
-        project_user_id: project_user_id.id,
+        project_user_id: projectUserId ?? user.project_user_id,
         environment_id: selectedEnvironmentId,
     });
 
@@ -401,8 +401,67 @@ function setIngestTab(tab) {
 
 // ─── Initialization ───────────────────────────────────────────────────────────
 
+function renderEnvironmentOptions() {
+    environmentSelect.innerHTML = '';
+
+    if (environments.length === 0) {
+        const option = document.createElement('option');
+        option.value = '';
+        option.textContent = 'No environments';
+        environmentSelect.append(option);
+        environmentSelect.disabled = true;
+        selectedEnvironmentId = null;
+        return;
+    }
+
+    for (const environment of environments) {
+        const option = document.createElement('option');
+        option.value = environment.id;
+        option.textContent = environment.environment || environment.id;
+        environmentSelect.append(option);
+    }
+
+    selectedEnvironmentId = environments.some(
+        (environment) => String(environment.id) === String(selectedEnvironmentId)
+    )
+        ? selectedEnvironmentId
+        : environments[0].id;
+    environmentSelect.value = selectedEnvironmentId;
+    environmentSelect.disabled = false;
+}
+
+async function initializeProjectContext() {
+    const user = getUser();
+    if (!user?.project_id) {
+        projectName.textContent = 'Project unavailable';
+        environmentSelect.innerHTML = '<option value="">No project</option>';
+        throw new Error('User project information not found. Please log in again.');
+    }
+
+    const [projectResult, environmentsResult, projectUserResult] = await Promise.allSettled([
+        fetchProject(user.project_id),
+        fetchProjectEnvironments(user.project_id),
+        getProjectUser(user.id),
+    ]);
+
+    const project = projectResult.status === 'fulfilled' ? projectResult.value : null;
+    projectName.textContent = project?.name || 'Project unavailable';
+
+    if (environmentsResult.status === 'rejected') {
+        environmentSelect.innerHTML = '<option value="">Environments unavailable</option>';
+        environmentSelect.disabled = true;
+        throw new Error(`Could not load project environments: ${environmentsResult.reason.message}`);
+    }
+
+    environments = environmentsResult.value;
+    const projectUser = projectUserResult.status === 'fulfilled' ? projectUserResult.value : null;
+    projectUserId = projectUser?.id ?? user.project_user_id ?? null;
+    renderEnvironmentOptions();
+}
+
 async function initializeChat() {
     try {
+        await initializeProjectContext();
         await refreshSessions();
         renderWelcomeMessage();
         await startSession();
@@ -451,6 +510,28 @@ input.addEventListener('keydown', (event) => {
     if (event.key === 'Enter' && !event.shiftKey) {
         event.preventDefault();
         form.requestSubmit();
+    }
+});
+
+environmentSelect.addEventListener('change', async () => {
+    selectedEnvironmentId = environmentSelect.value || null;
+    sessionId = null;
+    sessions = [];
+    setSidebarSelection('new-chat');
+    renderHistory();
+    renderWelcomeMessage();
+
+    if (!selectedEnvironmentId) return;
+
+    environmentSelect.disabled = true;
+    try {
+        await refreshSessions();
+        await startSession();
+        input.focus();
+    } catch (error) {
+        messages.append(createMessage('assistant', error.message));
+    } finally {
+        environmentSelect.disabled = false;
     }
 });
 

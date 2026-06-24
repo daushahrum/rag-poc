@@ -65,6 +65,11 @@ button:disabled {
   height: 100vh;
   min-height: 100vh;
   overflow: hidden;
+  transition: grid-template-columns 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.app-shell.sidebar-resizing {
+  transition: none;
 }
 
 /* ── Sidebar ── */
@@ -80,6 +85,7 @@ button:disabled {
   overflow-y: auto;
   background: var(--sidebar);
   color: var(--sidebar-text);
+  overflow-x: hidden;
   /* border-right removed — resizer div acts as the separator */
 }
 
@@ -475,6 +481,10 @@ button:disabled {
   background: var(--surface);
 }
 
+.chat-context {
+  min-width: 0;
+}
+
 .header-actions {
   display: flex;
   align-items: center;
@@ -492,6 +502,31 @@ button:disabled {
   margin-top: 2px;
   color: var(--muted);
   font-size: 12px;
+}
+
+.environment-field {
+  margin-top: 3px;
+}
+
+.environment-field select {
+  max-width: min(280px, 42vw);
+  padding: 2px 24px 2px 0;
+  border: 0;
+  border-radius: 6px;
+  background-color: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+  outline: none;
+}
+
+.environment-field select:focus-visible {
+  box-shadow: 0 0 0 3px rgba(16, 163, 127, 0.14);
+}
+
+.environment-field select:disabled {
+  cursor: default;
+  opacity: 0.7;
 }
 
 /* ── Welcome screen ── */
@@ -768,7 +803,7 @@ button:disabled {
   min-height: 52px;
   padding: 8px 8px 8px 16px;
   border: 1px solid var(--border-strong);
-  border-radius: 10px;
+  border-radius: 999px;
   background: var(--surface);
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
 }
@@ -832,7 +867,7 @@ button:disabled {
   width: 36px;
   height: 36px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 50%;
   background: var(--accent);
   color: #ffffff;
   transition: background 0.12s ease;
@@ -1409,6 +1444,10 @@ button:disabled {
     padding-right: 16px;
   }
 
+  .environment-field select {
+    max-width: 40vw;
+  }
+
   .status-pill {
     display: none;
   }
@@ -1453,7 +1492,8 @@ button:disabled {
     min-height: 100vh;
     padding: 0;
     transform: translateX(-100%);
-    transition: transform 0.28s ease-in-out;
+    transition: transform 0.34s cubic-bezier(0.22, 1, 0.36, 1),
+                box-shadow 0.34s ease;
     box-shadow: none;
   }
 
@@ -1477,6 +1517,14 @@ button:disabled {
   .sidebar-overlay.active {
     opacity: 1;
     pointer-events: auto;
+  }
+
+  .chat-header {
+    gap: 10px;
+  }
+
+  .environment-field select {
+    max-width: 34vw;
   }
 
   /* Show the hamburger menu button */

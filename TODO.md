@@ -1,20 +1,59 @@
-# TODO - Fix chat session list parsing for `/api/chat/sessions/list`
+# TODO - Update chat header, composer, and sidebar motion
 
-## Task: Ensure frontend parses array response and maps `topic` to `title`
+## Goal
 
-### Steps:
-1. [x] Read and understand current `fetchSessions()` implementation in `public/js/api/chat.api.js`
-2. [x] Confirm history renderer expects `session.title` in `public/js/pages/app.page.js`
-3. [x] Update `fetchSessions()` to support both response shapes:
-   - raw array response
-   - `{ sessions: [...] }` response
-4. [x] Normalize session objects for UI compatibility:
-   - `title = s.title ?? s.topic ?? 'Untitled chat'`
-5. [x] Run static sanity check of edited code path
+Replace the static `ANDI` chat header with the signed-in user's project name and an environment selector, update the message composer to use a fully rounded shape and the placeholder `ask anything`, and smooth the sidebar collapse/expand motion.
 
-### Details:
-- Files to edit:
-  - `public/js/api/chat.api.js`
-  - `TODO.md`
-- Validation:
-  - Ensure `fetchSessions()` always returns an array of session objects with `title`
+## Plan
+
+1. [x] Add stable header elements in `views/index.html`
+   - Replace the static `ANDI` heading with a project-name element.
+   - Replace the static subtitle with an accessible environment `<select>`.
+   - Keep sensible loading/fallback text while project data is unavailable.
+   - Change the chat textarea placeholder to `ask anything`.
+
+2. [x] Extend `public/js/api/project.api.js`
+   - Add a helper for `GET /api/project/:id`.
+   - Reuse the existing authenticated request pattern.
+   - Return a clear error when project details cannot be loaded.
+
+3. [x] Initialize project and environment state in `public/js/pages/app.page.js`
+   - Read `project_id` from the authenticated user.
+   - Fetch the project details and environments during page initialization.
+   - Render the project `name` in the header.
+   - Populate the environment selector from each environment's `id` and `environment` label.
+   - Default to the first available environment and store its ID in `selectedEnvironmentId`.
+   - Load chat sessions only after the environment has been selected.
+
+4. [x] Wire environment changes into chat behavior
+   - Update `selectedEnvironmentId` when the selector changes.
+   - Clear/reset the active chat state for the newly selected environment.
+   - Refresh the session history using the selected environment.
+   - Create the next chat session with that same environment.
+   - Handle projects with no environments without leaving a stale selection.
+
+5. [x] Update `public/css/styles.css`
+   - Lay out the project name and environment selector cleanly within the existing header.
+   - Style the selector consistently with the current UI and preserve keyboard focus visibility.
+   - Set `.composer-box` to a pill-shaped/full border radius.
+   - Confirm the rounded composer still accommodates multiline textarea growth and the send button.
+   - Preserve usable spacing and wrapping on narrow/mobile layouts.
+   - Animate desktop sidebar width changes with a smooth easing curve while keeping drag-resize immediate.
+   - Smooth the mobile sidebar slide and shadow transitions.
+
+6. [x] Validate
+   - Confirm the header shows the authenticated user's project name.
+   - Confirm every available environment appears in the selector.
+   - Confirm switching environments refreshes the relevant chat history and new-session context.
+   - Confirm missing project/environment data displays a safe fallback.
+   - Confirm the textarea says `ask anything`.
+   - Confirm the composer remains fully rounded at desktop and mobile widths.
+   - Run the available static checks/tests and inspect the final diff without modifying unrelated backend work.
+
+## Expected files
+
+- `views/index.html`
+- `public/js/api/project.api.js`
+- `public/js/pages/app.page.js`
+- `public/css/styles.css`
+- `TODO.md`

@@ -32,6 +32,13 @@ router.post(
 );
 
 router.get(
+    '/public/list',
+    markPublic,
+    verifyProjectKey,
+    chatSessionController.listChatSession
+);
+
+router.get(
     '/list',
     auth.authenticate,
     chatSessionController.listChatSession
