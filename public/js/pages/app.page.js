@@ -14,12 +14,26 @@ import {
 import { sendMessage, fetchSessions, fetchSessionMessages, createChatSession } from '../api/chat.api.js';
 import {
     createProject,
+    createProjectEnvironment,
+    deleteProjectEnvironment,
     fetchProject,
     fetchProjects,
     fetchProjectEnvironments,
     getProjectUser,
+    updateProjectEnvironment,
 } from '../api/project.api.js';
-import { createUser } from '../api/user.api.js';
+import {
+    createUser,
+    deleteUser,
+    fetchUsers,
+    updateUser,
+} from '../api/user.api.js';
+import {
+    createTool,
+    deleteTool,
+    fetchProjectTools,
+    updateTool,
+} from '../api/tool.api.js';
 import {
     ingestKnowledge,
     fetchKnowledgeDocuments,
@@ -57,6 +71,11 @@ const roleMenu              = document.querySelector('#roleMenu');
 const sidebarSection        = document.querySelector('.sidebar-section');
 const historySectionLabel   = document.querySelector('#historySectionLabel');
 const myProjectButton       = document.querySelector('#myProjectButton');
+const projectSubmenu        = document.querySelector('#projectSubmenu');
+const projectUsersButton    = document.querySelector('#projectUsersButton');
+const projectEnvironmentsButton = document.querySelector('#projectEnvironmentsButton');
+const projectToolsButton    = document.querySelector('#projectToolsButton');
+const projectKnowledgeButton = document.querySelector('#projectKnowledgeButton');
 const analyticsButton       = document.querySelector('#analyticsButton');
 const adminDashboardButton  = document.querySelector('#adminDashboardButton');
 const adminProjectsButton   = document.querySelector('#adminProjectsButton');
@@ -142,6 +161,10 @@ let sidebarSelection = {
 const roleMenuButtons = {
     'new-chat': newChatButton,
     'my-project': myProjectButton,
+    'project-users': projectUsersButton,
+    'project-environments': projectEnvironmentsButton,
+    'project-tools': projectToolsButton,
+    'project-knowledge': projectKnowledgeButton,
     analytics: analyticsButton,
     dashboard: adminDashboardButton,
     projects: adminProjectsButton,
@@ -173,6 +196,15 @@ function renderSidebarSelection() {
         button.classList.toggle('active', isActive);
         button.setAttribute('aria-current', isActive ? 'page' : 'false');
     });
+
+    const projectSectionActive = (
+        sidebarSelection.type === 'menu'
+        && String(sidebarSelection.value).startsWith('project-')
+    );
+    myProjectButton.classList.toggle(
+        'active',
+        projectSectionActive || sidebarSelection.value === 'my-project'
+    );
 
     Object.entries(developerMenuButtons).forEach(([key, button]) => {
         const isActive = sidebarSelection.type === 'developer' && sidebarSelection.value === key;
@@ -207,6 +239,7 @@ function renderRoleMenu() {
 // ─── Chat rendering ───────────────────────────────────────────────────────────
 
 function renderWelcomeMessage() {
+    messages.classList.remove('crud-canvas');
     messages.innerHTML = '';
 
     const screen = document.createElement('div');
@@ -254,8 +287,9 @@ function renderWelcomeMessage() {
 
 function renderPlaceholder(title, description) {
     closeAllPanels();
+    messages.classList.remove('crud-canvas');
     form.hidden = true;
-    sidebarSection.hidden = true;
+    sidebarSection.hidden = false;
     adminProjectField.hidden = true;
     environmentField.hidden = true;
     messages.innerHTML = '';
@@ -299,8 +333,9 @@ async function renderCreateUserScreen() {
     if (roleMode !== 'admin') return;
 
     closeAllPanels();
+    messages.classList.add('crud-canvas');
     form.hidden = true;
-    sidebarSection.hidden = true;
+    sidebarSection.hidden = false;
     adminProjectField.hidden = true;
     environmentField.hidden = true;
     messages.innerHTML = '';
@@ -433,8 +468,9 @@ function renderCreateProjectScreen() {
     if (roleMode !== 'admin') return;
 
     closeAllPanels();
+    messages.classList.add('crud-canvas');
     form.hidden = true;
-    sidebarSection.hidden = true;
+    sidebarSection.hidden = false;
     adminProjectField.hidden = true;
     environmentField.hidden = true;
     messages.innerHTML = '';
@@ -548,8 +584,905 @@ function renderCreateProjectScreen() {
     nameInput.focus();
 }
 
+async function renderProjectKnowledgeScreen() {
+    closeAllPanels();
+    messages.classList.add('crud-canvas');
+    form.hidden = true;
+    sidebarSection.hidden = false;
+    adminProjectField.hidden = true;
+    environmentField.hidden = true;
+    messages.innerHTML = '';
+
+    const screen = document.createElement('div');
+    screen.className = 'project-knowledge-screen';
+
+    const header = document.createElement('div');
+    header.className = 'project-knowledge-header';
+    const headerCopy = document.createElement('div');
+    const eyebrow = document.createElement('p');
+    eyebrow.className = 'section-label';
+    eyebrow.textContent = 'My Project';
+    const heading = document.createElement('h2');
+    heading.textContent = 'Knowledge';
+    const description = document.createElement('p');
+    description.textContent = 'Create and maintain the knowledge used to answer project questions.';
+    headerCopy.append(eyebrow, heading, description);
+
+    const createButton = document.createElement('button');
+    createButton.className = 'create-user-submit';
+    createButton.type = 'button';
+    createButton.innerHTML = '<i class="bi bi-plus-lg"></i><span>New knowledge</span>';
+    header.append(headerCopy, createButton);
+
+    const layout = document.createElement('div');
+    layout.className = 'project-knowledge-layout';
+    const listPanel = document.createElement('aside');
+    listPanel.className = 'project-knowledge-list-panel';
+    const listHeader = document.createElement('div');
+    listHeader.className = 'knowledge-list-header';
+    const listTitle = document.createElement('strong');
+    listTitle.textContent = 'Documents';
+    const refreshButton = document.createElement('button');
+    refreshButton.className = 'small-button';
+    refreshButton.type = 'button';
+    refreshButton.textContent = 'Refresh';
+    listHeader.append(listTitle, refreshButton);
+    const list = document.createElement('div');
+    list.className = 'knowledge-list';
+    listPanel.append(listHeader, list);
+
+    const editor = document.createElement('form');
+    editor.className = 'project-knowledge-editor';
+    const editorHeading = document.createElement('h3');
+    editorHeading.textContent = 'Create knowledge';
+    const titleLabel = document.createElement('label');
+    titleLabel.textContent = 'Title';
+    const titleField = createInput('title', 'text', 'Knowledge title', 'off');
+    const contentLabel = document.createElement('label');
+    contentLabel.textContent = 'Content';
+    const contentField = document.createElement('textarea');
+    contentField.name = 'content';
+    contentField.rows = 16;
+    contentField.placeholder = 'Add the knowledge content used by ANDI.';
+    contentField.required = true;
+
+    const actions = document.createElement('div');
+    actions.className = 'project-knowledge-actions';
+    const status = document.createElement('p');
+    status.className = 'create-user-status';
+    status.setAttribute('role', 'status');
+    const actionButtons = document.createElement('div');
+    actionButtons.className = 'knowledge-actions';
+    const deleteButton = document.createElement('button');
+    deleteButton.className = 'danger-button';
+    deleteButton.type = 'button';
+    deleteButton.textContent = 'Delete';
+    const saveButton = document.createElement('button');
+    saveButton.className = 'create-user-submit';
+    saveButton.type = 'submit';
+    saveButton.textContent = 'Create knowledge';
+    actionButtons.append(deleteButton, saveButton);
+    actions.append(status, actionButtons);
+    editor.append(
+        editorHeading,
+        titleLabel,
+        titleField,
+        contentLabel,
+        contentField,
+        actions,
+    );
+
+    layout.append(listPanel, editor);
+    screen.append(header, layout);
+    messages.append(screen);
+
+    let editingId = null;
+
+    function setEditorMode(doc = null) {
+        editingId = doc?.id ?? null;
+        editorHeading.textContent = doc ? 'Edit knowledge' : 'Create knowledge';
+        titleField.value = doc?.title ?? '';
+        contentField.value = doc?.content ?? '';
+        deleteButton.hidden = !doc;
+        saveButton.textContent = doc ? 'Save changes' : 'Create knowledge';
+        status.textContent = '';
+        status.className = 'create-user-status';
+        list.querySelectorAll('.knowledge-item').forEach((item) => {
+            item.classList.toggle('active', item.dataset.documentId === String(editingId));
+        });
+    }
+
+    function renderList() {
+        list.innerHTML = '';
+
+        if (knowledgeDocuments.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'project-knowledge-empty';
+            empty.innerHTML = '<i class="bi bi-journal-text" aria-hidden="true"></i><strong>No knowledge yet</strong><span>Create the first document for this project.</span>';
+            list.append(empty);
+            return;
+        }
+
+        for (const doc of knowledgeDocuments) {
+            const item = document.createElement('button');
+            item.className = 'knowledge-item';
+            item.type = 'button';
+            item.dataset.documentId = String(doc.id);
+            item.classList.toggle('active', String(doc.id) === String(editingId));
+            const itemTitle = document.createElement('span');
+            itemTitle.className = 'knowledge-item-title';
+            itemTitle.textContent = doc.title;
+            const itemMeta = document.createElement('span');
+            itemMeta.className = 'knowledge-item-meta';
+            itemMeta.textContent = `${doc.chunk_count ?? 0} chunks · ${formatSessionTime(doc.created_at)}`;
+            const preview = document.createElement('span');
+            preview.className = 'knowledge-item-preview';
+            preview.textContent = doc.preview || 'No content preview';
+            item.append(itemTitle, itemMeta, preview);
+            item.addEventListener('click', () => setEditorMode(doc));
+            list.append(item);
+        }
+    }
+
+    async function loadDocuments() {
+        list.innerHTML = '<p class="history-empty">Loading knowledge...</p>';
+        try {
+            knowledgeDocuments = await fetchKnowledgeDocuments(activeProjectId);
+            renderList();
+        } catch (error) {
+            list.innerHTML = '';
+            status.textContent = error.message;
+            status.classList.add('error');
+        }
+    }
+
+    createButton.addEventListener('click', () => {
+        setEditorMode();
+        titleField.focus();
+    });
+    refreshButton.addEventListener('click', loadDocuments);
+
+    editor.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        saveButton.disabled = true;
+        deleteButton.disabled = true;
+        status.textContent = editingId ? 'Saving knowledge...' : 'Creating knowledge...';
+        status.className = 'create-user-status';
+
+        try {
+            const wasEditing = Boolean(editingId);
+            let createdDocumentId = null;
+
+            if (editingId) {
+                await updateKnowledgeDocument(editingId, {
+                    title: titleField.value.trim(),
+                    content: contentField.value.trim(),
+                });
+            } else {
+                const createdDocument = await ingestKnowledge(
+                    titleField.value.trim(),
+                    contentField.value.trim(),
+                    activeProjectId,
+                );
+                createdDocumentId = createdDocument.id;
+            }
+
+            const savedId = editingId ?? createdDocumentId;
+            await loadDocuments();
+            const savedDocument = knowledgeDocuments.find(
+                (doc) => String(doc.id) === String(savedId)
+            );
+            setEditorMode(savedDocument ?? null);
+            status.textContent = wasEditing ? 'Knowledge updated.' : 'Knowledge created.';
+            status.classList.add('success');
+        } catch (error) {
+            status.textContent = error.message;
+            status.classList.add('error');
+        } finally {
+            saveButton.disabled = false;
+            deleteButton.disabled = false;
+        }
+    });
+
+    deleteButton.addEventListener('click', async () => {
+        if (!editingId || !window.confirm('Delete this knowledge document?')) return;
+
+        saveButton.disabled = true;
+        deleteButton.disabled = true;
+        status.textContent = 'Deleting knowledge...';
+
+        try {
+            await deleteKnowledgeDocument(editingId);
+            setEditorMode();
+            await loadDocuments();
+            status.textContent = 'Knowledge deleted.';
+            status.classList.add('success');
+        } catch (error) {
+            status.textContent = error.message;
+            status.classList.add('error');
+        } finally {
+            saveButton.disabled = false;
+            deleteButton.disabled = false;
+        }
+    });
+
+    setEditorMode();
+    await loadDocuments();
+}
+
+function createProjectManagerScreen(title, description, actionLabel) {
+    closeAllPanels();
+    messages.classList.add('crud-canvas');
+    form.hidden = true;
+    sidebarSection.hidden = false;
+    adminProjectField.hidden = true;
+    environmentField.hidden = true;
+    messages.innerHTML = '';
+
+    const screen = document.createElement('div');
+    screen.className = 'project-knowledge-screen';
+    const header = document.createElement('div');
+    header.className = 'project-knowledge-header';
+    const headerCopy = document.createElement('div');
+    headerCopy.innerHTML = '<p class="section-label">My Project</p>';
+    const heading = document.createElement('h2');
+    heading.textContent = title;
+    const copy = document.createElement('p');
+    copy.textContent = description;
+    headerCopy.append(heading, copy);
+    const createButton = document.createElement('button');
+    createButton.className = 'create-user-submit';
+    createButton.type = 'button';
+    createButton.innerHTML = `<i class="bi bi-plus-lg"></i><span>${actionLabel}</span>`;
+    header.append(headerCopy, createButton);
+
+    const layout = document.createElement('div');
+    layout.className = 'project-knowledge-layout';
+    const listPanel = document.createElement('aside');
+    listPanel.className = 'project-knowledge-list-panel';
+    const listHeader = document.createElement('div');
+    listHeader.className = 'knowledge-list-header';
+    const listTitle = document.createElement('strong');
+    listTitle.textContent = title;
+    const refreshButton = document.createElement('button');
+    refreshButton.className = 'small-button';
+    refreshButton.type = 'button';
+    refreshButton.textContent = 'Refresh';
+    listHeader.append(listTitle, refreshButton);
+    const list = document.createElement('div');
+    list.className = 'knowledge-list';
+    listPanel.append(listHeader, list);
+    const editor = document.createElement('form');
+    editor.className = 'project-knowledge-editor project-resource-editor';
+    layout.append(listPanel, editor);
+    screen.append(header, layout);
+    messages.append(screen);
+
+    return { createButton, refreshButton, list, editor };
+}
+
+function parseOptionalJson(value, label) {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+
+    try {
+        return JSON.parse(trimmed);
+    } catch {
+        throw new Error(`${label} must contain valid JSON.`);
+    }
+}
+
+async function renderProjectUsersScreen() {
+    const { createButton, refreshButton, list, editor } = createProjectManagerScreen(
+        'Users',
+        'Manage the project owners who can access this workspace.',
+        'New user',
+    );
+
+    const heading = document.createElement('h3');
+    const fields = document.createElement('div');
+    fields.className = 'project-resource-grid';
+    const usernameField = createInput('id', 'text', 'Username', 'username');
+    const nameField = createInput('name', 'text', 'Full name', 'name');
+    const emailField = createInput('email', 'email', 'name@example.com', 'email');
+    const mobileField = createInput('mobile', 'tel', 'Mobile number', 'tel');
+    fields.append(
+        createFormField('Username', usernameField),
+        createFormField('Full name', nameField),
+        createFormField('Email', emailField),
+        createFormField('Mobile', mobileField),
+    );
+
+    const accessGrid = document.createElement('div');
+    accessGrid.className = 'project-resource-grid';
+    const passwordField = createInput('password', 'password', 'Temporary password', 'new-password');
+    passwordField.minLength = 8;
+    const passwordWrapper = createFormField('Password', passwordField);
+    const passwordHint = document.createElement('small');
+    passwordHint.className = 'create-field-hint';
+    passwordHint.textContent = 'At least 8 characters. Leave blank when editing to keep the current password.';
+    passwordWrapper.append(passwordHint);
+    const activeField = document.createElement('label');
+    activeField.className = 'project-toggle-field';
+    const activeInput = document.createElement('input');
+    activeInput.type = 'checkbox';
+    activeInput.checked = true;
+    activeField.append(activeInput, document.createTextNode('User is active'));
+    accessGrid.append(passwordWrapper, activeField);
+
+    const actions = document.createElement('div');
+    actions.className = 'project-knowledge-actions';
+    const status = document.createElement('p');
+    status.className = 'create-user-status';
+    status.setAttribute('role', 'status');
+    const buttons = document.createElement('div');
+    buttons.className = 'knowledge-actions';
+    const deleteButton = document.createElement('button');
+    deleteButton.className = 'danger-button';
+    deleteButton.type = 'button';
+    deleteButton.textContent = 'Delete';
+    const saveButton = document.createElement('button');
+    saveButton.className = 'create-user-submit';
+    saveButton.type = 'submit';
+    buttons.append(deleteButton, saveButton);
+    actions.append(status, buttons);
+    editor.append(heading, fields, accessGrid, actions);
+
+    let items = [];
+    let editingId = null;
+
+    function setMode(item = null) {
+        editingId = item?.id ?? null;
+        heading.textContent = item ? 'Edit user' : 'Create user';
+        usernameField.value = item?.id ?? '';
+        usernameField.disabled = Boolean(item);
+        nameField.value = item?.name ?? '';
+        emailField.value = item?.email ?? '';
+        mobileField.value = item?.mobile ?? '';
+        passwordField.value = '';
+        passwordField.required = !item;
+        activeInput.checked = item?.active ?? true;
+        deleteButton.hidden = !item || String(item.id) === String(currentUser?.id);
+        saveButton.textContent = item ? 'Save changes' : 'Create user';
+        status.textContent = '';
+        status.className = 'create-user-status';
+        list.querySelectorAll('.knowledge-item').forEach((button) => {
+            button.classList.toggle('active', button.dataset.itemId === String(editingId));
+        });
+    }
+
+    function renderList() {
+        list.innerHTML = '';
+        if (items.length === 0) {
+            list.innerHTML = '<div class="project-knowledge-empty"><i class="bi bi-people"></i><strong>No users yet</strong><span>Create the first user for this project.</span></div>';
+            return;
+        }
+
+        for (const item of items) {
+            const button = document.createElement('button');
+            button.className = 'knowledge-item';
+            button.type = 'button';
+            button.dataset.itemId = String(item.id);
+            button.classList.toggle('active', String(item.id) === String(editingId));
+            const title = document.createElement('span');
+            title.className = 'knowledge-item-title';
+            title.textContent = item.name;
+            const meta = document.createElement('span');
+            meta.className = 'knowledge-item-meta';
+            meta.textContent = `${item.id} · ${item.active ? 'Active' : 'Inactive'}`;
+            const preview = document.createElement('span');
+            preview.className = 'knowledge-item-preview';
+            preview.textContent = item.email;
+            button.append(title, meta, preview);
+            button.addEventListener('click', () => setMode(item));
+            list.append(button);
+        }
+    }
+
+    async function loadItems() {
+        list.innerHTML = '<p class="history-empty">Loading users...</p>';
+        try {
+            const data = await fetchUsers(activeProjectId);
+            items = Array.isArray(data) ? data : (data.users ?? []);
+            renderList();
+        } catch (error) {
+            list.innerHTML = '';
+            status.textContent = error.message;
+            status.classList.add('error');
+        }
+    }
+
+    createButton.addEventListener('click', () => {
+        setMode();
+        usernameField.focus();
+    });
+    refreshButton.addEventListener('click', loadItems);
+    editor.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        status.className = 'create-user-status';
+        saveButton.disabled = true;
+        deleteButton.disabled = true;
+
+        try {
+            const payload = {
+                name: nameField.value.trim(),
+                email: emailField.value.trim(),
+                mobile: mobileField.value.trim(),
+                active: activeInput.checked,
+                role: 'project_owner',
+                project_id: activeProjectId,
+            };
+            if (passwordField.value) {
+                payload.password = passwordField.value;
+            }
+
+            const wasEditing = Boolean(editingId);
+            const saved = editingId
+                ? await updateUser(editingId, payload)
+                : await createUser({
+                    ...payload,
+                    id: usernameField.value.trim(),
+                });
+            const savedId = editingId ?? saved.id;
+            await loadItems();
+            setMode(items.find((item) => String(item.id) === String(savedId)) ?? null);
+            status.textContent = wasEditing ? 'User updated.' : 'User created.';
+            status.classList.add('success');
+        } catch (error) {
+            status.textContent = error.message;
+            status.classList.add('error');
+        } finally {
+            saveButton.disabled = false;
+            deleteButton.disabled = false;
+        }
+    });
+    deleteButton.addEventListener('click', async () => {
+        if (
+            !editingId
+            || String(editingId) === String(currentUser?.id)
+            || !window.confirm('Delete this user?')
+        ) return;
+
+        saveButton.disabled = true;
+        deleteButton.disabled = true;
+        try {
+            await deleteUser(editingId);
+            setMode();
+            await loadItems();
+            status.textContent = 'User deleted.';
+            status.classList.add('success');
+        } catch (error) {
+            status.textContent = error.message;
+            status.classList.add('error');
+        } finally {
+            saveButton.disabled = false;
+            deleteButton.disabled = false;
+        }
+    });
+
+    setMode();
+    await loadItems();
+}
+
+async function renderProjectEnvironmentsScreen() {
+    const { createButton, refreshButton, list, editor } = createProjectManagerScreen(
+        'Environments',
+        'Configure the API environments available to this project.',
+        'New environment',
+    );
+
+    const heading = document.createElement('h3');
+    const nameLabel = document.createElement('label');
+    nameLabel.textContent = 'Environment name';
+    const nameField = createInput('environment', 'text', 'e.g. Development', 'off');
+    const urlLabel = document.createElement('label');
+    urlLabel.textContent = 'Base URL';
+    const urlField = createInput('base_url', 'url', 'https://api.example.com', 'url');
+    const formGrid = document.createElement('div');
+    formGrid.className = 'project-resource-grid';
+    const authField = document.createElement('label');
+    authField.className = 'project-resource-field';
+    authField.innerHTML = '<span>Authentication</span>';
+    const authSelect = document.createElement('select');
+    authSelect.innerHTML = `
+        <option value="none">None</option>
+        <option value="bearer">Bearer token</option>
+        <option value="api_key">API key</option>
+        <option value="basic">Basic auth</option>
+    `;
+    authField.append(authSelect);
+    const activeField = document.createElement('label');
+    activeField.className = 'project-toggle-field';
+    const activeInput = document.createElement('input');
+    activeInput.type = 'checkbox';
+    activeInput.checked = true;
+    activeField.append(activeInput, document.createTextNode('Environment is active'));
+    formGrid.append(authField, activeField);
+    const configLabel = document.createElement('label');
+    configLabel.textContent = 'Authentication config (JSON)';
+    const configField = document.createElement('textarea');
+    configField.rows = 7;
+    configField.placeholder = '{"token":"..."}';
+    const actions = document.createElement('div');
+    actions.className = 'project-knowledge-actions';
+    const status = document.createElement('p');
+    status.className = 'create-user-status';
+    status.setAttribute('role', 'status');
+    const buttons = document.createElement('div');
+    buttons.className = 'knowledge-actions';
+    const deleteButton = document.createElement('button');
+    deleteButton.className = 'danger-button';
+    deleteButton.type = 'button';
+    deleteButton.textContent = 'Delete';
+    const saveButton = document.createElement('button');
+    saveButton.className = 'create-user-submit';
+    saveButton.type = 'submit';
+    buttons.append(deleteButton, saveButton);
+    actions.append(status, buttons);
+    editor.append(
+        heading,
+        nameLabel,
+        nameField,
+        urlLabel,
+        urlField,
+        formGrid,
+        configLabel,
+        configField,
+        actions,
+    );
+
+    let items = [];
+    let editingId = null;
+
+    function setMode(item = null) {
+        editingId = item?.id ?? null;
+        heading.textContent = item ? 'Edit environment' : 'Create environment';
+        nameField.value = item?.environment ?? '';
+        urlField.value = item?.base_url ?? '';
+        authSelect.value = item?.auth_type ?? 'none';
+        configField.value = item?.auth_config
+            ? JSON.stringify(item.auth_config, null, 2)
+            : '';
+        activeInput.checked = item?.is_active ?? true;
+        deleteButton.hidden = !item;
+        saveButton.textContent = item ? 'Save changes' : 'Create environment';
+        status.textContent = '';
+        status.className = 'create-user-status';
+        list.querySelectorAll('.knowledge-item').forEach((button) => {
+            button.classList.toggle('active', button.dataset.itemId === String(editingId));
+        });
+    }
+
+    function renderList() {
+        list.innerHTML = '';
+        if (items.length === 0) {
+            list.innerHTML = '<div class="project-knowledge-empty"><i class="bi bi-layers"></i><strong>No environments yet</strong><span>Create the first environment for this project.</span></div>';
+            return;
+        }
+
+        for (const item of items) {
+            const button = document.createElement('button');
+            button.className = 'knowledge-item';
+            button.type = 'button';
+            button.dataset.itemId = String(item.id);
+            button.classList.toggle('active', String(item.id) === String(editingId));
+            const title = document.createElement('span');
+            title.className = 'knowledge-item-title';
+            title.textContent = item.environment;
+            const meta = document.createElement('span');
+            meta.className = 'knowledge-item-meta';
+            meta.textContent = `${item.auth_type || 'none'} · ${item.is_active ? 'Active' : 'Inactive'}`;
+            const preview = document.createElement('span');
+            preview.className = 'knowledge-item-preview';
+            preview.textContent = item.base_url;
+            button.append(title, meta, preview);
+            button.addEventListener('click', () => setMode(item));
+            list.append(button);
+        }
+    }
+
+    async function loadItems() {
+        list.innerHTML = '<p class="history-empty">Loading environments...</p>';
+        try {
+            items = await fetchProjectEnvironments(activeProjectId);
+            environments = items;
+            renderEnvironmentOptions();
+            renderList();
+        } catch (error) {
+            list.innerHTML = '';
+            status.textContent = error.message;
+            status.classList.add('error');
+        }
+    }
+
+    createButton.addEventListener('click', () => {
+        setMode();
+        nameField.focus();
+    });
+    refreshButton.addEventListener('click', loadItems);
+    editor.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        status.className = 'create-user-status';
+        saveButton.disabled = true;
+        deleteButton.disabled = true;
+
+        try {
+            const payload = {
+                project_id: activeProjectId,
+                environment: nameField.value.trim(),
+                base_url: urlField.value.trim(),
+                auth_type: authSelect.value,
+                auth_config: parseOptionalJson(configField.value, 'Authentication config'),
+                is_active: activeInput.checked,
+            };
+            const wasEditing = Boolean(editingId);
+            const saved = editingId
+                ? await updateProjectEnvironment(editingId, payload)
+                : await createProjectEnvironment(payload);
+            const savedId = editingId ?? saved.id;
+            await loadItems();
+            setMode(items.find((item) => String(item.id) === String(savedId)) ?? null);
+            status.textContent = wasEditing ? 'Environment updated.' : 'Environment created.';
+            status.classList.add('success');
+        } catch (error) {
+            status.textContent = error.message;
+            status.classList.add('error');
+        } finally {
+            saveButton.disabled = false;
+            deleteButton.disabled = false;
+        }
+    });
+    deleteButton.addEventListener('click', async () => {
+        if (!editingId || !window.confirm('Delete this environment?')) return;
+        saveButton.disabled = true;
+        deleteButton.disabled = true;
+        try {
+            await deleteProjectEnvironment(editingId);
+            setMode();
+            await loadItems();
+            status.textContent = 'Environment deleted.';
+            status.classList.add('success');
+        } catch (error) {
+            status.textContent = error.message;
+            status.classList.add('error');
+        } finally {
+            saveButton.disabled = false;
+            deleteButton.disabled = false;
+        }
+    });
+
+    setMode();
+    await loadItems();
+}
+
+async function renderProjectToolsScreen() {
+    const { createButton, refreshButton, list, editor } = createProjectManagerScreen(
+        'Tools',
+        'Define the project APIs ANDI can call while answering questions.',
+        'New tool',
+    );
+
+    const heading = document.createElement('h3');
+    const nameLabel = document.createElement('label');
+    nameLabel.textContent = 'Tool name';
+    const nameField = createInput('tool_name', 'text', 'e.g. search_orders', 'off');
+    const descriptionLabel = document.createElement('label');
+    descriptionLabel.textContent = 'Description';
+    const descriptionField = document.createElement('textarea');
+    descriptionField.rows = 3;
+    descriptionField.placeholder = 'Explain when and how ANDI should use this tool.';
+    const endpointLabel = document.createElement('label');
+    endpointLabel.textContent = 'Endpoint';
+    const endpointField = createInput('endpoint', 'text', '/orders/search', 'off');
+    const settingsGrid = document.createElement('div');
+    settingsGrid.className = 'project-resource-grid three-columns';
+    const methodField = document.createElement('label');
+    methodField.className = 'project-resource-field';
+    methodField.innerHTML = '<span>Method</span>';
+    const methodSelect = document.createElement('select');
+    methodSelect.innerHTML = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']
+        .map((method) => `<option value="${method}">${method}</option>`)
+        .join('');
+    methodField.append(methodSelect);
+    const versionField = createInput('version', 'text', '1.0.0', 'off');
+    const versionWrapper = document.createElement('label');
+    versionWrapper.className = 'project-resource-field';
+    versionWrapper.append(document.createElement('span'), versionField);
+    versionWrapper.firstChild.textContent = 'Version';
+    const enabledField = document.createElement('label');
+    enabledField.className = 'project-toggle-field';
+    const enabledInput = document.createElement('input');
+    enabledInput.type = 'checkbox';
+    enabledInput.checked = true;
+    enabledField.append(enabledInput, document.createTextNode('Tool is enabled'));
+    settingsGrid.append(methodField, versionWrapper, enabledField);
+
+    const advanced = document.createElement('details');
+    advanced.className = 'project-tool-advanced';
+    advanced.innerHTML = '<summary>Request and response schemas</summary>';
+    const jsonGrid = document.createElement('div');
+    jsonGrid.className = 'project-tool-json-grid';
+    const jsonFields = [
+        ['Path parameters', 'path_params'],
+        ['Query parameters', 'query_params'],
+        ['Body schema', 'body_schema'],
+        ['Example payload', 'example_payload'],
+        ['Response schema', 'response_schema'],
+    ].map(([labelText, name]) => {
+        const field = document.createElement('label');
+        field.className = 'project-resource-field';
+        const label = document.createElement('span');
+        label.textContent = labelText;
+        const textarea = document.createElement('textarea');
+        textarea.name = name;
+        textarea.rows = 5;
+        textarea.placeholder = '{}';
+        field.append(label, textarea);
+        jsonGrid.append(field);
+        return [name, textarea, labelText];
+    });
+    advanced.append(jsonGrid);
+
+    const actions = document.createElement('div');
+    actions.className = 'project-knowledge-actions';
+    const status = document.createElement('p');
+    status.className = 'create-user-status';
+    status.setAttribute('role', 'status');
+    const buttons = document.createElement('div');
+    buttons.className = 'knowledge-actions';
+    const deleteButton = document.createElement('button');
+    deleteButton.className = 'danger-button';
+    deleteButton.type = 'button';
+    deleteButton.textContent = 'Delete';
+    const saveButton = document.createElement('button');
+    saveButton.className = 'create-user-submit';
+    saveButton.type = 'submit';
+    buttons.append(deleteButton, saveButton);
+    actions.append(status, buttons);
+    editor.append(
+        heading,
+        nameLabel,
+        nameField,
+        descriptionLabel,
+        descriptionField,
+        endpointLabel,
+        endpointField,
+        settingsGrid,
+        advanced,
+        actions,
+    );
+
+    let items = [];
+    let editingId = null;
+
+    function setMode(item = null) {
+        editingId = item?.id ?? null;
+        heading.textContent = item ? 'Edit tool' : 'Create tool';
+        nameField.value = item?.tool_name ?? '';
+        descriptionField.value = item?.description ?? '';
+        endpointField.value = item?.endpoint ?? '';
+        methodSelect.value = item?.method ?? 'GET';
+        versionField.value = item?.version ?? '1.0.0';
+        enabledInput.checked = item?.is_enabled ?? true;
+        for (const [name, field] of jsonFields) {
+            field.value = item?.[name] ? JSON.stringify(item[name], null, 2) : '';
+        }
+        deleteButton.hidden = !item;
+        saveButton.textContent = item ? 'Save changes' : 'Create tool';
+        status.textContent = '';
+        status.className = 'create-user-status';
+        list.querySelectorAll('.knowledge-item').forEach((button) => {
+            button.classList.toggle('active', button.dataset.itemId === String(editingId));
+        });
+    }
+
+    function renderList() {
+        list.innerHTML = '';
+        if (items.length === 0) {
+            list.innerHTML = '<div class="project-knowledge-empty"><i class="bi bi-tools"></i><strong>No tools yet</strong><span>Create the first callable tool for this project.</span></div>';
+            return;
+        }
+
+        for (const item of items) {
+            const button = document.createElement('button');
+            button.className = 'knowledge-item';
+            button.type = 'button';
+            button.dataset.itemId = String(item.id);
+            button.classList.toggle('active', String(item.id) === String(editingId));
+            const title = document.createElement('span');
+            title.className = 'knowledge-item-title';
+            title.textContent = item.tool_name;
+            const meta = document.createElement('span');
+            meta.className = 'knowledge-item-meta';
+            meta.textContent = `${item.method} · v${item.version || '1.0.0'} · ${item.is_enabled ? 'Enabled' : 'Disabled'}`;
+            const preview = document.createElement('span');
+            preview.className = 'knowledge-item-preview';
+            preview.textContent = item.endpoint;
+            button.append(title, meta, preview);
+            button.addEventListener('click', () => setMode(item));
+            list.append(button);
+        }
+    }
+
+    async function loadItems() {
+        list.innerHTML = '<p class="history-empty">Loading tools...</p>';
+        try {
+            const data = await fetchProjectTools(activeProjectId);
+            items = Array.isArray(data) ? data : (data.tools ?? []);
+            renderList();
+        } catch (error) {
+            list.innerHTML = '';
+            status.textContent = error.message;
+            status.classList.add('error');
+        }
+    }
+
+    createButton.addEventListener('click', () => {
+        setMode();
+        nameField.focus();
+    });
+    refreshButton.addEventListener('click', loadItems);
+    editor.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        status.className = 'create-user-status';
+        saveButton.disabled = true;
+        deleteButton.disabled = true;
+        try {
+            const payload = {
+                project_id: activeProjectId,
+                tool_name: nameField.value.trim(),
+                description: descriptionField.value.trim() || null,
+                endpoint: endpointField.value.trim(),
+                method: methodSelect.value,
+                version: versionField.value.trim() || '1.0.0',
+                is_enabled: enabledInput.checked,
+            };
+            for (const [name, field, label] of jsonFields) {
+                payload[name] = parseOptionalJson(field.value, label);
+            }
+            const wasEditing = Boolean(editingId);
+            const saved = editingId
+                ? await updateTool(editingId, payload)
+                : await createTool(payload);
+            const savedId = editingId ?? saved.id;
+            await loadItems();
+            setMode(items.find((item) => String(item.id) === String(savedId)) ?? null);
+            status.textContent = wasEditing ? 'Tool updated.' : 'Tool created.';
+            status.classList.add('success');
+        } catch (error) {
+            status.textContent = error.message;
+            status.classList.add('error');
+        } finally {
+            saveButton.disabled = false;
+            deleteButton.disabled = false;
+        }
+    });
+    deleteButton.addEventListener('click', async () => {
+        if (!editingId || !window.confirm('Delete this tool?')) return;
+        saveButton.disabled = true;
+        deleteButton.disabled = true;
+        try {
+            await deleteTool(editingId);
+            setMode();
+            await loadItems();
+            status.textContent = 'Tool deleted.';
+            status.classList.add('success');
+        } catch (error) {
+            status.textContent = error.message;
+            status.classList.add('error');
+        } finally {
+            saveButton.disabled = false;
+            deleteButton.disabled = false;
+        }
+    });
+
+    setMode();
+    await loadItems();
+}
+
 function showChatSurface() {
     closeAllPanels();
+    messages.classList.remove('crud-canvas');
     form.hidden = false;
     sidebarSection.hidden = false;
     environmentField.hidden = false;
@@ -664,7 +1597,7 @@ function renderHistory() {
 // ─── Knowledge center ─────────────────────────────────────────────────────────
 
 async function refreshKnowledgeDocuments() {
-    knowledgeDocuments = await fetchKnowledgeDocuments();
+    knowledgeDocuments = await fetchKnowledgeDocuments(activeProjectId);
     renderKnowledgeDocuments();
 }
 
@@ -1072,11 +2005,65 @@ newChatButton.addEventListener('click', async () => {
 });
 
 myProjectButton.addEventListener('click', () => {
-    projectName.hidden = false;
-    adminProjectField.hidden = true;
-    projectName.textContent = 'My Project';
-    setSidebarSelection('menu', 'my-project');
-    renderPlaceholder('My Project', 'Project management is coming soon.');
+    const isOpen = !projectSubmenu.hidden;
+    projectSubmenu.hidden = isOpen;
+    myProjectButton.setAttribute('aria-expanded', String(!isOpen));
+});
+
+projectUsersButton.addEventListener('click', async () => {
+    projectName.textContent = 'Users';
+    setSidebarSelection('menu', 'project-users');
+
+    try {
+        if (!activeProjectId) {
+            await initializeProjectOwnerContext();
+        }
+        await renderProjectUsersScreen();
+    } catch (error) {
+        renderPlaceholder('Users unavailable', error.message);
+    }
+});
+
+projectEnvironmentsButton.addEventListener('click', async () => {
+    projectName.textContent = 'Environments';
+    setSidebarSelection('menu', 'project-environments');
+
+    try {
+        if (!activeProjectId) {
+            await initializeProjectOwnerContext();
+        }
+        await renderProjectEnvironmentsScreen();
+    } catch (error) {
+        renderPlaceholder('Environments unavailable', error.message);
+    }
+});
+
+projectToolsButton.addEventListener('click', async () => {
+    projectName.textContent = 'Tools';
+    setSidebarSelection('menu', 'project-tools');
+
+    try {
+        if (!activeProjectId) {
+            await initializeProjectOwnerContext();
+        }
+        await renderProjectToolsScreen();
+    } catch (error) {
+        renderPlaceholder('Tools unavailable', error.message);
+    }
+});
+
+projectKnowledgeButton.addEventListener('click', async () => {
+    projectName.textContent = 'Knowledge';
+    setSidebarSelection('menu', 'project-knowledge');
+
+    try {
+        if (!activeProjectId) {
+            await initializeProjectOwnerContext();
+        }
+        await renderProjectKnowledgeScreen();
+    } catch (error) {
+        renderPlaceholder('Knowledge unavailable', error.message);
+    }
 });
 
 analyticsButton.addEventListener('click', () => {
@@ -1207,7 +2194,7 @@ ingestForm.addEventListener('submit', async (event) => {
     ingestStatus.textContent = 'Ingesting knowledge...';
 
     try {
-        await ingestKnowledge(knowledgeTitleInput.value.trim(), content);
+        await ingestKnowledge(knowledgeTitleInput.value.trim(), content, activeProjectId);
         knowledgeTitleInput.value = '';
         knowledgeInput.value = '';
         ingestStatus.textContent = 'Knowledge ingested.';

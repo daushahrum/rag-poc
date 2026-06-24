@@ -4,36 +4,48 @@
 
 import { getAuthHeaders } from '../auth.js';
 
-export async function ingestKnowledge(title, content) {
+export async function ingestKnowledge(title, content, projectId) {
     const response = await fetch('/api/knowledge_document/create', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             ...getAuthHeaders(),
         },
-        body: JSON.stringify({ title, content }),
+        body: JSON.stringify({ title, content, project_id: projectId }),
     });
 
     if (!response.ok) {
         const data = await response.json().catch(() => ({}));
-        throw new Error(data.error ?? 'Could not ingest knowledge.');
+        throw new Error(data.error ?? data.message ?? 'Could not ingest knowledge.');
     }
 
     return response.json();
 }
 
-export async function fetchKnowledgeDocuments() {
-    const response = await fetch('/api/knowledge_document/list', {
+export async function fetchKnowledgeDocuments(projectId) {
+    const response = await fetch(`/api/knowledge_document/project/${encodeURIComponent(projectId)}`, {
         headers: getAuthHeaders(),
     });
 
     if (!response.ok) {
         const data = await response.json().catch(() => ({}));
-        throw new Error(data.error ?? 'Could not load knowledge documents.');
+        throw new Error(data.error ?? data.message ?? 'Could not load knowledge documents.');
     }
 
     const data = await response.json();
-    return data.documents ?? [];
+    return (Array.isArray(data) ? data : (data.documents ?? [])).map((document) => {
+        const chunks = [...(document.chunks ?? [])].sort(
+            (left, right) => left.chunk_index - right.chunk_index
+        );
+        const content = chunks.map((chunk) => chunk.content).join(' ');
+
+        return {
+            ...document,
+            content,
+            chunk_count: chunks.length,
+            preview: content.slice(0, 140),
+        };
+    });
 }
 
 export async function fetchKnowledgeDocument(documentId) {
@@ -47,7 +59,7 @@ export async function fetchKnowledgeDocument(documentId) {
     }
 
     const data = await response.json();
-    return data.document;
+    return data.document ?? data;
 }
 
 export async function updateKnowledgeDocument(documentId, payload) {
@@ -62,7 +74,7 @@ export async function updateKnowledgeDocument(documentId, payload) {
 
     if (!response.ok) {
         const data = await response.json().catch(() => ({}));
-        throw new Error(data.error ?? 'Could not update knowledge document.');
+        throw new Error(data.error ?? data.message ?? 'Could not update knowledge document.');
     }
 
     return response.json();
@@ -80,7 +92,7 @@ export async function deleteKnowledgeDocument(documentId) {
 
     if (!response.ok) {
         const data = await response.json().catch(() => ({}));
-        throw new Error(data.error ?? 'Could not delete knowledge document.');
+        throw new Error(data.error ?? data.message ?? 'Could not delete knowledge document.');
     }
 
     return response.json();

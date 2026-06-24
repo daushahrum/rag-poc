@@ -40,6 +40,13 @@ export async function deleteDocumentChunk(id) {
     return documentChunkRepository.deleteDocumentChunk(id);
 }
 
+export async function deleteDocumentChunksByDocumentId(documentId) {
+    if (!documentId) {
+        throw new Error('Document id is required');
+    }
+    return documentChunkRepository.deleteDocumentChunksByDocumentId(documentId);
+}
+
 export async function updateDocumentChunk(payload) {
     if (!payload || typeof payload !== 'object') {
         throw new Error('Document chunk payload is required');

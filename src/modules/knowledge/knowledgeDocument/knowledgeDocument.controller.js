@@ -82,7 +82,11 @@ export async function getKnowledgeDocumentByProjectId(req, res) {
 
                 return {
                     ...document.toJSON(),
-                    chunks,
+                    chunks: chunks.map((chunk) => ({
+                        id: chunk.id,
+                        content: chunk.content,
+                        chunk_index: chunk.chunk_index,
+                    })),
                 };
             })
         );

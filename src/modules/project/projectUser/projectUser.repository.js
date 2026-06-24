@@ -23,6 +23,12 @@ export async function deleteProjectUser(id) {
     });
 }
 
+export async function deleteProjectUsersByExternalUserId(external_user_id) {
+    return ProjectUser.destroy({
+        where: { external_user_id },
+    });
+}
+
 export async function getProjectUserById(id) {
     return ProjectUser.findByPk(id);
 }

@@ -63,6 +63,7 @@ export async function createUser(payload) {
     return user;
 }
 export async function deleteUser(id) {
+    await projectUserRepository.deleteProjectUsersByExternalUserId(id);
     return userRepository.deleteUser(id);
 }
 
@@ -75,15 +76,32 @@ export async function updateUser(payload) {
         name,
         email,
         mobile,
+        active,
+        password,
         updated_by,
         project_id,
     } = payload;
 
-    return userRepository.updateUser(id, payload);
+    const updatePayload = {
+        ...(role !== undefined && { role }),
+        ...(name !== undefined && { name }),
+        ...(email !== undefined && { email }),
+        ...(mobile !== undefined && { mobile }),
+        ...(active !== undefined && { active }),
+        ...(updated_by !== undefined && { updated_by }),
+        ...(project_id !== undefined && { project_id }),
+    };
+
+    if (password) {
+        updatePayload.password = await bcrypt.hash(password, 10);
+        updatePayload.last_password_changed_at = new Date();
+    }
+
+    return userRepository.updateUser(id, updatePayload);
 }
 
-export async function getUsers() {
-    return userRepository.getUsers();
+export async function getUsers(filters = {}) {
+    return userRepository.getUsers(filters);
 }
 
 export async function getUserById(id) {

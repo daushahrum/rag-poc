@@ -1,11 +1,11 @@
 /**
- * User API — handles calls to /api/user/*
+ * Tool API — handles calls to /api/tool/*
  */
 
 import { getAuthHeaders } from '../auth.js';
 
 async function request(path, options = {}) {
-    const response = await fetch(`/api/user/${path}`, {
+    const response = await fetch(`/api/tool/${path}`, {
         ...options,
         headers: {
             ...(options.body ? { 'Content-Type': 'application/json' } : {}),
@@ -15,33 +15,31 @@ async function request(path, options = {}) {
     });
 
     const data = await response.json().catch(() => ({}));
-
     if (!response.ok) {
-        throw new Error(data.message ?? data.error ?? 'User request failed.');
+        throw new Error(data.error ?? data.message ?? 'Tool request failed.');
     }
-
     return data;
 }
 
-export function createUser(payload) {
+export function fetchProjectTools(projectId) {
+    return request(`list?project_id=${encodeURIComponent(projectId)}`);
+}
+
+export function createTool(payload) {
     return request('create', {
         method: 'POST',
         body: JSON.stringify(payload),
     });
 }
 
-export function fetchUsers(projectId) {
-    return request(`list?project_id=${encodeURIComponent(projectId)}`);
-}
-
-export function updateUser(id, payload) {
+export function updateTool(id, payload) {
     return request('update', {
         method: 'POST',
         body: JSON.stringify({ id, ...payload }),
     });
 }
 
-export function deleteUser(id) {
+export function deleteTool(id) {
     return request('delete', {
         method: 'POST',
         body: JSON.stringify({ id }),

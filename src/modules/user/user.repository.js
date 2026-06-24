@@ -24,9 +24,21 @@ export async function deleteUser(id) {
 }
 
 export async function getUserById(id) {
-    return User.findByPk(id);
+    return User.findByPk(id, {
+        attributes: { exclude: ['password', 'reset_password_token', 'session_id'] },
+    });
 }
 
-export async function getUsers() {
-    return User.findAll();
+export async function getUsers(filters = {}) {
+    const where = {};
+
+    if (filters.project_id) {
+        where.project_id = filters.project_id;
+    }
+
+    return User.findAll({
+        where,
+        attributes: { exclude: ['password', 'reset_password_token', 'session_id'] },
+        order: [['name', 'ASC']],
+    });
 }

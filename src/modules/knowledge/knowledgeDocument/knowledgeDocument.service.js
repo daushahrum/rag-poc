@@ -34,6 +34,7 @@ export async function deleteKnowledgeDocument(id) {
     if (!id) {
         throw new Error('Knowledge document id is required');
     }
+    await documentChunkService.deleteDocumentChunksByDocumentId(id);
     return knowledgeDocumentRepository.deleteKnowledgeDocument(id);
 }
 
@@ -47,7 +48,7 @@ export async function updateKnowledgeDocument(payload) {
         throw new Error('Knowledge document id is required for update');
     }
 
-    const { title, updated_by } = payload;
+    const { title, content, updated_by } = payload;
 
     const updatePayload = {
         ...(title !== undefined && { title }),
@@ -58,7 +59,15 @@ export async function updateKnowledgeDocument(payload) {
         throw new Error('No updatable fields provided');
     }
 
-    return knowledgeDocumentRepository.updateKnowledgeDocument(id, updatePayload);
+    const result = await knowledgeDocumentRepository.updateKnowledgeDocument(id, updatePayload);
+
+    if (content !== undefined) {
+        const document = await knowledgeDocumentRepository.getKnowledgeDocumentById(id);
+        await documentChunkService.deleteDocumentChunksByDocumentId(id);
+        await documentChunkService.chunkDocument(id, content, document.project_id);
+    }
+
+    return result;
 }
 
 export async function getKnowledgeDocuments(filters = {}) {

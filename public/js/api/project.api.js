@@ -37,6 +37,35 @@ export async function fetchProjectEnvironments(projectId) {
     return Array.isArray(data) ? data : (data.environments ?? []);
 }
 
+async function mutateProjectEnvironment(path, payload) {
+    const response = await fetch(`/api/project/environments/${path}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            ...getAuthHeaders(),
+        },
+        body: JSON.stringify(payload),
+    });
+
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+        throw new Error(data.error ?? data.message ?? `Could not ${path} environment.`);
+    }
+    return data;
+}
+
+export function createProjectEnvironment(payload) {
+    return mutateProjectEnvironment('create', payload);
+}
+
+export function updateProjectEnvironment(id, payload) {
+    return mutateProjectEnvironment('update', { id, ...payload });
+}
+
+export function deleteProjectEnvironment(id) {
+    return mutateProjectEnvironment('delete', { id });
+}
+
 export async function fetchProject(projectId) {
     const response = await fetch(`/api/project/${encodeURIComponent(projectId)}`, {
         headers: getAuthHeaders(),

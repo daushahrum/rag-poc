@@ -27,6 +27,12 @@ export async function deleteDocumentChunk(id) {
     });
 }
 
+export async function deleteDocumentChunksByDocumentId(document_id) {
+    return DocumentChunks.destroy({
+        where: { document_id },
+    });
+}
+
 export async function getDocumentChunkById(id) {
     return DocumentChunks.findByPk(id);
 }
