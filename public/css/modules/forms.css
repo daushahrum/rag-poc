@@ -1,8 +1,13 @@
 .small-button,
 .danger-button {
-  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: max-content;
+  max-width: 100%;
+  border: 1px solid color-mix(in srgb, var(--border-strong) 45%, transparent);
   padding: 0 12px;
-  background: transparent;
+  background: var(--surface-soft);
   color: var(--text);
   font-weight: 700;
   text-align: center;
@@ -16,17 +21,31 @@
 }
 
 .small-button:hover {
-  background: var(--surface-soft);
+  border-color: color-mix(in srgb, var(--muted) 45%, transparent);
+  background: #e9ecef;
 }
 
 .danger-button {
-  background: #fff5f5;
+  border-color: color-mix(in srgb, var(--danger) 35%, transparent);
+  background: var(--danger-light);
   color: var(--danger);
   border-radius: 8px;
 }
 
 .danger-button:hover {
+  border-color: color-mix(in srgb, var(--danger-dark) 50%, transparent);
   background: #ffe7e5;
+}
+
+.warning-button {
+  border-color: color-mix(in srgb, var(--warning) 35%, transparent);
+  background: var(--warning-light);
+  color: var(--warning-dark);
+}
+
+.warning-button:hover {
+  border-color: color-mix(in srgb, var(--warning-dark) 50%, transparent);
+  background: #fef3c7;
 }
 
 .icon-button {
@@ -214,28 +233,31 @@
 /* ── Upload dropzone ── */
 .upload-dropzone {
   display: grid;
-  gap: 10px;
-  min-height: 160px;
+  place-items: center;
+  gap: 8px;
+  min-height: 118px;
   margin-bottom: 12px;
   padding: 18px;
   border: 1.5px dashed var(--border-strong);
   border-radius: 10px;
   background: var(--surface-soft);
   color: var(--muted);
-  transition: border-color 0.12s ease;
+  text-align: center;
+  transition: border-color 0.12s ease, background 0.12s ease;
 }
 
-.upload-dropzone:hover {
+.upload-dropzone:hover,
+.upload-dropzone.drag-over {
   border-color: var(--accent);
+  background: var(--accent-light);
 }
 
-.upload-dropzone label {
+.upload-dropzone i {
   color: var(--text);
-  font-weight: 700;
-  font-size: 13px;
+  font-size: 22px;
 }
 
-.upload-dropzone input {
+.upload-dropzone input:not(.sr-only) {
   width: 100%;
 }
 
@@ -243,6 +265,41 @@
   margin: 0;
   font-size: 12px;
   line-height: 1.5;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-knowledge-upload {
+  margin-bottom: 0;
+}
+
+.upload-selected-file {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.knowledge-creation-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.knowledge-creation-divider::before,
+.knowledge-creation-divider::after {
+  content: "";
+  height: 1px;
+  flex: 1;
+  background: var(--border);
 }
 
 /* ── Status pill ── */

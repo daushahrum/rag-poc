@@ -1,12 +1,51 @@
 // modules/knowledgeDocument/knowledgeDocument.controller.js
 
+import { PDFParse } from 'pdf-parse';
+
 import * as knowledgeDocumentService from './knowledgeDocument.service.js';
 import * as documentChunkService from '../documentChunk/documentChunk.service.js';
 
+function getDocumentTitleFromFilename(filename) {
+    const title = filename
+        .replace(/\.[^.]+$/, '')
+        .replace(/[_-]+/g, ' ')
+        .trim();
+
+    return title || 'Knowledge document';
+}
+
+async function extractUploadedDocumentContent(file) {
+    const isPdf = file.mimetype === 'application/pdf' || /\.pdf$/i.test(file.originalname);
+    const isText = file.mimetype === 'text/plain' || /\.txt$/i.test(file.originalname);
+
+    if (isText) {
+        return file.buffer.toString('utf8').trim();
+    }
+
+    if (isPdf) {
+        const parser = new PDFParse({ data: file.buffer });
+        try {
+            const result = await parser.getText();
+            return (result.text ?? '').trim();
+        } finally {
+            await parser.destroy();
+        }
+    }
+
+    throw new Error('Only PDF or TXT documents are supported');
+}
+
 export async function createKnowledgeDocument(req, res) {
     try {
+        const uploadedContent = req.file
+            ? await extractUploadedDocumentContent(req.file)
+            : null;
         const payload = {
             ...req.body,
+            ...(req.file && {
+                title: req.body.title || getDocumentTitleFromFilename(req.file.originalname),
+                content: uploadedContent,
+            }),
             created_by: req.token.id,
             updated_by: req.token.id,
         };

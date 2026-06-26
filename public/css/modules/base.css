@@ -16,6 +16,11 @@
   --accent-dark: #0EA5E9;
   --accent-light: #E7F5FB;
   --danger: #b42318;
+  --danger-light: #fff5f5;
+  --danger-dark: #991b1b;
+  --warning: #d97706;
+  --warning-light: #fffbeb;
+  --warning-dark: #b45309;
   --user: #e9eefc;
   --assistant: #ffffff;
   --sidebar-text: #374151;

@@ -103,7 +103,11 @@
 .messages.crud-canvas > .create-user-screen,
 .messages.crud-canvas > .project-knowledge-screen {
   flex: 1;
+  width: 100%;
+  max-width: 100%;
   min-height: 0;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .message {

@@ -1,15 +1,23 @@
 // modules/knowledgeDocument/knowledgeDocument.route.js
 
 import { Router } from 'express';
+import multer from 'multer';
 import * as knowledgeDocumentController from './knowledgeDocument.controller.js';
 
 import * as auth from '../../../middleware/authenticate.js';
 
 const router = Router();
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+        fileSize: 10 * 1024 * 1024,
+    },
+});
 
 router.post(
     '/create',
     auth.authenticate,
+    upload.single('document'),
     knowledgeDocumentController.createKnowledgeDocument
 );
 

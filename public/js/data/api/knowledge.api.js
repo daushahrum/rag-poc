@@ -98,9 +98,12 @@ export async function deleteKnowledgeDocument(documentId) {
     return response.json();
 }
 
-export async function ingestDocumentFile(file) {
+export async function ingestDocumentFile(file, options = {}) {
+    const { projectId, title } = options;
     const formData = new FormData();
     formData.append('document', file);
+    if (projectId) formData.append('project_id', projectId);
+    if (title) formData.append('title', title);
 
     const response = await fetch('/api/knowledge_document/create', {
         method: 'POST',
@@ -110,7 +113,7 @@ export async function ingestDocumentFile(file) {
 
     if (!response.ok) {
         const data = await response.json().catch(() => ({}));
-        throw new Error(data.error ?? 'Could not ingest document.');
+        throw new Error(data.error ?? data.message ?? 'Could not ingest document.');
     }
 
     return response.json();
