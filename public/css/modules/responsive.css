@@ -1,0 +1,246 @@
+/* ── Animations ── */
+@keyframes pulse {
+  0%,
+  80%,
+  100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+
+  40% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+/* ── Mobile menu button (hamburger) — hidden on desktop/tablet ── */
+.mobile-menu-button {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 22px;
+  line-height: 1;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.mobile-menu-button:hover {
+  background: var(--surface-soft);
+  color: var(--text);
+}
+
+/* ── Sidebar overlay (mobile) — hidden by default ── */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 39;
+  background: rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.28s ease-in-out;
+}
+
+/* ── Responsive ── */
+@media (max-width: 820px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+    height: auto;
+    overflow: visible;
+  }
+
+  .sidebar-resizer {
+    display: none;   /* drag-resize is not meaningful on narrow viewports */
+  }
+
+  .sidebar {
+    position: static;
+    height: auto;
+    min-height: auto;
+    gap: 4px;
+    padding: 10px;
+  }
+
+  .project-drawer,
+  .ingest-drawer {
+    width: 100vw;
+  }
+
+  .knowledge-center {
+    left: 0;
+    padding: 14px;
+  }
+
+  .knowledge-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(180px, 32vh) minmax(0, 1fr);
+  }
+
+  .knowledge-list-panel {
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+    padding-right: 0;
+    padding-bottom: 14px;
+  }
+
+  .chat-panel {
+    height: auto;
+    min-height: 72vh;
+  }
+
+  .messages,
+  .composer {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .chat-header {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .environment-field select {
+    max-width: 40vw;
+  }
+
+  .create-user-screen {
+    padding: 32px 16px;
+  }
+
+  .create-user-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .project-knowledge-screen {
+    height: auto;
+    min-height: 100%;
+    padding: 0;
+  }
+
+  .project-knowledge-layout {
+    grid-template-columns: 1fr;
+    overflow: visible;
+  }
+
+  .project-knowledge-list-panel {
+    max-height: 280px;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .project-resource-grid,
+  .project-resource-grid.three-columns,
+  .project-tool-json-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .status-pill {
+    display: none;
+  }
+
+  .message,
+  .message.user {
+    grid-template-columns: 30px minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .message.user .avatar {
+    grid-column: 1;
+  }
+
+  .message.user .bubble {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .avatar {
+    width: 30px;
+    height: 30px;
+  }
+}
+
+/* ── Mobile phone only (sidebar becomes a slide-in overlay) ── */
+@media (max-width: 767px) {
+  /* Restore full-height shell — sidebar is out of document flow */
+  .app-shell {
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* Sidebar: fixed, off-screen by default */
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 40;
+    width: min(280px, 85vw);
+    height: 100vh;
+    min-height: 100vh;
+    padding: 0;
+    transform: translateX(-100%);
+    transition: transform 0.34s cubic-bezier(0.22, 1, 0.36, 1),
+                box-shadow 0.34s ease;
+    box-shadow: none;
+  }
+
+  /* Slide in when open */
+  .sidebar.sidebar-open {
+    transform: translateX(0);
+    box-shadow: 4px 0 32px rgba(0, 0, 0, 0.2);
+  }
+
+  /* Restore chat panel to fill the full viewport */
+  .chat-panel {
+    height: 100vh;
+    min-height: 0;
+  }
+
+  /* Show the dim overlay */
+  .sidebar-overlay {
+    display: block;
+  }
+
+  .sidebar-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .chat-header {
+    gap: 10px;
+  }
+
+  .environment-field select {
+    max-width: 34vw;
+  }
+
+  .create-user-form {
+    padding: 18px;
+  }
+
+  .create-user-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .project-knowledge-header,
+  .project-knowledge-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .project-knowledge-editor {
+    padding: 18px;
+    overflow: visible;
+  }
+
+  /* Show the hamburger menu button */
+  .mobile-menu-button {
+    display: flex;
+  }
+}

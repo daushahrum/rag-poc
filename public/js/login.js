@@ -1,5 +1,5 @@
 /**
  * Entry point for views/login.html
- * All logic lives in pages/login.page.js
+ * All logic lives in presentation/pages/login.page.js
  */
-import './pages/login.page.js';
+import './presentation/pages/login.page.js';

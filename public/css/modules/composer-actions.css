@@ -1,0 +1,94 @@
+.composer {
+  padding: 12px max(22px, calc((100vw - 272px - 820px) / 2)) 20px;
+  background: linear-gradient(180deg, var(--bg), var(--surface) 18%);
+}
+
+.composer-box {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 36px;
+  align-items: end;
+  gap: 10px;
+  width: min(100%, 820px);
+  margin-inline: auto;
+  min-height: 52px;
+  padding: 8px 8px 8px 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+.composer-box:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(16, 163, 127, 0.12), 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+.composer textarea {
+  width: 100%;
+  max-height: 180px;
+  resize: none;
+  border: 0;
+  padding: 7px 0;
+  color: var(--text);
+  outline: none;
+  line-height: 1.5;
+  background: transparent;
+}
+
+/* ── Buttons ── */
+.logout-button {
+  padding: 7px 14px;
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+.profile-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+.profile-button i {
+  font-size: 18px;
+}
+
+.profile-button:hover,
+.logout-button:hover {
+  background: var(--surface-soft);
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+.send-button {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #ffffff;
+  transition: background 0.12s ease;
+}
+
+.send-button:hover {
+  background: var(--accent-dark);
+}
+
+.send-button svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}

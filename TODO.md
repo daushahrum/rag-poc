@@ -12,12 +12,12 @@ Replace the static `ANDI` chat header with the signed-in user's project name and
    - Keep sensible loading/fallback text while project data is unavailable.
    - Change the chat textarea placeholder to `ask anything`.
 
-2. [x] Extend `public/js/api/project.api.js`
+2. [x] Extend `public/js/data/api/project.api.js`
    - Add a helper for `GET /api/project/:id`.
    - Reuse the existing authenticated request pattern.
    - Return a clear error when project details cannot be loaded.
 
-3. [x] Initialize project and environment state in `public/js/pages/app.page.js`
+3. [x] Initialize project and environment state in `public/js/presentation/pages/app.page.js`
    - Read `project_id` from the authenticated user.
    - Fetch the project details and environments during page initialization.
    - Render the project `name` in the header.
@@ -53,7 +53,7 @@ Replace the static `ANDI` chat header with the signed-in user's project name and
 ## Expected files
 
 - `views/index.html`
-- `public/js/api/project.api.js`
-- `public/js/pages/app.page.js`
+- `public/js/data/api/project.api.js`
+- `public/js/presentation/pages/app.page.js`
 - `public/css/styles.css`
 - `TODO.md`

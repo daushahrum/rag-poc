@@ -2,7 +2,7 @@
  * Message UI — chat bubble and typing indicator components
  */
 
-import { renderFormattedText } from './formatter.ui.js';
+import { renderFormattedText } from './formatter.js';
 
 export function createMessage(role, content, sources = []) {
     const article = document.createElement('article');

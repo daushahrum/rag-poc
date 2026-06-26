@@ -9,9 +9,9 @@ import {
     isAuthenticated,
     isAdmin,
     isProjectOwner,
-} from '../auth.js';
+} from '../../domain/use-cases/auth.use-cases.js';
 
-import { sendMessage, fetchSessions, fetchSessionMessages, createChatSession } from '../api/chat.api.js';
+import { sendMessage, fetchSessions, fetchSessionMessages, createChatSession } from '../../domain/use-cases/chat.use-cases.js';
 import {
     createProject,
     createProjectEnvironment,
@@ -21,19 +21,19 @@ import {
     fetchProjectEnvironments,
     getProjectUser,
     updateProjectEnvironment,
-} from '../api/project.api.js';
+} from '../../domain/use-cases/project.use-cases.js';
 import {
     createUser,
     deleteUser,
     fetchUsers,
     updateUser,
-} from '../api/user.api.js';
+} from '../../domain/use-cases/user.use-cases.js';
 import {
     createTool,
     deleteTool,
     fetchProjectTools,
     updateTool,
-} from '../api/tool.api.js';
+} from '../../domain/use-cases/tool.use-cases.js';
 import {
     ingestKnowledge,
     fetchKnowledgeDocuments,
@@ -41,12 +41,17 @@ import {
     updateKnowledgeDocument,
     deleteKnowledgeDocument,
     ingestDocumentFile,
-} from '../api/knowledge.api.js';
+} from '../../domain/use-cases/knowledge.use-cases.js';
 
-import { createMessage, createTypingMessage } from '../ui/message.ui.js';
+import {
+    createFormField,
+    createInput,
+    parseOptionalJson,
+} from '../components/form-controls.js';
+import { createMessage, createTypingMessage } from '../components/message.js';
 
-import { getRandomGreeting, truncateText, formatSessionTime } from '../utils/text.utils.js';
-import { scrollToBottom, resizeTextarea } from '../utils/dom.utils.js';
+import { getRandomGreeting, truncateText, formatSessionTime } from '../../core/utils/text.js';
+import { scrollToBottom, resizeTextarea } from '../../core/utils/dom.js';
 
 // ─── Auth guard ──────────────────────────────────────────────────────────────
 
@@ -306,27 +311,6 @@ function renderPlaceholder(title, description) {
     content.append(heading, copy);
     screen.append(content);
     messages.append(screen);
-}
-
-function createFormField(labelText, control) {
-    const field = document.createElement('label');
-    field.className = 'create-user-field';
-
-    const label = document.createElement('span');
-    label.textContent = labelText;
-
-    field.append(label, control);
-    return field;
-}
-
-function createInput(name, type, placeholder, autocomplete) {
-    const input = document.createElement('input');
-    input.name = name;
-    input.type = type;
-    input.placeholder = placeholder;
-    input.autocomplete = autocomplete;
-    input.required = true;
-    return input;
 }
 
 async function renderCreateUserScreen() {
@@ -859,17 +843,6 @@ function createProjectManagerScreen(title, description, actionLabel) {
     messages.append(screen);
 
     return { createButton, refreshButton, list, editor };
-}
-
-function parseOptionalJson(value, label) {
-    const trimmed = value.trim();
-    if (!trimmed) return null;
-
-    try {
-        return JSON.parse(trimmed);
-    } catch {
-        throw new Error(`${label} must contain valid JSON.`);
-    }
 }
 
 async function renderProjectUsersScreen() {

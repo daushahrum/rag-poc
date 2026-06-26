@@ -1,0 +1,465 @@
+/* ── Sidebar ── */
+.sidebar {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  height: 100vh;
+  min-height: 0;
+  /* padding: 12px 10px; */
+  overflow-y: auto;
+  background: var(--sidebar);
+  color: var(--sidebar-text);
+  overflow-x: hidden;
+  /* border-right removed — resizer div acts as the separator */
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+/* ── Sidebar resize handle ── */
+.sidebar-resizer {
+  position: relative;
+  width: 1px;
+  height: 100vh;
+  cursor: col-resize;
+  background: var(--border);
+  transition: background 0.15s ease;
+  flex-shrink: 0;
+  z-index: 5;
+  /* Widen the hit area without growing the visual stripe */
+}
+
+.sidebar-resizer::before {
+  content: '';
+  position: absolute;
+  inset: 0 -6px;        /* extend clickable zone 6px left & right */
+  cursor: col-resize;
+}
+
+.sidebar-resizer:hover,
+.sidebar-resizer.is-dragging {
+  background: var(--accent);
+}
+
+/* ── Collapsed sidebar (icon-only) ── */
+.sidebar.collapsed {
+  align-items: center;
+  /* padding-left: 4px;
+  padding-right: 4px; */
+  overflow-x: hidden;
+}
+
+/* ── Fade + shrink labels out when collapsed ── */
+
+/* Inline-style labels: fade + shrink horizontally */
+.sidebar.collapsed .btn-label,
+.sidebar.collapsed .sidebar-collapse-button {
+  max-width: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Block-style labels: fade + shrink vertically */
+.sidebar.collapsed .section-label,
+.sidebar.collapsed .history-title,
+.sidebar.collapsed .history-meta,
+.sidebar.collapsed .history-empty {
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  pointer-events: none;
+}
+
+/* Keep the brand mark anchored while the sidebar crosses its collapse point */
+.sidebar.collapsed .brand {
+  justify-content: flex-start;
+  padding-left: var(--collapsed-brand-inset, 16px);
+}
+
+/* Preserve the expanded button geometry so icons do not shift while resizing */
+.sidebar.collapsed .developer-menu-button {
+  justify-content: flex-start;
+  padding-left: var(--collapsed-icon-inset, 18px);
+  width: 100%;
+}
+
+/* History items show only a thin accent bar when collapsed */
+.sidebar.collapsed .history-item {
+  justify-content: center;
+  padding: 8px 0;
+  min-height: 10px;
+  height: 6px;
+  width: 0%;
+  border-radius: 999px;
+  background: var(--border);
+  margin-bottom: 2px;
+  pointer-events: none;   /* can't meaningfully click when collapsed */
+}
+
+/* Section gap still exists but takes no visual space */
+.sidebar.collapsed .sidebar-section {
+  width: 100%;
+  margin-top: 4px;
+}
+
+/* ── Sidebar label transition base styles ── */
+
+/* Button text labels — fade + shrink horizontally */
+.btn-label {
+  overflow: hidden;
+  white-space: nowrap;
+  max-width: 200px;
+  opacity: 1;
+  transition: opacity 0.22s ease-in-out, max-width 0.28s ease-in-out;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 60px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.brand-logo-button,
+.sidebar-collapse-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  transition: background 0.12s ease, color 0.12s ease,
+              opacity 0.22s ease-in-out, max-width 0.28s ease-in-out;
+}
+
+.brand-logo-button:hover,
+.sidebar-collapse-button:hover {
+  background: var(--surface-soft);
+  color: var(--text);
+}
+
+.sidebar-collapse-button {
+  flex-shrink: 0;
+  overflow: hidden;
+  max-width: 36px;
+}
+
+.sidebar-collapse-button i {
+  font-size: 18px;
+}
+
+.brand-mark,
+.avatar {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.brand-mark {
+  object-fit: contain;
+}
+
+.chat-header h2,
+.chat-header p,
+.section-label,
+.bubble p,
+.bubble h3,
+.bubble h4,
+.bubble h5,
+.project-drawer h2,
+.project-result h3,
+.project-result p,
+.ingest-drawer h2,
+.ingest-status {
+  margin: 0;
+}
+
+/* ── Sidebar buttons ── */
+.developer-menu-button,
+.history-item,
+.ingest-button,
+.danger-button,
+.small-button {
+  width: 100%;
+  min-height: 38px;
+  /* border-radius: 8px; */
+  border: none;
+  color: inherit;
+  text-align: left;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.developer-menu-button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 18px;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--sidebar-text);
+}
+
+.role-menu {
+  display: grid;
+  width: 100%;
+}
+
+.project-menu-group {
+  display: grid;
+}
+
+.project-menu-toggle .project-menu-chevron {
+  width: auto;
+  margin-left: auto;
+  font-size: 12px;
+  transition: transform 0.16s ease;
+}
+
+.project-menu-toggle[aria-expanded="false"] .project-menu-chevron {
+  transform: rotate(-90deg);
+}
+
+.project-submenu {
+  display: grid;
+  padding: 3px 0 5px;
+}
+
+.project-submenu-button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 34px;
+  padding: 7px 18px 7px 46px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: left;
+}
+
+.project-submenu-button:hover {
+  background: var(--sidebar-hover);
+  color: var(--text);
+}
+
+.project-submenu-button.active {
+  position: relative;
+  background: var(--accent-light);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.project-submenu-button.active::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 3px;
+  height: 100%;
+  background: var(--accent);
+}
+
+.project-submenu-button i {
+  width: 16px;
+  flex: 0 0 16px;
+  text-align: center;
+}
+
+.sidebar.collapsed .project-submenu {
+  display: none;
+}
+
+.sidebar.collapsed .project-menu-chevron {
+  display: none;
+}
+
+.developer-menu-button i {
+  display: grid;
+  width: 18px;
+  flex-shrink: 0;
+  place-items: center;
+  font-size: 18px;
+  /* opacity: 0.85; */
+}
+
+.developer-menu-button i {
+  color: var(--muted);
+}
+
+.developer-menu-button:hover {
+  background: var(--sidebar-hover);
+  color: var(--text);
+}
+
+.developer-menu-button.active {
+  position: relative;
+  background: var(--accent-light);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.developer-menu-button.active::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 3px;
+  height: 100%;
+  background: var(--accent);
+}
+
+.developer-menu-button.active i {
+  color: var(--accent);
+}
+
+/* ── Sidebar section ── */
+.sidebar-section {
+  display: grid;
+  gap: 0;
+  min-height: 0;
+  margin-top: 8px;
+}
+
+.section-label {
+  color: var(--sidebar-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 6px 10px 4px;
+  overflow: hidden;
+  max-height: 3em;
+  transition: opacity 0.16s ease-in-out, max-height 0.22s ease-in-out,
+              padding-top 0.22s ease-in-out, padding-bottom 0.22s ease-in-out;
+}
+
+/* ── History list ── */
+.history-list {
+  display: grid;
+  gap: 0;
+}
+
+.history-loading {
+  display: flex;
+  justify-content: center;
+  padding: 14px 0;
+}
+
+.history-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.history-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  min-height: 38px;
+  padding: 10px 18px;
+  background: transparent;
+  color: var(--sidebar-text);
+  border: none;
+  /* border-radius: 8px; */
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.history-item:hover {
+  background: var(--sidebar-hover);
+  color: var(--text);
+}
+
+.history-item.active {
+  position: relative;
+  background: var(--sidebar-active);
+  color: var(--text);
+}
+
+.history-item.active::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 3px;
+  height: 100%;
+  background: var(--sidebar-muted);
+}
+
+.history-item.active .history-title,
+.history-item.active .history-meta {
+  color: inherit;
+}
+
+.history-item.active .history-meta {
+  color: var(--sidebar-muted);
+}
+
+.history-title,
+.history-meta {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.history-title {
+  font-size: 14px;
+  font-weight: 400;
+  color: inherit;
+  overflow: hidden;
+  max-height: 2.5em;
+  transition: opacity 0.16s ease-in-out, max-height 0.22s ease-in-out;
+}
+
+.history-item.active .history-title {
+  font-weight: 600;
+}
+
+.history-meta {
+  font-size: 14x;
+  font-weight: 500;
+  color: var(--sidebar-muted);
+  margin-top: 1px;
+  overflow: hidden;
+  max-height: 2em;
+  transition: opacity 0.16s ease-in-out, max-height 0.22s ease-in-out;
+}
+
+.history-empty {
+  margin: 0;
+  padding: 8px 10px;
+  color: var(--sidebar-muted);
+  font-size: 12px;
+  overflow: hidden;
+  max-height: 3em;
+  transition: opacity 0.16s ease-in-out, max-height 0.22s ease-in-out,
+              padding-top 0.22s ease-in-out, padding-bottom 0.22s ease-in-out;
+}

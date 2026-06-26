@@ -2,8 +2,7 @@
  * Login Page — handles views/login.html
  */
 
-import { setAuth, isAuthenticated } from '../auth.js';
-import { login } from '../api/auth.api.js';
+import { isAuthenticated, login, setAuth } from '../../domain/use-cases/auth.use-cases.js';
 
 // Redirect if already authenticated
 if (isAuthenticated()) {

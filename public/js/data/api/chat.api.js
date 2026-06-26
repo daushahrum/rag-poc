@@ -2,7 +2,7 @@
  * Chat API — handles calls to /api/chat/*
  */
 
-import { getAuthHeaders } from '../auth.js';
+import { getAuthHeaders } from '../../core/auth/session.js';
 
 export async function sendMessage(sessionId, message) {
     const response = await fetch('/api/chat/portal/send', {

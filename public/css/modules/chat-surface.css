@@ -1,0 +1,91 @@
+/* ── Chat panel ── */
+.chat-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-width: 0;
+  height: 100vh;
+  min-height: 0;
+  background: var(--surface);
+}
+
+.chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 60px;
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.chat-context {
+  min-width: 0;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.chat-header h2 {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--text);
+}
+
+.chat-header p {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.environment-field,
+.admin-project-field {
+  margin-top: 3px;
+}
+
+.environment-field select,
+.admin-project-field select {
+  max-width: min(280px, 42vw);
+  padding: 2px 24px 2px 0;
+  border: 0;
+  border-radius: 6px;
+  background-color: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+  outline: none;
+}
+
+.environment-field select:focus-visible,
+.admin-project-field select:focus-visible {
+  box-shadow: 0 0 0 3px rgba(16, 163, 127, 0.14);
+}
+
+.environment-field select:disabled,
+.admin-project-field select:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.placeholder-screen {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding: 40px 24px;
+  text-align: center;
+}
+
+.placeholder-screen h2 {
+  margin: 0 0 8px;
+  font-size: 22px;
+}
+
+.placeholder-screen p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}

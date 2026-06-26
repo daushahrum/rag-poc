@@ -2,7 +2,7 @@
  * Project API — handles calls to /api/project/*
  */
 
-import { getAuthHeaders } from '../auth.js';
+import { getAuthHeaders } from '../../core/auth/session.js';
 
 export async function createProject(name, code) {
     const response = await fetch('/api/project/create', {

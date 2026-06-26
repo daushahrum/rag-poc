@@ -2,7 +2,7 @@
  * Knowledge API — handles calls to /api/knowledge_document/*
  */
 
-import { getAuthHeaders } from '../auth.js';
+import { getAuthHeaders } from '../../core/auth/session.js';
 
 export async function ingestKnowledge(title, content, projectId) {
     const response = await fetch('/api/knowledge_document/create', {

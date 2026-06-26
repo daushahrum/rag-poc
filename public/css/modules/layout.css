@@ -1,0 +1,13 @@
+/* ── Layout ── */
+.app-shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-width) 5px minmax(0, 1fr);
+  height: 100vh;
+  min-height: 100vh;
+  overflow: hidden;
+  transition: grid-template-columns 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.app-shell.sidebar-resizing {
+  transition: none;
+}

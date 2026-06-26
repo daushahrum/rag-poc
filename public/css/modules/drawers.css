@@ -1,0 +1,172 @@
+/* ── Drawers ── */
+.project-drawer,
+.ingest-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 20;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 14px;
+  width: min(420px, 100vw);
+  height: 100vh;
+  padding: 18px;
+  border-left: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: -12px 0 40px rgba(0, 0, 0, 0.08);
+  transform: translateX(100%);
+  transition: transform 180ms ease;
+}
+
+.project-drawer {
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+.project-drawer.open,
+.ingest-drawer.open {
+  transform: translateX(0);
+}
+
+.drawer-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.project-drawer h2,
+.ingest-drawer h2 {
+  margin-top: 4px;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+/* ── Knowledge center ── */
+.knowledge-center {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: calc(var(--sidebar-width) + 5px);   /* sidebar + resizer width */
+  z-index: 30;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 16px;
+  padding: 18px;
+  background: var(--surface);
+  transform: translateX(100%);
+  transition: transform 180ms ease;
+}
+
+.knowledge-center.open {
+  transform: translateX(0);
+}
+
+.knowledge-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.knowledge-header h2 {
+  margin: 4px 0 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.knowledge-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+  gap: 18px;
+  min-height: 0;
+}
+
+.knowledge-list-panel,
+.knowledge-editor {
+  min-height: 0;
+}
+
+.knowledge-list-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 10px;
+  border-right: 1px solid var(--border);
+  padding-right: 18px;
+}
+
+.knowledge-list-header,
+.knowledge-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.knowledge-list-header {
+  justify-content: space-between;
+}
+
+.knowledge-list {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  overflow-y: auto;
+}
+
+.knowledge-item {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  min-height: 68px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+
+.knowledge-item:hover,
+.knowledge-item.active {
+  border-color: var(--accent);
+  background: var(--accent-light);
+}
+
+.knowledge-item-title,
+.knowledge-item-meta,
+.knowledge-item-preview {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.knowledge-item-title {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.knowledge-item-meta,
+.knowledge-item-preview {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.knowledge-editor {
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto auto;
+  gap: 9px;
+}
+
+.knowledge-editor label {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.knowledge-editor textarea {
+  min-height: 0;
+}
+
+/* ── Shared form styles ── */
