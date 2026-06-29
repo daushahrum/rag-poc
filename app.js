@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import authRoutes from "./src/modules/auth/auth.route.js";
 import userRoutes from "./src/modules/user/user.route.js";
 import projectRoutes from "./src/modules/project/project.route.js";
+import appRoutes from "./src/modules/apps/app.route.js";
 import chatRoutes from "./src/modules/chat/chat.route.js";
 import chatSessionRoutes from "./src/modules/chat/chatSession/chatSession.route.js";
 import chatMessageRoutes from "./src/modules/chat/chatMessages/chatMessage.route.js";
@@ -43,6 +44,7 @@ app.get("/login", (req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/project", projectRoutes);
+app.use("/api/apps", appRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/chat/sessions", chatSessionRoutes);
 app.use("/api/chat/messages", chatMessageRoutes);

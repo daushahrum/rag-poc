@@ -159,6 +159,46 @@
   font-size: 12px;
 }
 
+.app-key-panel {
+  display: grid;
+  grid-template-columns: minmax(160px, 0.6fr) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #a7f3d0;
+  border-radius: 8px;
+  background: #ecfdf5;
+  color: #065f46;
+}
+
+.app-key-panel[hidden] {
+  display: none;
+}
+
+.app-key-panel strong,
+.app-key-panel span {
+  display: block;
+}
+
+.app-key-panel span {
+  margin-top: 2px;
+  color: #047857;
+  font-size: 12px;
+}
+
+.app-key-panel input {
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid #a7f3d0;
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+}
+
 /* ── Project knowledge ── */
 .project-knowledge-screen {
   display: grid;

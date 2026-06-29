@@ -11,6 +11,7 @@
     { "name": "Auth" },
     { "name": "Users" },
     { "name": "Projects" },
+    { "name": "Apps" },
     { "name": "Project Environments" },
     { "name": "Project Users" },
     { "name": "Chat Sessions" },
@@ -77,8 +78,20 @@
           "id": { "type": "integer", "format": "int64", "readOnly": true },
           "code": { "type": "string" },
           "name": { "type": "string" },
-          "is_active": { "type": "boolean" },
-          "project_key_hash": { "type": "string", "readOnly": true }
+          "is_active": { "type": "boolean" }
+        }
+      },
+      "ProjectApp": {
+        "type": "object",
+        "required": ["project_id", "name", "platform"],
+        "properties": {
+          "id": { "type": "integer", "format": "int64", "readOnly": true },
+          "project_id": { "type": "integer", "format": "int64" },
+          "name": { "type": "string" },
+          "platform": { "type": "string" },
+          "project_key_hash": { "type": "string", "readOnly": true },
+          "project_key": { "type": "string", "readOnly": true },
+          "status": { "type": "string", "default": "active" }
         }
       },
       "ProjectEnvironment": {
@@ -202,6 +215,13 @@
     "/api/project/create_environment": { "post": { "tags": ["Project Environments"], "summary": "Create project environment legacy route", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProjectEnvironment" } } } }, "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
     "/api/project/environment_list/{project_id}": { "get": { "tags": ["Project Environments"], "summary": "List environments by project legacy route", "parameters": [{ "name": "project_id", "in": "path", "required": true, "schema": { "type": "integer" } }], "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
     "/api/project/tools/{project_id}": { "get": { "tags": ["Tools"], "summary": "List tools by project", "parameters": [{ "name": "project_id", "in": "path", "required": true, "schema": { "type": "integer" } }], "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+
+    "/api/apps/create": { "post": { "tags": ["Apps"], "summary": "Create app", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProjectApp" } } } }, "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+    "/api/apps/update": { "post": { "tags": ["Apps"], "summary": "Update app", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProjectApp" } } } }, "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+    "/api/apps/delete": { "post": { "tags": ["Apps"], "summary": "Delete app", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/IdBody" } } } }, "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+    "/api/apps/list": { "get": { "tags": ["Apps"], "summary": "List apps", "parameters": [{ "name": "project_id", "in": "query", "schema": { "type": "integer" } }, { "name": "status", "in": "query", "schema": { "type": "string" } }], "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+    "/api/apps/find": { "get": { "tags": ["Apps"], "summary": "Find app", "parameters": [{ "name": "project_id", "in": "query", "schema": { "type": "integer" } }, { "name": "name", "in": "query", "schema": { "type": "string" } }, { "name": "platform", "in": "query", "schema": { "type": "string" } }, { "name": "status", "in": "query", "schema": { "type": "string" } }], "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
+    "/api/apps/{id}": { "get": { "tags": ["Apps"], "summary": "Get app", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }], "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
 
     "/api/project/environments/create": { "post": { "tags": ["Project Environments"], "summary": "Create project environment", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProjectEnvironment" } } } }, "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },
     "/api/project/environments/update": { "post": { "tags": ["Project Environments"], "summary": "Update project environment", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ProjectEnvironment" } } } }, "responses": { "200": { "description": "OK" }, "400": { "$ref": "#/components/responses/BadRequest" } } } },

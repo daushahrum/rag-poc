@@ -36,6 +36,7 @@ import { renderCreateProjectScreen } from './screens/admin-create-project.screen
 import { createChatScreen } from './screens/chat.screen.js';
 import { renderCreateUserScreen } from './screens/admin-create-user.screen.js';
 import { renderProjectEnvironmentsScreen } from './screens/project-environments.screen.js';
+import { renderProjectAppsScreen } from './screens/project-apps.screen.js';
 import { renderProjectKnowledgeScreen } from './screens/project-knowledge.screen.js';
 import { renderProjectToolsScreen } from './screens/project-tools.screen.js';
 import { renderProjectUsersScreen } from './screens/project-users.screen.js';
@@ -66,6 +67,7 @@ const {
     projectUsersButton,
     projectEnvironmentsButton,
     projectToolsButton,
+    projectAppsButton,
     projectKnowledgeButton,
     analyticsButton,
     adminDashboardButton,
@@ -167,6 +169,7 @@ const sidebarController = createSidebarController({
         'project-users': projectUsersButton,
         'project-environments': projectEnvironmentsButton,
         'project-tools': projectToolsButton,
+        'project-apps': projectAppsButton,
         'project-knowledge': projectKnowledgeButton,
         analytics: analyticsButton,
         dashboard: adminDashboardButton,
@@ -688,6 +691,20 @@ projectToolsButton.addEventListener('click', async () => {
     }
 });
 
+projectAppsButton.addEventListener('click', async () => {
+    projectName.textContent = 'Connected Apps';
+    setSidebarSelection('menu', 'project-apps');
+
+    try {
+        if (!state.activeProjectId) {
+            await initializeProjectOwnerContext();
+        }
+        await renderProjectAppsScreen(appContext);
+    } catch (error) {
+        renderPlaceholder('Apps unavailable', error.message);
+    }
+});
+
 projectKnowledgeButton.addEventListener('click', async () => {
     projectName.textContent = 'Knowledge';
     setSidebarSelection('menu', 'project-knowledge');
@@ -774,7 +791,7 @@ projectForm.addEventListener('submit', async (event) => {
 
         createdProjectName.textContent = project.name;
         createdProjectCode.textContent = project.code;
-        projectKeyOutput.value = project.project_key;
+        projectKeyOutput.value = project.project_key ?? '';
         projectResult.hidden = false;
         projectForm.reset();
         projectStatus.textContent = 'Project created.';

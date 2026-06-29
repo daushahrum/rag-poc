@@ -23,6 +23,7 @@ export function getAppDom() {
         projectUsersButton: document.querySelector('#projectUsersButton'),
         projectEnvironmentsButton: document.querySelector('#projectEnvironmentsButton'),
         projectToolsButton: document.querySelector('#projectToolsButton'),
+        projectAppsButton: document.querySelector('#projectAppsButton'),
         projectKnowledgeButton: document.querySelector('#projectKnowledgeButton'),
         analyticsButton: document.querySelector('#analyticsButton'),
         adminDashboardButton: document.querySelector('#adminDashboardButton'),

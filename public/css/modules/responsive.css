@@ -140,6 +140,11 @@
     grid-template-columns: 1fr;
   }
 
+  .app-key-panel {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
   .status-pill {
     display: none;
   }

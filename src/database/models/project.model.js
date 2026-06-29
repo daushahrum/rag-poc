@@ -21,11 +21,6 @@ export default function ProjectModel(sequelize) {
                 allowNull: false,
             },
 
-            project_key_hash: {
-                type: DataTypes.TEXT,
-                allowNull: false,
-            },
-
             is_active: {
                 type: DataTypes.BOOLEAN,
                 allowNull: true,

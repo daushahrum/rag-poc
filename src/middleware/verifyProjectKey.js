@@ -1,7 +1,18 @@
 // middleware/verifyProjectKey.js
 
 import * as projectRepository from '../modules/project/project.repository.js';
+import * as appService from '../modules/apps/app.service.js';
 import * as chatSessionRepository from '../modules/chat/chatSession/chatSession.repository.js';
+
+async function verifyActiveProjectApp(projectId, projectKey) {
+    const app = await appService.getAppByProjectKey(projectId, projectKey);
+
+    if (!app) {
+        return null;
+    }
+
+    return app.status === 'active' ? app : false;
+}
 
 /**
  * Verify both project key and session key.
@@ -32,8 +43,14 @@ export async function verifyProjectAndSessionKey(req, res, next) {
             return res.status(404).json({ message: 'Project not found' });
         }
 
-        if (project.project_key_hash !== projectKey) {
+        const app = await verifyActiveProjectApp(project.id, projectKey);
+
+        if (app === null) {
             return res.status(401).json({ message: 'Invalid project key' });
+        }
+
+        if (app === false) {
+            return res.status(403).json({ message: 'App is not active' });
         }
 
         if (!project.is_active) {
@@ -41,6 +58,7 @@ export async function verifyProjectAndSessionKey(req, res, next) {
         }
 
         req.project = project;
+        req.projectApp = app;
         req.chatSession = session;
         next();
     } catch (error) {
@@ -71,8 +89,14 @@ export async function verifyProjectKey(req, res, next) {
             return res.status(404).json({ message: 'Project not found' });
         }
 
-        if (project.project_key_hash !== projectKey) {
+        const app = await verifyActiveProjectApp(project.id, projectKey);
+
+        if (app === null) {
             return res.status(401).json({ message: 'Invalid project key' });
+        }
+
+        if (app === false) {
+            return res.status(403).json({ message: 'App is not active' });
         }
 
         if (!project.is_active) {
@@ -80,6 +104,7 @@ export async function verifyProjectKey(req, res, next) {
         }
 
         req.project = project;
+        req.projectApp = app;
         next();
     } catch (error) {
         return res.status(400).json({ message: error.message });

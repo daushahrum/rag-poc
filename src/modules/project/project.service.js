@@ -1,10 +1,4 @@
-// modules/project/project.service.js
-import crypto from 'crypto';
 import * as projectRepository from './project.repository.js';
-
-function generateProjectKeyHash() {
-    return crypto.randomBytes(32).toString('hex');
-}
 
 export async function createProject(payload) {
     if (!payload || typeof payload !== 'object') {
@@ -23,7 +17,6 @@ export async function createProject(payload) {
 
     const projectToCreate = {
         ...payload,
-        project_key_hash: generateProjectKeyHash(),
         is_active: payload.is_active ?? true,
     };
 
