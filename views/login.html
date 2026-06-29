@@ -12,37 +12,11 @@
 
   <!-- LEFT -->
   <div class="left-panel">
-    <div class="left-brand">
-      <div class="brand-mark">AI</div>
-      <span class="brand-name">ANDI</span>
-    </div>
+    <canvas class="particle-field" id="particleField" aria-hidden="true"></canvas>
 
-    <div class="left-main">
-      <h2 class="left-headline">Knowledge that<br>actually <em>works</em><br>for your team.</h2>
-      <p class="left-sub">Connect your docs, ingest your knowledge, and chat with an AI that knows your context — not just the internet's.</p>
-      <div class="feature-list">
-        <div class="feature-item">
-          <div class="feature-dot"></div>
-          <div class="feature-text">
-            <strong>Project-scoped knowledge</strong>
-            Organize documents and context per project. No cross-contamination.
-          </div>
-        </div>
-        <div class="feature-item">
-          <div class="feature-dot"></div>
-          <div class="feature-text">
-            <strong>Semantic retrieval</strong>
-            Searches meaning, not just keywords. Finds the answer buried on page 47.
-          </div>
-        </div>
-        <div class="feature-item">
-          <div class="feature-dot"></div>
-          <div class="feature-text">
-            <strong>Full conversation history</strong>
-            Pick up any thread. Every session is saved and searchable.
-          </div>
-        </div>
-      </div>
+    <div class="left-copy">
+      <h2><span>Automate</span> your customer<br>service experience</h2>
+      <p>Upload. Ingest. Retrieve</p>
     </div>
 
     <div class="left-footer">© 2026 AMAST. All rights reserved.</div>
@@ -51,8 +25,14 @@
   <!-- RIGHT -->
   <div class="right-panel">
     <div class="login-box">
+      <div class="login-mark" aria-label="ANDI">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+
       <div class="login-heading">
-        <h1>Welcome back</h1>
+        <h1>Welcome back!</h1>
         <p>Sign in to your account to continue.</p>
       </div>
 
@@ -68,7 +48,6 @@
             required
           />
         </div>
-
         <div class="field">
           <div class="field-row">
             <label for="password">Password</label>
@@ -88,10 +67,6 @@
 
         <button type="submit" class="submit-btn" id="submitBtn">Sign in</button>
       </form>
-
-      <div class="divider">or</div>
-
-      <p class="signup-link">Don't have an account? <a href="/signup">Create one</a></p>
     </div>
   </div>
 
