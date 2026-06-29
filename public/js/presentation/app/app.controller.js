@@ -386,7 +386,7 @@ function renderEnvironmentOptions() {
 function resetChatState() {
     state.sessionId = null;
     state.sessions = [];
-    setSidebarSelection('menu', state.roleMode === 'admin' ? 'chat' : 'new-chat');
+    setSidebarSelection('menu', 'new-chat');
     renderHistory();
     renderWelcomeMessage();
 }
@@ -405,6 +405,8 @@ async function initializeProjectOwnerContext() {
     if (!state.currentUser?.project_id) {
         projectName.textContent = 'Project unavailable';
         environmentSelect.innerHTML = '<option value="">No project</option>';
+        environmentSelect.disabled = true;
+        setComposerEnabled(false);
         throw new Error('User project information not found. Please log in again.');
     }
 
@@ -448,9 +450,61 @@ function renderProjectOptions() {
     projectSelect.value = state.activeProjectId ?? '';
 }
 
-async function initializeAdminChat() {
+async function initializeAdminProjectContext() {
+    adminProjectField.hidden = false;
+    projectName.hidden = true;
+    projectSelect.disabled = true;
+    environmentSelect.disabled = true;
+    environmentSelect.innerHTML = '<option value="">Select a project</option>';
+    state.selectedEnvironmentId = null;
+    state.environments = [];
+    setComposerEnabled(false);
+
+    if (state.projects.length === 0) {
+        state.projects = await fetchProjects();
+    }
+
+    state.activeProjectId = state.projects.some(
+        (project) => String(project.id) === String(state.activeProjectId)
+    )
+        ? state.activeProjectId
+        : (state.projects[0]?.id ?? null);
+
+    renderProjectOptions();
+    projectSelect.disabled = state.projects.length === 0;
+
+    if (!state.activeProjectId) {
+        environmentSelect.innerHTML = '<option value="">No projects available</option>';
+        return false;
+    }
+
+    return true;
+}
+
+async function renderAdminProjectScreen(selection, title, renderer) {
+    state.adminProjectView = { selection, title, renderer };
+    projectName.textContent = title;
+    setSidebarSelection('menu', selection);
+
+    try {
+        const hasProject = await initializeAdminProjectContext();
+        if (!hasProject) {
+            renderHistory();
+            renderPlaceholder(title, 'Create a project before managing project settings.');
+            return;
+        }
+
+        await renderer(appContext);
+    } catch (error) {
+        renderHistory();
+        renderPlaceholder(`${title} unavailable`, error.message);
+    }
+}
+
+async function initializeAdminChat({ selection = 'chat', startNew = false } = {}) {
+    state.adminProjectView = null;
     showChatSurface();
-    setSidebarSelection('menu', 'chat');
+    setSidebarSelection('menu', selection);
     adminProjectField.hidden = false;
     projectName.hidden = true;
     projectSelect.disabled = true;
@@ -485,7 +539,11 @@ async function initializeAdminChat() {
         await loadEnvironmentsForProject(state.activeProjectId);
         await refreshSessions();
         renderWelcomeMessage();
-        await startSession();
+        if (startNew) {
+            await startSession();
+        } else if (state.sessions.length > 0) {
+            await loadSession(state.sessions[0].id);
+        }
     } catch (error) {
         renderWelcomeMessage();
         messages.append(createMessage('assistant', error.message));
@@ -496,6 +554,7 @@ async function initializeAdminChat() {
 }
 
 async function initializeProjectOwnerChat() {
+    state.adminProjectView = null;
     showChatSurface();
     setSidebarSelection('menu', 'new-chat');
 
@@ -505,6 +564,7 @@ async function initializeProjectOwnerChat() {
         renderWelcomeMessage();
         await startSession();
     } catch (error) {
+        renderHistory();
         renderWelcomeMessage();
         messages.append(createMessage('assistant', error.message));
     }
@@ -514,6 +574,7 @@ function initializeRoleView() {
     renderRoleMenu();
 
     if (state.roleMode === 'admin') {
+        renderHistory();
         adminProjectField.hidden = true;
         projectName.hidden = false;
         projectName.textContent = 'Dashboard';
@@ -569,6 +630,13 @@ projectSelect.addEventListener('change', async () => {
     state.activeProjectId = projectSelect.value || null;
     state.selectedEnvironmentId = null;
     state.environments = [];
+
+    if (state.roleMode === 'admin' && state.adminProjectView) {
+        const { selection, title, renderer } = state.adminProjectView;
+        await renderAdminProjectScreen(selection, title, renderer);
+        return;
+    }
+
     resetChatState();
 
     if (!state.activeProjectId) {
@@ -596,9 +664,14 @@ projectSelect.addEventListener('change', async () => {
 
 environmentSelect.addEventListener('change', async () => {
     state.selectedEnvironmentId = environmentSelect.value || null;
+
+    if (state.roleMode === 'admin' && state.adminProjectView) {
+        return;
+    }
+
     state.sessionId = null;
     state.sessions = [];
-    setSidebarSelection('menu', state.roleMode === 'admin' ? 'chat' : 'new-chat');
+    setSidebarSelection('menu', 'new-chat');
     renderHistory();
     renderWelcomeMessage();
 
@@ -619,6 +692,11 @@ environmentSelect.addEventListener('change', async () => {
 // ─── Event listeners: new chat ────────────────────────────────────────────────
 
 newChatButton.addEventListener('click', async () => {
+    if (state.roleMode === 'admin') {
+        initializeAdminChat({ selection: 'new-chat', startNew: true });
+        return;
+    }
+
     showChatSurface();
     adminProjectField.hidden = true;
     projectName.hidden = false;
@@ -654,6 +732,11 @@ myProjectButton.addEventListener('click', () => {
 });
 
 projectUsersButton.addEventListener('click', async () => {
+    if (state.roleMode === 'admin') {
+        await renderAdminProjectScreen('project-users', 'Users', renderProjectUsersScreen);
+        return;
+    }
+
     projectName.textContent = 'Users';
     setSidebarSelection('menu', 'project-users');
 
@@ -668,6 +751,11 @@ projectUsersButton.addEventListener('click', async () => {
 });
 
 projectEnvironmentsButton.addEventListener('click', async () => {
+    if (state.roleMode === 'admin') {
+        await renderAdminProjectScreen('project-environments', 'Environments', renderProjectEnvironmentsScreen);
+        return;
+    }
+
     projectName.textContent = 'Environments';
     setSidebarSelection('menu', 'project-environments');
 
@@ -682,6 +770,11 @@ projectEnvironmentsButton.addEventListener('click', async () => {
 });
 
 projectToolsButton.addEventListener('click', async () => {
+    if (state.roleMode === 'admin') {
+        await renderAdminProjectScreen('project-tools', 'Tools', renderProjectToolsScreen);
+        return;
+    }
+
     projectName.textContent = 'Tools';
     setSidebarSelection('menu', 'project-tools');
 
@@ -696,6 +789,11 @@ projectToolsButton.addEventListener('click', async () => {
 });
 
 projectAppsButton.addEventListener('click', async () => {
+    if (state.roleMode === 'admin') {
+        await renderAdminProjectScreen('project-apps', 'Connected Apps', renderProjectAppsScreen);
+        return;
+    }
+
     projectName.textContent = 'Connected Apps';
     setSidebarSelection('menu', 'project-apps');
 
@@ -710,6 +808,11 @@ projectAppsButton.addEventListener('click', async () => {
 });
 
 projectPromptButton.addEventListener('click', async () => {
+    if (state.roleMode === 'admin') {
+        await renderAdminProjectScreen('project-prompt', 'Prompt', renderProjectPromptScreen);
+        return;
+    }
+
     projectName.textContent = 'Prompt';
     setSidebarSelection('menu', 'project-prompt');
 
@@ -724,6 +827,11 @@ projectPromptButton.addEventListener('click', async () => {
 });
 
 projectKnowledgeButton.addEventListener('click', async () => {
+    if (state.roleMode === 'admin') {
+        await renderAdminProjectScreen('project-knowledge', 'Knowledge', renderProjectKnowledgeScreen);
+        return;
+    }
+
     projectName.textContent = 'Knowledge';
     setSidebarSelection('menu', 'project-knowledge');
 
@@ -738,6 +846,7 @@ projectKnowledgeButton.addEventListener('click', async () => {
 });
 
 analyticsButton.addEventListener('click', () => {
+    state.adminProjectView = null;
     projectName.hidden = false;
     adminProjectField.hidden = true;
     projectName.textContent = 'Analytics';
@@ -746,6 +855,8 @@ analyticsButton.addEventListener('click', () => {
 });
 
 adminDashboardButton.addEventListener('click', () => {
+    state.adminProjectView = null;
+    renderHistory();
     projectName.hidden = false;
     adminProjectField.hidden = true;
     projectName.textContent = 'Dashboard';
@@ -754,6 +865,7 @@ adminDashboardButton.addEventListener('click', () => {
 });
 
 adminProjectsButton.addEventListener('click', () => {
+    state.adminProjectView = null;
     projectName.hidden = false;
     adminProjectField.hidden = true;
     projectName.textContent = 'Projects';
@@ -762,6 +874,7 @@ adminProjectsButton.addEventListener('click', () => {
 });
 
 adminUsersButton.addEventListener('click', () => {
+    state.adminProjectView = null;
     projectName.hidden = false;
     adminProjectField.hidden = true;
     projectName.textContent = 'Users';

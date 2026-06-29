@@ -42,6 +42,25 @@ export async function updateProject(id, payload) {
     return data;
 }
 
+export async function deleteProject(id) {
+    const response = await fetch('/api/project/delete', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            ...getAuthHeaders(),
+        },
+        body: JSON.stringify({ id }),
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+        throw new Error(data.error ?? data.message ?? 'Could not delete project.');
+    }
+
+    return data;
+}
+
 export async function fetchProjectEnvironments(projectId) {
     const response = await fetch(`/api/project/environments/project/${encodeURIComponent(projectId)}`, {
         headers: getAuthHeaders(),

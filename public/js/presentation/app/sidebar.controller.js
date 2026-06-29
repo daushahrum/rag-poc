@@ -61,14 +61,25 @@ export function createSidebarController({
             return;
         }
 
-        setSidebarSelection('menu', roleMode === 'admin' ? 'chat' : 'new-chat');
+        setSidebarSelection('menu', 'new-chat');
     }
 
     function renderRoleMenu() {
-        roleMenu.querySelectorAll('[data-menu-role]').forEach((button) => {
-            const allowedRoles = button.dataset.menuRole.split(/\s+/);
-            button.hidden = !allowedRoles.includes(roleMode);
+        roleMenu.classList.toggle('admin-role-menu', roleMode === 'admin');
+
+        roleMenu.querySelectorAll('[data-menu-role]').forEach((element) => {
+            const allowedRoles = element.dataset.menuRole.split(/\s+/);
+            element.hidden = !allowedRoles.includes(roleMode);
         });
+
+        const projectSubmenu = roleMenu.querySelector('#projectSubmenu');
+        const projectMenuGroup = roleMenu.querySelector('.project-menu-group');
+        if (projectSubmenu && roleMode === 'admin') {
+            projectSubmenu.hidden = false;
+        }
+        if (projectMenuGroup) {
+            projectMenuGroup.classList.toggle('admin-resource-menu', roleMode === 'admin');
+        }
     }
 
     return {

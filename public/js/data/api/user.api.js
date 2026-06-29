@@ -31,7 +31,8 @@ export function createUser(payload) {
 }
 
 export function fetchUsers(projectId) {
-    return request(`list?project_id=${encodeURIComponent(projectId)}`);
+    const query = projectId ? `?project_id=${encodeURIComponent(projectId)}` : '';
+    return request(`list${query}`);
 }
 
 export function updateUser(id, payload) {

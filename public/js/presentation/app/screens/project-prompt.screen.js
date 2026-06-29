@@ -9,7 +9,7 @@ export async function renderProjectPromptScreen(context) {
     messages.classList.add('crud-canvas');
     form.hidden = true;
     sidebarSection.hidden = false;
-    adminProjectField.hidden = true;
+    adminProjectField.hidden = state.roleMode !== 'admin';
     environmentField.hidden = true;
     messages.innerHTML = '';
 

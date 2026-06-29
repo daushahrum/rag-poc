@@ -30,58 +30,65 @@
         </div>
 
         <nav class="role-menu" id="roleMenu" aria-label="Role navigation">
-          <button class="developer-menu-button new-chat" id="newChatButton" type="button" data-menu-role="project-owner fallback">
+          <button class="developer-menu-button new-chat" id="newChatButton" type="button" data-menu-role="project-owner admin fallback">
             <i class="bi bi-plus-lg"></i>
             <span class="btn-label">New Chat</span>
           </button>
-          <div class="project-menu-group" data-menu-role="project-owner">
-            <button class="developer-menu-button project-menu-toggle" id="myProjectButton" type="button" aria-expanded="true">
+
+          <div class="admin-menu-section" data-menu-role="admin">
+            <p class="section-label admin-nav-label">Admin</p>
+            <button class="developer-menu-button" id="adminDashboardButton" type="button">
+              <i class="bi bi-grid"></i>
+              <span class="btn-label">Dashboard</span>
+            </button>
+            <button class="developer-menu-button" id="adminProjectsButton" type="button">
+              <i class="bi bi-folder"></i>
+              <span class="btn-label">Projects</span>
+            </button>
+            <button class="developer-menu-button" id="adminUsersButton" type="button">
+              <i class="bi bi-people"></i>
+              <span class="btn-label">Users</span>
+            </button>
+            <button class="developer-menu-button" id="adminChatButton" type="button">
+              <i class="bi bi-chat-dots"></i>
+              <span class="btn-label">Chat</span>
+            </button>
+          </div>
+
+          <div class="project-menu-group" data-menu-role="project-owner admin">
+            <p class="section-label admin-nav-label" data-menu-role="admin">Resources</p>
+            <button class="developer-menu-button project-menu-toggle" id="myProjectButton" type="button" aria-expanded="true" data-menu-role="project-owner">
               <i class="bi bi-folder"></i>
               <span class="btn-label">My Project</span>
               <i class="bi bi-chevron-down project-menu-chevron" aria-hidden="true"></i>
             </button>
             <div class="project-submenu" id="projectSubmenu">
-              <button class="project-submenu-button" id="projectUsersButton" type="button">
+              <button class="project-submenu-button" id="projectUsersButton" type="button" data-menu-role="project-owner">
                 <i class="bi bi-people"></i><span class="btn-label">Users</span>
               </button>
-              <button class="project-submenu-button" id="projectEnvironmentsButton" type="button">
+              <button class="project-submenu-button" id="projectEnvironmentsButton" type="button" data-menu-role="project-owner admin">
                 <i class="bi bi-layers"></i><span class="btn-label">Environments</span>
               </button>
-              <button class="project-submenu-button" id="projectToolsButton" type="button">
+              <button class="project-submenu-button" id="projectToolsButton" type="button" data-menu-role="project-owner admin">
                 <i class="bi bi-tools"></i><span class="btn-label">Tools</span>
               </button>
-              <button class="project-submenu-button" id="projectAppsButton" type="button">
+              <button class="project-submenu-button" id="projectAppsButton" type="button" data-menu-role="project-owner admin">
                 <i class="bi bi-window-stack"></i><span class="btn-label">Connected Apps</span>
               </button>
-              <button class="project-submenu-button" id="projectPromptButton" type="button">
-                <i class="bi bi-chat-square-text"></i><span class="btn-label">Prompt</span>
+              <button class="project-submenu-button" id="projectPromptButton" type="button" data-menu-role="project-owner admin">
+                <i class="bi bi-chat-square-text"></i><span class="btn-label">Prompts</span>
               </button>
-              <button class="project-submenu-button" id="projectKnowledgeButton" type="button">
+              <button class="project-submenu-button" id="projectKnowledgeButton" type="button" data-menu-role="project-owner admin">
                 <i class="bi bi-book"></i><span class="btn-label">Knowledge</span>
               </button>
             </div>
           </div>
+
           <button class="developer-menu-button" id="analyticsButton" type="button" data-menu-role="project-owner">
             <i class="bi bi-bar-chart"></i>
             <span class="btn-label">Analytics</span>
           </button>
 
-          <button class="developer-menu-button" id="adminDashboardButton" type="button" data-menu-role="admin">
-            <i class="bi bi-grid"></i>
-            <span class="btn-label">Dashboard</span>
-          </button>
-          <button class="developer-menu-button" id="adminProjectsButton" type="button" data-menu-role="admin">
-            <i class="bi bi-folder"></i>
-            <span class="btn-label">Projects</span>
-          </button>
-          <button class="developer-menu-button" id="adminUsersButton" type="button" data-menu-role="admin">
-            <i class="bi bi-people"></i>
-            <span class="btn-label">Users</span>
-          </button>
-          <button class="developer-menu-button" id="adminChatButton" type="button" data-menu-role="admin">
-            <i class="bi bi-chat-dots"></i>
-            <span class="btn-label">Chat</span>
-          </button>
         </nav>
 
         <div class="sidebar-legacy-actions" hidden>

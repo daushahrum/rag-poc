@@ -221,6 +221,26 @@
   width: 100%;
 }
 
+.admin-menu-section {
+  display: grid;
+}
+
+.admin-role-menu .new-chat {
+  order: 0;
+}
+
+.admin-role-menu .admin-menu-section {
+  order: 1;
+}
+
+.admin-role-menu .project-menu-group {
+  order: 2;
+}
+
+.admin-nav-label {
+  padding: 14px 18px 5px;
+}
+
 .project-menu-group {
   display: grid;
 }
@@ -281,6 +301,17 @@
   width: 16px;
   flex: 0 0 16px;
   text-align: center;
+}
+
+.admin-resource-menu .project-submenu {
+  padding: 0 0 5px;
+}
+
+.admin-resource-menu .project-submenu-button {
+  min-height: 38px;
+  padding: 11px 18px;
+  color: var(--sidebar-text);
+  font-size: 14px;
 }
 
 .sidebar.collapsed .project-submenu {

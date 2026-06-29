@@ -22,6 +22,7 @@ export function createAppState() {
         activeProjectId: null,
         activeProject: null,
         activeProjectName: '',
+        adminProjectView: null,
         currentUser,
         roleMode,
     };

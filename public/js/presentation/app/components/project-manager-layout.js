@@ -1,12 +1,13 @@
 export function createProjectManagerScreen(context, title, description, actionLabel, options = {}) {
-    const { dom, controllers } = context;
+    const { dom, state, controllers } = context;
     const { closeAllPanels } = controllers;
     const { messages, form, sidebarSection, adminProjectField, environmentField } = dom;
+    const showAdminContext = state.roleMode === 'admin' && options.showAdminContext !== false;
     closeAllPanels();
     messages.classList.add('crud-canvas');
     form.hidden = true;
     sidebarSection.hidden = false;
-    adminProjectField.hidden = true;
+    adminProjectField.hidden = !showAdminContext;
     environmentField.hidden = true;
     messages.innerHTML = '';
 

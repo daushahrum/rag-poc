@@ -1,6 +1,7 @@
 export {
     createProject,
     createProjectEnvironment,
+    deleteProject,
     deleteProjectEnvironment,
     fetchProject,
     fetchProjectEnvironments,
