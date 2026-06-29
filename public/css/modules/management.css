@@ -50,6 +50,7 @@
 }
 
 .create-user-field input,
+.create-user-field textarea,
 .create-user-field select {
   width: 100%;
   min-height: 42px;
@@ -61,13 +62,19 @@
   font-size: 14px;
   font-weight: 400;
   outline: none;
+  line-height: 1.5;
   transition: border-color 0.12s ease, box-shadow 0.12s ease;
 }
 
 .create-user-field input:focus,
+.create-user-field textarea:focus,
 .create-user-field select:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(16, 163, 127, 0.12);
+}
+
+.create-user-field textarea {
+  resize: vertical;
 }
 
 .create-field-hint {
@@ -157,6 +164,12 @@
   margin-top: 2px;
   color: #047857;
   font-size: 12px;
+}
+
+.project-prompt-form {
+  display: grid;
+  gap: 18px;
+  width: min(100%, 860px);
 }
 
 .app-key-panel {

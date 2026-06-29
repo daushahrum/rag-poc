@@ -7,6 +7,7 @@ import * as chatSessionRepository from './chatSession/chatSession.repository.js'
 import * as chatMessageRepository from './chatMessages/chatMessage.repository.js';
 import * as chatMessageService from './chatMessages/chatMessage.service.js';
 import * as toolRepository from '../tool/tool.repository.js';
+import * as projectRepository from '../project/project.repository.js';
 import * as projectEnvironmentRepository from '../project/projectEnvironment/projectEnvironment.repository.js';
 
 export async function sendMessage(session_id, message, userToken, isPortalAdmin) {
@@ -63,8 +64,11 @@ const { project_id, environment_id } = session;
     // 6. Retrieve RAG context relevant to this message
     const { context } = await buildContext(message, project_id);
 
-    // 7. Load available tools for this project (for the schema description in system prompt)
-    const availableTools = await toolRepository.getTools({ project_id, is_enabled: true });
+    // 7. Load project settings and available tools for this project.
+    const [project, availableTools] = await Promise.all([
+        projectRepository.getProjectById(project_id),
+        toolRepository.getTools({ project_id, is_enabled: true }),
+    ]);
 
     const toolCatalog = availableTools.map((t) => ({
         tool_name: t.tool_name,
@@ -77,7 +81,7 @@ const { project_id, environment_id } = session;
     }));
 
     // 8. Build system prompt
-    const systemPrompt = buildSystemPrompt(context, toolCatalog);
+    const systemPrompt = buildSystemPrompt(context, toolCatalog, project?.custom_prompt);
 
     // 9. Build message list for OpenAI
     const messages = [
@@ -140,8 +144,19 @@ async function generateAndSaveTopic(session_id, firstMessage) {
     }
 }
 
-function buildSystemPrompt(context, toolCatalog) {
+function buildSystemPrompt(context, toolCatalog, customPrompt) {
+    const projectInstructions = customPrompt?.trim()
+        ? `Project-specific instructions from the project manager:
+
+${customPrompt.trim()}
+
+Use these project-specific instructions when answering, as long as they do not conflict with higher-priority safety or system requirements.
+`
+        : 'No project-specific instructions are configured.';
+
     return `You are ANDI, a helpful assistant for hotel and laundry operations.
+
+${projectInstructions}
 
 Use the following knowledge base context to answer questions when relevant:
 

@@ -6,5 +6,6 @@ export {
     fetchProjectEnvironments,
     fetchProjects,
     getProjectUser,
+    updateProject,
     updateProjectEnvironment,
 } from '../../data/api/project.api.js';

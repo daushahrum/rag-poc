@@ -21,6 +21,11 @@ export default function ProjectModel(sequelize) {
                 allowNull: false,
             },
 
+            custom_prompt: {
+                type: DataTypes.TEXT,
+                allowNull: true,
+            },
+
             is_active: {
                 type: DataTypes.BOOLEAN,
                 allowNull: true,

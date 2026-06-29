@@ -23,6 +23,25 @@ export async function createProject(name, code) {
     return data.project ?? data;
 }
 
+export async function updateProject(id, payload) {
+    const response = await fetch('/api/project/update', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            ...getAuthHeaders(),
+        },
+        body: JSON.stringify({ id, ...payload }),
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+        throw new Error(data.error ?? data.message ?? 'Could not update project.');
+    }
+
+    return data;
+}
+
 export async function fetchProjectEnvironments(projectId) {
     const response = await fetch(`/api/project/environments/project/${encodeURIComponent(projectId)}`, {
         headers: getAuthHeaders(),

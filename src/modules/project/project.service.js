@@ -40,11 +40,12 @@ export async function updateProject(payload) {
         throw new Error('Project id is required for update');
     }
 
-    const { code, name, is_active, updated_by } = payload;
+    const { code, name, custom_prompt, is_active, updated_by } = payload;
 
     const updatePayload = {
         ...(code !== undefined && { code }),
         ...(name !== undefined && { name }),
+        ...(custom_prompt !== undefined && { custom_prompt }),
         ...(is_active !== undefined && { is_active }),
         ...(updated_by !== undefined && { updated_by }),
     };

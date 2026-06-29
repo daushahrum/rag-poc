@@ -38,6 +38,7 @@ import { renderCreateUserScreen } from './screens/admin-create-user.screen.js';
 import { renderProjectEnvironmentsScreen } from './screens/project-environments.screen.js';
 import { renderProjectAppsScreen } from './screens/project-apps.screen.js';
 import { renderProjectKnowledgeScreen } from './screens/project-knowledge.screen.js';
+import { renderProjectPromptScreen } from './screens/project-prompt.screen.js';
 import { renderProjectToolsScreen } from './screens/project-tools.screen.js';
 import { renderProjectUsersScreen } from './screens/project-users.screen.js';
 
@@ -68,6 +69,7 @@ const {
     projectEnvironmentsButton,
     projectToolsButton,
     projectAppsButton,
+    projectPromptButton,
     projectKnowledgeButton,
     analyticsButton,
     adminDashboardButton,
@@ -170,6 +172,7 @@ const sidebarController = createSidebarController({
         'project-environments': projectEnvironmentsButton,
         'project-tools': projectToolsButton,
         'project-apps': projectAppsButton,
+        'project-prompt': projectPromptButton,
         'project-knowledge': projectKnowledgeButton,
         analytics: analyticsButton,
         dashboard: adminDashboardButton,
@@ -416,6 +419,7 @@ async function initializeProjectOwnerContext() {
     ]);
 
     const project = projectResult.status === 'fulfilled' ? projectResult.value : null;
+    state.activeProject = project;
     state.activeProjectName = project?.name || 'Project unavailable';
     projectName.textContent = state.activeProjectName;
 
@@ -702,6 +706,20 @@ projectAppsButton.addEventListener('click', async () => {
         await renderProjectAppsScreen(appContext);
     } catch (error) {
         renderPlaceholder('Apps unavailable', error.message);
+    }
+});
+
+projectPromptButton.addEventListener('click', async () => {
+    projectName.textContent = 'Prompt';
+    setSidebarSelection('menu', 'project-prompt');
+
+    try {
+        if (!state.activeProjectId) {
+            await initializeProjectOwnerContext();
+        }
+        await renderProjectPromptScreen(appContext);
+    } catch (error) {
+        renderPlaceholder('Prompt unavailable', error.message);
     }
 });
 

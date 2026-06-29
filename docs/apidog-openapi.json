@@ -78,6 +78,7 @@
           "id": { "type": "integer", "format": "int64", "readOnly": true },
           "code": { "type": "string" },
           "name": { "type": "string" },
+          "custom_prompt": { "type": "string", "nullable": true },
           "is_active": { "type": "boolean" }
         }
       },

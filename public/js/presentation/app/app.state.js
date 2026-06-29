@@ -20,6 +20,7 @@ export function createAppState() {
         environments: [],
         projects: [],
         activeProjectId: null,
+        activeProject: null,
         activeProjectName: '',
         currentUser,
         roleMode,
