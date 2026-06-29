@@ -54,7 +54,7 @@ export async function renderProjectUsersScreen(context) {
     activeCheckmark.className = 'checkmark';
     const activeText = document.createElement('span');
     activeText.textContent = 'User is active';
-    activeField.append(activeInput, activeCheckmark, activeText);
+    activeField.append(activeText, activeInput, activeCheckmark);
     accessGrid.append(passwordWrapper, resetPasswordWrapper, activeField);
 
     const actions = document.createElement('div');

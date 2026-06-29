@@ -46,7 +46,7 @@ export async function renderProjectToolsScreen(context) {
     enabledCheckmark.className = 'checkmark';
     const enabledText = document.createElement('span');
     enabledText.textContent = 'Tool is enabled';
-    enabledField.append(enabledInput, enabledCheckmark, enabledText);
+    enabledField.append(enabledText, enabledInput, enabledCheckmark);
     settingsGrid.append(methodField, versionWrapper, enabledField);
 
     const advanced = document.createElement('details');

@@ -110,6 +110,7 @@ const {
     saveKnowledgeButton,
     deleteKnowledgeButton,
     knowledgeCenterStatus,
+    themeToggleButton,
     logoutButton,
 } = dom;
 
@@ -118,6 +119,35 @@ const {
 const state = createAppState();
 const DEFAULT_COMPOSER_PLACEHOLDER = 'Ask anything';
 const NO_ENVIRONMENT_PLACEHOLDER = 'No environments found for this project';
+const THEME_STORAGE_KEY = 'andi-theme';
+
+function getStoredTheme() {
+    try {
+        return localStorage.getItem(THEME_STORAGE_KEY);
+    } catch (_) {
+        return null;
+    }
+}
+
+function setStoredTheme(theme) {
+    try {
+        localStorage.setItem(THEME_STORAGE_KEY, theme);
+    } catch (_) {}
+}
+
+function setTheme(theme) {
+    const isDark = theme === 'dark';
+    document.documentElement.dataset.theme = isDark ? 'dark' : 'light';
+    themeToggleButton.setAttribute('aria-pressed', String(isDark));
+    themeToggleButton.setAttribute('aria-label', isDark ? 'Switch to light mode' : 'Switch to dark mode');
+    themeToggleButton.title = isDark ? 'Switch to light mode' : 'Switch to dark mode';
+    themeToggleButton.innerHTML = `<i class="bi ${isDark ? 'bi-sun' : 'bi-moon-stars'}" aria-hidden="true"></i>`;
+    setStoredTheme(isDark ? 'dark' : 'light');
+}
+
+function initializeTheme() {
+    setTheme(getStoredTheme() === 'dark' ? 'dark' : 'light');
+}
 
 function setComposerEnabled(enabled) {
     input.disabled = !enabled;
@@ -936,6 +966,11 @@ document.addEventListener('keydown', (event) => {
 
 // ─── Event listeners: logout ──────────────────────────────────────────────────
 
+themeToggleButton.addEventListener('click', () => {
+    const nextTheme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+    setTheme(nextTheme);
+});
+
 logoutButton.addEventListener('click', () => {
     clearAuth();
     window.location.href = '/login';
@@ -945,6 +980,7 @@ logoutButton.addEventListener('click', () => {
 
 clearKnowledgeEditor();
 resizeTextarea(input);
+initializeTheme();
 renderRoleMenu();
 initializeRoleView();
 }

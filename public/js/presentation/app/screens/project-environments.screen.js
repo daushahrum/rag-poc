@@ -40,7 +40,7 @@ export async function renderProjectEnvironmentsScreen(context) {
     activeCheckmark.className = 'checkmark';
     const activeText = document.createElement('span');
     activeText.textContent = 'Environment is active';
-    activeField.append(activeInput, activeCheckmark, activeText);
+    activeField.append(activeText, activeInput, activeCheckmark);
     formGrid.append(authField, activeField);
     const configLabel = document.createElement('label');
     configLabel.textContent = 'Authentication config (JSON)';

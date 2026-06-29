@@ -36,6 +36,7 @@
 }
 
 /* ── Buttons ── */
+.theme-toggle-button,
 .logout-button {
   padding: 7px 14px;
   background: transparent;
@@ -45,6 +46,18 @@
   font-size: 13px;
   font-weight: 600;
   transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+.theme-toggle-button {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+}
+
+.theme-toggle-button i {
+  font-size: 16px;
 }
 
 .profile-button {
@@ -65,6 +78,7 @@
 }
 
 .profile-button:hover,
+.theme-toggle-button:hover,
 .logout-button:hover {
   background: var(--surface-soft);
   color: var(--text);

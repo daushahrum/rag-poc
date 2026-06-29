@@ -119,7 +119,7 @@
 
 .create-user-submit:hover:not(:disabled) {
   border-color: color-mix(in srgb, var(--accent) 50%, transparent);
-  background: #d9f0f8;
+  background: color-mix(in srgb, var(--accent-light) 82%, var(--surface));
 }
 
 .create-project-result {
@@ -382,50 +382,66 @@
 
 .project-toggle-field {
   position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
+  display: block;
+  justify-self: start;
   min-height: 18px;
+  padding-left: 27px;
+  width: max-content;
+  max-width: 100%;
   color: var(--text);
+  cursor: pointer;
   font-size: 13px;
   font-weight: 600;
+  line-height: 18px;
+  user-select: none;
 }
 
 .project-toggle-field input {
-  appearance: none;
-  width: 18px;
-  height: 18px;
+  position: absolute;
+  opacity: 0;
+  cursor: pointer;
+  width: 0;
+  height: 0;
   margin: 0;
-  border: 1px solid var(--border-strong);
-  border-radius: 4px;
-  background: var(--surface);
+  padding: 0;
 }
 
-.project-toggle-field input:checked {
-  border-color: var(--accent);
-  background: var(--accent-light);
+.project-toggle-field:hover input ~ .checkmark {
+  background: var(--surface-soft);
 }
 
 .project-toggle-field .checkmark {
   position: absolute;
+  left: 0;
+  top: 0;
   width: 18px;
   height: 18px;
-  display: grid;
-  place-items: center;
-  color: var(--accent);
-  font-size: 13px;
-  font-weight: 800;
-  line-height: 1;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--surface);
   pointer-events: none;
 }
 
-.project-toggle-field .checkmark::after {
-  content: "\2713";
-  opacity: 0;
+.project-toggle-field input:checked ~ .checkmark {
+  border-color: var(--accent);
+  background: var(--accent);
 }
 
-.project-toggle-field input:checked + .checkmark::after {
-  opacity: 1;
+.project-toggle-field .checkmark::after {
+  content: "";
+  position: absolute;
+  display: none;
+  left: 5px;
+  top: 2px;
+  width: 5px;
+  height: 10px;
+  border: solid #ffffff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.project-toggle-field input:checked ~ .checkmark::after {
+  display: block;
 }
 
 .project-tool-advanced {
@@ -433,7 +449,7 @@
   padding: 12px 14px;
   border: 1px solid var(--border);
   border-radius: 9px;
-  background: #fbfcfd;
+  background: color-mix(in srgb, var(--surface) 82%, var(--surface-soft));
 }
 
 .project-tool-advanced summary {

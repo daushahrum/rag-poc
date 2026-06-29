@@ -22,7 +22,7 @@
 
 .small-button:hover {
   border-color: color-mix(in srgb, var(--muted) 45%, transparent);
-  background: #e9ecef;
+  background: color-mix(in srgb, var(--surface-soft) 80%, var(--surface));
 }
 
 .danger-button {
@@ -34,7 +34,7 @@
 
 .danger-button:hover {
   border-color: color-mix(in srgb, var(--danger-dark) 50%, transparent);
-  background: #ffe7e5;
+  background: color-mix(in srgb, var(--danger-light) 85%, var(--surface));
 }
 
 .warning-button {
@@ -45,7 +45,7 @@
 
 .warning-button:hover {
   border-color: color-mix(in srgb, var(--warning-dark) 50%, transparent);
-  background: #fef3c7;
+  background: color-mix(in srgb, var(--warning-light) 85%, var(--surface));
 }
 
 .icon-button {

@@ -67,6 +67,7 @@ export function getAppDom() {
         saveKnowledgeButton: document.querySelector('#saveKnowledgeButton'),
         deleteKnowledgeButton: document.querySelector('#deleteKnowledgeButton'),
         knowledgeCenterStatus: document.querySelector('#knowledgeCenterStatus'),
+        themeToggleButton: document.querySelector('#themeToggleButton'),
         logoutButton: document.querySelector('#logoutButton'),
     };
 }
