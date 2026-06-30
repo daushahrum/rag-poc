@@ -18,7 +18,7 @@ export async function renderProjectPromptScreen(context) {
 
     const header = document.createElement('div');
     header.className = 'create-user-header';
-    const title = document.createElement('h2');
+    const title = document.createElement('h3');
     title.textContent = 'Custom Prompt';
     const description = document.createElement('p');
     description.textContent = 'Set project-specific instructions ANDI should consider when answering.';

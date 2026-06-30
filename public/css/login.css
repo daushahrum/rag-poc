@@ -75,6 +75,18 @@ button:disabled {
   pointer-events: none;
 }
 
+.particle-logo {
+  position: absolute;
+  left: 50%;
+  top: calc(50% - 200px);
+  transform: translateX(-50%);
+  z-index: 3;
+  width: 86px;
+  height: 86px;
+  display: block;
+  object-fit: contain;
+}
+
 .left-copy {
   position: relative;
   z-index: 3;
@@ -139,32 +151,6 @@ button:disabled {
   width: min(100%, 380px);
   display: grid;
   gap: 28px;
-}
-
-.login-mark {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: -112px;
-  height: 76px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-}
-
-.login-mark span {
-  display: block;
-  width: 18px;
-  height: 18px;
-  background: #5aa6e9;
-  transform: rotate(45deg);
-}
-
-.login-mark span:nth-child(2) {
-  width: 25px;
-  height: 25px;
-  background: #4d98dd;
 }
 
 .login-heading {
@@ -322,6 +308,12 @@ button:disabled {
     padding: 42px 24px;
   }
 
+  .particle-logo {
+    top: 44px;
+    width: 52px;
+    height: 52px;
+  }
+
   .left-footer {
     display: none;
   }
@@ -335,11 +327,6 @@ button:disabled {
   .login-box {
     width: min(100%, 390px);
     margin-inline: auto;
-  }
-
-  .login-mark {
-    top: -78px;
-    height: 54px;
   }
 }
 

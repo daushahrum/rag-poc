@@ -132,10 +132,7 @@ export async function renderProjectAppsScreen(context) {
             const meta = document.createElement('span');
             meta.className = 'knowledge-item-meta';
             meta.textContent = `${item.platform} · ${item.status === 'active' ? 'Active' : 'Inactive'}`;
-            const preview = document.createElement('span');
-            preview.className = 'knowledge-item-preview';
-            preview.textContent = `App ID ${item.id}`;
-            button.append(title, meta, preview);
+            button.append(title, meta);
             button.addEventListener('click', () => setMode(item));
             list.append(button);
         }
