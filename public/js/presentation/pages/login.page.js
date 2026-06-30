@@ -14,6 +14,11 @@ const submitBtn = document.getElementById('submitBtn');
 const errorMsg = document.getElementById('errorMsg');
 const leftPanel = document.querySelector('.left-panel');
 const particleField = document.getElementById('particleField');
+const particleEggButton = document.getElementById('particleEggButton');
+const particleConfigPanel = document.getElementById('particleConfigPanel');
+const particleConfigClose = document.getElementById('particleConfigClose');
+const particleRandomize = document.getElementById('particleRandomize');
+const particleReset = document.getElementById('particleReset');
 
 // ─── UI helpers ─────────────────────────────────────────────────────────────
 
@@ -38,15 +43,38 @@ function initParticleField() {
 
     const ctx = particleField.getContext('2d');
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const CONFIG = {
+    const DEFAULT_CONFIG = {
         count: 90,
         maxSpeed: 0.35,
         connectionDist: 110,
         mouseRadius: 130,
         mouseRepel: 0.014,
-        dotColor: 'rgba(52, 174, 242, 0.85)',
+        dotColor: [52, 174, 242],
+        dotAlpha: 0.85,
         lineColor: [45, 157, 235],
+        dotSize: 1.4,
         bgColor: '#0d0d18'
+    };
+    const CONFIG = { ...DEFAULT_CONFIG };
+    CONFIG.dotColor = [...DEFAULT_CONFIG.dotColor];
+    CONFIG.lineColor = [...DEFAULT_CONFIG.lineColor];
+
+    const controls = {
+        count: document.getElementById('particleCount'),
+        countValue: document.getElementById('particleCountValue'),
+        speed: document.getElementById('particleSpeed'),
+        speedValue: document.getElementById('particleSpeedValue'),
+        links: document.getElementById('particleLinks'),
+        linksValue: document.getElementById('particleLinksValue'),
+        mouse: document.getElementById('particleMouse'),
+        mouseValue: document.getElementById('particleMouseValue'),
+        repel: document.getElementById('particleRepel'),
+        repelValue: document.getElementById('particleRepelValue'),
+        size: document.getElementById('particleSize'),
+        sizeValue: document.getElementById('particleSizeValue'),
+        dotColor: document.getElementById('particleDotColor'),
+        lineColor: document.getElementById('particleLineColor'),
+        bgColor: document.getElementById('particleBgColor')
     };
 
     let width = 0;
@@ -54,6 +82,56 @@ function initParticleField() {
     let particles = [];
     let mouse = { x: -9999, y: -9999 };
     let animationId = 0;
+
+    function rgbStyle(color, alpha = 1) {
+        return `rgba(${color[0]},${color[1]},${color[2]},${alpha})`;
+    }
+
+    function hexToRgb(hex) {
+        const value = hex.replace('#', '');
+        return [
+            parseInt(value.slice(0, 2), 16),
+            parseInt(value.slice(2, 4), 16),
+            parseInt(value.slice(4, 6), 16)
+        ];
+    }
+
+    function rgbToHex(color) {
+        return `#${color.map((channel) => channel.toString(16).padStart(2, '0')).join('')}`;
+    }
+
+    function setPanelOpen(open) {
+        if (!particleEggButton || !particleConfigPanel) return;
+
+        particleConfigPanel.hidden = !open;
+        particleEggButton.setAttribute('aria-expanded', String(open));
+
+        if (open) {
+            controls.count?.focus({ preventScroll: true });
+        } else {
+            particleEggButton.focus({ preventScroll: true });
+        }
+    }
+
+    function syncControlValues() {
+        if (!controls.count) return;
+
+        controls.count.value = String(CONFIG.count);
+        controls.countValue.textContent = String(CONFIG.count);
+        controls.speed.value = String(CONFIG.maxSpeed);
+        controls.speedValue.textContent = CONFIG.maxSpeed.toFixed(2);
+        controls.links.value = String(CONFIG.connectionDist);
+        controls.linksValue.textContent = String(CONFIG.connectionDist);
+        controls.mouse.value = String(CONFIG.mouseRadius);
+        controls.mouseValue.textContent = String(CONFIG.mouseRadius);
+        controls.repel.value = String(CONFIG.mouseRepel);
+        controls.repelValue.textContent = CONFIG.mouseRepel.toFixed(3);
+        controls.size.value = String(CONFIG.dotSize);
+        controls.sizeValue.textContent = CONFIG.dotSize.toFixed(1);
+        controls.dotColor.value = rgbToHex(CONFIG.dotColor);
+        controls.lineColor.value = rgbToHex(CONFIG.lineColor);
+        controls.bgColor.value = CONFIG.bgColor;
+    }
 
     function resize() {
         const rect = particleField.getBoundingClientRect();
@@ -74,7 +152,7 @@ function initParticleField() {
                 y: Math.random() * height,
                 vx: (Math.random() - 0.5) * CONFIG.maxSpeed * 2,
                 vy: (Math.random() - 0.5) * CONFIG.maxSpeed * 2,
-                r: Math.random() * 1.4 + 0.8
+                r: Math.random() * CONFIG.dotSize + 0.8
             });
         }
     }
@@ -117,7 +195,7 @@ function initParticleField() {
                 }
             }
 
-            ctx.fillStyle = 'rgba(52, 174, 242, 0.9)';
+            ctx.fillStyle = rgbStyle(CONFIG.dotColor, 0.9);
             ctx.beginPath();
             ctx.arc(mouse.x, mouse.y, 2.5, 0, Math.PI * 2);
             ctx.fill();
@@ -147,7 +225,7 @@ function initParticleField() {
 
     function drawParticles() {
         for (const particle of particles) {
-            ctx.fillStyle = CONFIG.dotColor;
+            ctx.fillStyle = rgbStyle(CONFIG.dotColor, CONFIG.dotAlpha);
             ctx.beginPath();
             ctx.arc(particle.x, particle.y, particle.r, 0, Math.PI * 2);
             ctx.fill();
@@ -182,6 +260,114 @@ function initParticleField() {
         }
     }
 
+    function drawStaticFrame() {
+        ctx.fillStyle = CONFIG.bgColor;
+        ctx.fillRect(0, 0, width, height);
+        drawConnections();
+        drawParticles();
+    }
+
+    function refreshParticles() {
+        createParticles();
+        drawStaticFrame();
+    }
+
+    function bindRange(input, output, formatter, onChange) {
+        if (!input || !output) return;
+
+        input.addEventListener('input', () => {
+            const value = Number(input.value);
+            output.textContent = formatter(value);
+            onChange(value);
+        });
+    }
+
+    function bindParticleControls() {
+        if (!particleEggButton || !particleConfigPanel) return;
+
+        syncControlValues();
+
+        particleEggButton.addEventListener('click', () => {
+            setPanelOpen(particleConfigPanel.hidden);
+        });
+
+        particleConfigClose?.addEventListener('click', () => setPanelOpen(false));
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && !particleConfigPanel.hidden) {
+                setPanelOpen(false);
+            }
+        });
+
+        bindRange(controls.count, controls.countValue, String, (value) => {
+            CONFIG.count = value;
+            refreshParticles();
+        });
+
+        bindRange(controls.speed, controls.speedValue, (value) => value.toFixed(2), (value) => {
+            CONFIG.maxSpeed = value;
+            refreshParticles();
+        });
+
+        bindRange(controls.links, controls.linksValue, String, (value) => {
+            CONFIG.connectionDist = value;
+        });
+
+        bindRange(controls.mouse, controls.mouseValue, String, (value) => {
+            CONFIG.mouseRadius = value;
+        });
+
+        bindRange(controls.repel, controls.repelValue, (value) => value.toFixed(3), (value) => {
+            CONFIG.mouseRepel = value;
+        });
+
+        bindRange(controls.size, controls.sizeValue, (value) => value.toFixed(1), (value) => {
+            CONFIG.dotSize = value;
+            refreshParticles();
+        });
+
+        controls.dotColor?.addEventListener('input', () => {
+            CONFIG.dotColor = hexToRgb(controls.dotColor.value);
+            drawStaticFrame();
+        });
+
+        controls.lineColor?.addEventListener('input', () => {
+            CONFIG.lineColor = hexToRgb(controls.lineColor.value);
+            drawStaticFrame();
+        });
+
+        controls.bgColor?.addEventListener('input', () => {
+            CONFIG.bgColor = controls.bgColor.value;
+            drawStaticFrame();
+        });
+
+        particleRandomize?.addEventListener('click', () => {
+            CONFIG.count = Math.floor(Math.random() * 121) + 40;
+            CONFIG.maxSpeed = Number((Math.random() * 0.85 + 0.15).toFixed(2));
+            CONFIG.connectionDist = Math.floor(Math.random() * 151) + 60;
+            CONFIG.mouseRadius = Math.floor(Math.random() * 221) + 30;
+            CONFIG.mouseRepel = Number((Math.random() * 0.04 + 0.004).toFixed(3));
+            CONFIG.dotSize = Number((Math.random() * 2 + 0.7).toFixed(1));
+            CONFIG.dotColor = [
+                Math.floor(Math.random() * 156) + 80,
+                Math.floor(Math.random() * 156) + 80,
+                Math.floor(Math.random() * 156) + 80
+            ];
+            CONFIG.lineColor = [...CONFIG.dotColor];
+            CONFIG.bgColor = ['#0d0d18', '#101827', '#14111f', '#071a1f', '#181414'][Math.floor(Math.random() * 5)];
+            syncControlValues();
+            refreshParticles();
+        });
+
+        particleReset?.addEventListener('click', () => {
+            Object.assign(CONFIG, DEFAULT_CONFIG);
+            CONFIG.dotColor = [...DEFAULT_CONFIG.dotColor];
+            CONFIG.lineColor = [...DEFAULT_CONFIG.lineColor];
+            syncControlValues();
+            refreshParticles();
+        });
+    }
+
     leftPanel.addEventListener('mousemove', updatePointer);
     leftPanel.addEventListener('mouseleave', () => {
         mouse.x = -9999;
@@ -190,6 +376,7 @@ function initParticleField() {
     window.addEventListener('resize', restart);
 
     restart();
+    bindParticleControls();
     if (!prefersReducedMotion) tick();
 
     window.addEventListener('beforeunload', () => {

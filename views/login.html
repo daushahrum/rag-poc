@@ -21,6 +21,66 @@
     </div>
 
     <div class="left-footer">© 2026 AMAST. All rights reserved.</div>
+    <button class="particle-egg" id="particleEggButton" type="button" aria-label="Particle field settings" aria-expanded="false" aria-controls="particleConfigPanel">
+      <img src="/assets/icons/andi_ic_easter_egg.svg" alt="" aria-hidden="true" />
+    </button>
+
+    <div class="particle-config-panel" id="particleConfigPanel" hidden>
+      <div class="particle-config-header">
+        <div>
+          <h3>Particle Field</h3>
+          <p>Tune the login ambience.</p>
+        </div>
+        <button class="particle-config-close" id="particleConfigClose" type="button" aria-label="Close particle settings">×</button>
+      </div>
+
+      <div class="particle-control-grid">
+        <label class="particle-control">
+          <span>Particles <output id="particleCountValue">90</output></span>
+          <input id="particleCount" type="range" min="20" max="180" step="1" value="90" />
+        </label>
+        <label class="particle-control">
+          <span>Speed <output id="particleSpeedValue">0.35</output></span>
+          <input id="particleSpeed" type="range" min="0.05" max="1.2" step="0.05" value="0.35" />
+        </label>
+        <label class="particle-control">
+          <span>Links <output id="particleLinksValue">110</output></span>
+          <input id="particleLinks" type="range" min="30" max="220" step="5" value="110" />
+        </label>
+        <label class="particle-control">
+          <span>Cursor pull <output id="particleMouseValue">130</output></span>
+          <input id="particleMouse" type="range" min="0" max="260" step="5" value="130" />
+        </label>
+        <label class="particle-control">
+          <span>Repel <output id="particleRepelValue">0.014</output></span>
+          <input id="particleRepel" type="range" min="0" max="0.05" step="0.001" value="0.014" />
+        </label>
+        <label class="particle-control">
+          <span>Dot size <output id="particleSizeValue">1.4</output></span>
+          <input id="particleSize" type="range" min="0.5" max="3" step="0.1" value="1.4" />
+        </label>
+      </div>
+
+      <div class="particle-color-grid">
+        <label>
+          <span>Dots</span>
+          <input id="particleDotColor" type="color" value="#34aef2" />
+        </label>
+        <label>
+          <span>Links</span>
+          <input id="particleLineColor" type="color" value="#2d9deb" />
+        </label>
+        <label>
+          <span>Canvas</span>
+          <input id="particleBgColor" type="color" value="#0d0d18" />
+        </label>
+      </div>
+
+      <div class="particle-actions">
+        <button id="particleRandomize" type="button">Randomize</button>
+        <button id="particleReset" type="button">Reset</button>
+      </div>
+    </div>
   </div>
 
   <!-- RIGHT -->

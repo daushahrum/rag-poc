@@ -137,6 +137,183 @@ button:disabled {
   letter-spacing: 0.14em;
 }
 
+.particle-egg {
+  position: absolute;
+  right: 32px;
+  bottom: 22px;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  padding: 7px;
+  border: 0;
+  background: transparent;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.particle-egg img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  opacity: 0.62;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.particle-egg:hover,
+.particle-egg[aria-expanded="true"] {
+  transform: translateY(-1px);
+}
+
+.particle-egg:hover img,
+.particle-egg[aria-expanded="true"] img {
+  opacity: 1;
+  transform: scale(1.04);
+}
+
+.particle-config-close:focus-visible,
+.particle-actions button:focus-visible {
+  outline: 3px solid rgba(52, 174, 242, 0.45);
+  outline-offset: 3px;
+}
+
+.particle-config-panel {
+  position: absolute;
+  right: 32px;
+  bottom: 72px;
+  z-index: 5;
+  width: min(360px, calc(100% - 48px));
+  max-height: min(620px, calc(100vh - 104px));
+  overflow: auto;
+  padding: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  background: rgba(13, 18, 27, 0.88);
+  color: #f7fbff;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.34);
+  backdrop-filter: blur(18px);
+}
+
+.particle-config-panel[hidden] {
+  display: none;
+}
+
+.particle-config-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 16px;
+}
+
+.particle-config-header h3 {
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.particle-config-header p {
+  margin-top: 3px;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.particle-config-close {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 22px;
+  line-height: 1;
+}
+
+.particle-config-close:hover {
+  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+.particle-control-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.particle-control {
+  display: grid;
+  gap: 7px;
+}
+
+.particle-control span,
+.particle-color-grid span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.2;
+}
+
+.particle-control output {
+  color: rgba(255, 255, 255, 0.52);
+  font-variant-numeric: tabular-nums;
+}
+
+.particle-control input[type="range"] {
+  width: 100%;
+  height: 4px;
+  accent-color: #34aef2;
+}
+
+.particle-color-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.particle-color-grid label {
+  display: grid;
+  gap: 7px;
+}
+
+.particle-color-grid input {
+  width: 100%;
+  height: 34px;
+  padding: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.particle-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.particle-actions button {
+  min-height: 34px;
+  border: 1px solid rgba(52, 174, 242, 0.38);
+  border-radius: 7px;
+  background: rgba(52, 174, 242, 0.14);
+  color: #e8f7ff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.particle-actions button:hover {
+  border-color: rgba(52, 174, 242, 0.68);
+  background: rgba(52, 174, 242, 0.22);
+}
+
 .right-panel {
   position: relative;
   min-height: 100vh;
@@ -316,6 +493,18 @@ button:disabled {
 
   .left-footer {
     display: none;
+  }
+
+  .particle-egg {
+    right: 22px;
+    bottom: 18px;
+  }
+
+  .particle-config-panel {
+    right: 18px;
+    bottom: 64px;
+    width: min(340px, calc(100% - 36px));
+    max-height: calc(42vh - 82px);
   }
 
   .right-panel {
