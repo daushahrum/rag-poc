@@ -36,5 +36,33 @@ export function initModels(sequelize) {
         if (typeof m.associate === 'function') m.associate(models);
     });
 
+    models.ChatResponseAudits.belongsTo(models.ChatMessages, {
+        as: 'assistant_message',
+        foreignKey: 'message_id',
+        targetKey: 'id',
+        constraints: false,
+    });
+
+    models.ChatResponseAudits.belongsTo(models.ChatMessages, {
+        as: 'user_message',
+        foreignKey: 'user_message_id',
+        targetKey: 'id',
+        constraints: false,
+    });
+
+    models.ChatResponseAudits.belongsTo(models.ChatSessions, {
+        as: 'chat_session',
+        foreignKey: 'chat_session_id',
+        targetKey: 'id',
+        constraints: false,
+    });
+
+    models.ChatSessions.belongsTo(models.ProjectUser, {
+        as: 'project_user',
+        foreignKey: 'project_user_id',
+        targetKey: 'id',
+        constraints: false,
+    });
+
     return models;
 }

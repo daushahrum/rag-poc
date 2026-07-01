@@ -67,6 +67,7 @@ const {
     sidebar,
     sidebarLogoButton,
     sidebarSection,
+    historySection,
     historySectionLabel,
     myProjectButton,
     projectSubmenu,
@@ -168,6 +169,8 @@ function setComposerEnabled(enabled) {
 const sidebarController = createSidebarController({
     roleMode: state.roleMode,
     roleMenu,
+    historySection,
+    historySectionLabel,
     historyList,
     getSessionId: () => state.sessionId,
     buttons: {
@@ -794,12 +797,14 @@ myProjectButton.addEventListener('click', () => {
     ) {
         sidebarLogoButton.click();
         projectSubmenu.hidden = false;
+        myProjectButton.closest('.project-menu-group')?.classList.remove('submenu-collapsed');
         myProjectButton.setAttribute('aria-expanded', 'true');
         return;
     }
 
     const isOpen = !projectSubmenu.hidden;
     projectSubmenu.hidden = isOpen;
+    myProjectButton.closest('.project-menu-group')?.classList.toggle('submenu-collapsed', isOpen);
     myProjectButton.setAttribute('aria-expanded', String(!isOpen));
 });
 

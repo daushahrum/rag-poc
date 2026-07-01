@@ -1,6 +1,7 @@
 export {
     createChatSession,
     createChatResponseAudit,
+    fetchChatResponseAudits,
     fetchQueryQualityAnalytics,
     fetchSessionMessages,
     fetchSessions,

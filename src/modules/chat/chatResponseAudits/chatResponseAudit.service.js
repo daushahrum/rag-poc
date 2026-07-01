@@ -196,7 +196,8 @@ export async function deleteChatResponseAudit(id) {
 }
 
 export async function getChatResponseAudits(filters = {}) {
-    return chatResponseAuditRepository.getChatResponseAudits(filters);
+    const audits = await chatResponseAuditRepository.getChatResponseAudits(filters);
+    return audits.map(serializeChatResponseAudit);
 }
 
 export async function getChatResponseAuditById(id) {
@@ -218,6 +219,23 @@ function toNumber(value) {
 
 function toPlainRow(row) {
     return typeof row?.get === 'function' ? row.get({ plain: true }) : row;
+}
+
+function serializeChatResponseAudit(row) {
+    const audit = toPlainRow(row);
+    const sessionProjectUserId = audit.chat_session?.project_user_id ?? null;
+    const projectUser = audit.chat_session?.project_user ?? null;
+    const projectUserMatchesSession = Boolean(
+        sessionProjectUserId
+        && projectUser?.id
+        && String(sessionProjectUserId) === String(projectUser.id)
+    );
+
+    return {
+        ...audit,
+        project_user_id: sessionProjectUserId,
+        user_id: projectUserMatchesSession ? projectUser.external_user_id : null,
+    };
 }
 
 function normalizeAnalyticsFilters(filters = {}) {

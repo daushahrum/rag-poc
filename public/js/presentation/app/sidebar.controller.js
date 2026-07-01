@@ -1,6 +1,8 @@
 export function createSidebarController({
     roleMode,
     roleMenu,
+    historySection,
+    historySectionLabel,
     historyList,
     getSessionId,
     buttons,
@@ -80,6 +82,21 @@ export function createSidebarController({
         if (projectMenuGroup) {
             projectMenuGroup.classList.toggle('admin-resource-menu', roleMode === 'admin');
         }
+    }
+
+    function setHistorySectionCollapsed(isCollapsed) {
+        if (!historySection || !historySectionLabel) {
+            return;
+        }
+
+        historySection.classList.toggle('is-collapsed', isCollapsed);
+        historySectionLabel.setAttribute('aria-expanded', String(!isCollapsed));
+    }
+
+    if (historySectionLabel) {
+        historySectionLabel.addEventListener('click', () => {
+            setHistorySectionCollapsed(!historySection?.classList.contains('is-collapsed'));
+        });
     }
 
     return {

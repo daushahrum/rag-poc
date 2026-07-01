@@ -148,3 +148,29 @@ export async function fetchQueryQualityAnalytics({
 
     return data;
 }
+
+export async function fetchChatResponseAudits(filters = {}) {
+    const params = new URLSearchParams();
+
+    Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+            params.set(key, value);
+        }
+    });
+
+    const query = params.toString();
+    const url = query
+        ? `/api/chat/response-audits/list?${query}`
+        : '/api/chat/response-audits/list';
+
+    const response = await fetch(url, {
+        headers: getAuthHeaders(),
+    });
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+        throw new Error(data.error ?? data.message ?? 'Could not load response audits.');
+    }
+
+    return Array.isArray(data) ? data : [];
+}

@@ -17,6 +17,7 @@ export function getAppDom() {
         sidebar: document.querySelector('.sidebar'),
         sidebarLogoButton: document.querySelector('#sidebarLogoButton'),
         sidebarSection: document.querySelector('.sidebar-section'),
+        historySection: document.querySelector('#historySection'),
         historySectionLabel: document.querySelector('#historySectionLabel'),
         myProjectButton: document.querySelector('#myProjectButton'),
         projectSubmenu: document.querySelector('#projectSubmenu'),

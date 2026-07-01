@@ -1,3 +1,30 @@
+import { fetchChatResponseAudits } from '../../../domain/use-cases/chat.use-cases.js';
+
+const confidenceReasonLabels = {
+    chunks_do_not_contain_direct_answer: 'No direct answer found in retrieved knowledge',
+    top_chunks_contradict_each_other: 'Retrieved knowledge has conflicting information',
+    andi_answered_i_dont_know: 'ANDI could not answer from available knowledge',
+    no_chunks_found: 'No relevant knowledge was retrieved',
+    no_relevant_context: 'No relevant context found',
+    insufficient_confidence_score: 'Confidence score was too low',
+    weak_but_possible_context: 'Weak but possibly relevant context',
+    weak_close_scores_unrelated_documents: 'Retrieved results were weak and spread across unrelated documents',
+    usable_similarity_same_document_support: 'Answer supported by matching chunks from the same document',
+    moderate_similarity_clustered_support: 'Moderate match with clustered document support',
+    usable_confidence_score: 'Confidence score is acceptable',
+    strong_confidence_score: 'High confidence answer',
+    query_uses_vague_pronouns: 'Question used vague references',
+    top_score_and_second_score_are_close: 'Top retrieved results were too similar to distinguish',
+    top_chunks_from_unrelated_documents: 'Top retrieved results came from unrelated documents',
+    answer_requires_policy_or_process_not_present_in_kb: 'Requested policy or process was not found',
+    retrieved_text_only_partially_answers_question: 'Retrieved knowledge only partially answers the question',
+    multiple_retrieved_chunks_agree: 'Multiple retrieved chunks support the answer',
+    retrieved_chunk_from_trusted_project_document: 'Retrieved from project knowledge',
+    query_keyword_or_entity_found_in_chunks: 'Question keywords appeared in retrieved knowledge',
+    top_result_has_strong_gap_from_second: 'Top result was clearly stronger than the next match',
+    top_chunk_contains_direct_answer_words: 'Top chunk appears to contain an answer statement',
+};
+
 function toNumber(value) {
     if (value === null || value === undefined || value === '') {
         return 0;
@@ -11,9 +38,27 @@ function formatCount(value) {
     return new Intl.NumberFormat().format(toNumber(value));
 }
 
-function createMetricCard(metric) {
-    const card = document.createElement('article');
+function formatScore(value) {
+    if (value === null || value === undefined || value === '') {
+        return '-';
+    }
+
+    const number = Number(value);
+    return Number.isFinite(number) ? number.toFixed(3) : '-';
+}
+
+function createMetricCard(metric, { activeMetric, onSelect } = {}) {
+    const card = document.createElement('button');
+    card.type = 'button';
     card.className = `analytics-metric-card ${metric.tone}`;
+    card.dataset.metric = metric.key;
+
+    if (activeMetric === metric.key) {
+        card.classList.add('selected');
+        card.setAttribute('aria-pressed', 'true');
+    } else {
+        card.setAttribute('aria-pressed', 'false');
+    }
 
     const icon = document.createElement('i');
     icon.className = `bi ${metric.icon}`;
@@ -26,6 +71,11 @@ function createMetricCard(metric) {
     value.textContent = metric.value;
 
     card.append(icon, label, value);
+
+    if (typeof onSelect === 'function') {
+        card.addEventListener('click', () => onSelect(metric.key));
+    }
+
     return card;
 }
 
@@ -41,24 +91,28 @@ function buildMetrics(data) {
 
     return [
         {
+            key: 'unresolved',
             label: 'Unresolved',
             value: formatCount(counts.unresolved_count),
             icon: 'bi-question-circle',
             tone: 'unresolved',
         },
         {
+            key: 'low_confidence',
             label: 'Low confidence',
-            value: formatCount(counts.low_confidence_count),
+            value: formatCount(toNumber(counts.medium_confidence_count) + toNumber(counts.low_confidence_count)),
             icon: 'bi-activity',
             tone: 'warning',
         },
         {
+            key: 'positive',
             label: 'Positive',
             value: formatCount(counts.positive_feedback_count),
             icon: 'bi-hand-thumbs-up',
             tone: 'success',
         },
         {
+            key: 'negative',
             label: 'Negative',
             value: formatCount(counts.negative_feedback_count),
             icon: 'bi-hand-thumbs-down',
@@ -67,12 +121,589 @@ function buildMetrics(data) {
     ];
 }
 
+function truncateText(value, maxLength = 34) {
+    const text = String(value ?? '').replace(/\s+/g, ' ').trim();
+
+    if (!text) {
+        return '-';
+    }
+
+    return text.length > maxLength ? `${text.slice(0, maxLength - 3)}...` : text;
+}
+
+function formatRelativeTime(value) {
+    if (!value) {
+        return '-';
+    }
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+        return '-';
+    }
+
+    const seconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
+    const units = [
+        ['d', 86400],
+        ['h', 3600],
+        ['m', 60],
+    ];
+
+    for (const [label, unitSeconds] of units) {
+        const amount = Math.floor(seconds / unitSeconds);
+
+        if (amount >= 1) {
+            return `${amount}${label} ago`;
+        }
+    }
+
+    return 'just now';
+}
+
+function getAuditUserLabel(audit) {
+    return audit.user_id
+        ?? audit.project_user_id
+        ?? audit.user_message?.id
+        ?? audit.user_message_id
+        ?? '-';
+}
+
+function getConfidenceScore(audit) {
+    const score = audit.assistant_message?.confidence_reasons?.score;
+
+    if (score !== undefined && score !== null) {
+        return score;
+    }
+
+    const match = String(audit.audit_reason ?? '').match(/adjusted_confidence_score=([0-9.]+)/);
+    return match ? Number(match[1]) : null;
+}
+
+function getAuditReason(audit) {
+    const classificationReason = audit.assistant_message?.confidence_reasons?.classification?.reason;
+
+    if (classificationReason) {
+        return classificationReason;
+    }
+
+    const match = String(audit.audit_reason ?? '').match(/reason=([^;]+)/);
+    return match ? match[1] : audit.audit_reason;
+}
+
+function humanizeReasonKey(reason) {
+    if (!reason) {
+        return '-';
+    }
+
+    return confidenceReasonLabels[reason]
+        ?? String(reason).replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function humanizeAuditReasonText(value) {
+    let text = String(value ?? '').trim();
+
+    if (!text) {
+        return '-';
+    }
+
+    Object.entries(confidenceReasonLabels).forEach(([key, label]) => {
+        text = text.replaceAll(key, label);
+    });
+
+    return text;
+}
+
+function humanizeStatus(value) {
+    if (!value) {
+        return '-';
+    }
+
+    return String(value)
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function createStatusBadge(value, { tone } = {}) {
+    const badge = document.createElement('span');
+    const normalized = String(value ?? 'unknown').toLowerCase();
+    badge.className = `analytics-status-badge ${tone ?? normalized.replace(/_/g, '-')}`;
+    badge.textContent = humanizeStatus(value);
+    return badge;
+}
+
+function getAuditById(rows, auditId) {
+    if (!auditId) {
+        return null;
+    }
+
+    return rows.find((row) => String(row.id) === String(auditId)) ?? null;
+}
+
+function createDetailField(label, value, { multiline = false } = {}) {
+    const field = document.createElement('div');
+    field.className = multiline ? 'analytics-side-field multiline' : 'analytics-side-field';
+
+    const labelEl = document.createElement('span');
+    labelEl.textContent = label;
+
+    const valueEl = document.createElement(multiline ? 'p' : 'strong');
+    valueEl.textContent = value || '-';
+
+    field.append(labelEl, valueEl);
+    return field;
+}
+
+function createBadgeDetailField(label, badge) {
+    const field = document.createElement('div');
+    field.className = 'analytics-side-field badge-field';
+
+    const labelEl = document.createElement('span');
+    labelEl.textContent = label;
+
+    field.append(labelEl, badge);
+    return field;
+}
+
+function createReasonDetailField(label, reasonKey) {
+    const field = document.createElement('div');
+    field.className = 'analytics-side-field multiline';
+
+    const labelEl = document.createElement('span');
+    labelEl.textContent = label;
+
+    const valueEl = document.createElement('p');
+    const humanLabel = document.createElement('strong');
+    humanLabel.textContent = humanizeReasonKey(reasonKey);
+    valueEl.append(humanLabel);
+
+    if (reasonKey && confidenceReasonLabels[reasonKey]) {
+        const rawKey = document.createElement('code');
+        rawKey.className = 'analytics-reason-key';
+        rawKey.textContent = reasonKey;
+        valueEl.append(rawKey);
+    }
+
+    field.append(labelEl, valueEl);
+    return field;
+}
+
+function createSelectedAuditPanel({ audit, mode, onClose }) {
+    const panel = document.createElement('aside');
+    panel.className = 'analytics-side-panel';
+
+    const header = document.createElement('header');
+    header.className = 'analytics-side-panel-header';
+
+    const titleWrap = document.createElement('div');
+    const title = document.createElement('h3');
+    title.textContent = mode === 'low_confidence' ? 'Low Confidence Detail' : 'Unresolved Detail';
+
+    const subtitle = document.createElement('p');
+    subtitle.textContent = `Audit ${String(audit.id ?? '').slice(0, 8) || '-'}`;
+
+    titleWrap.append(title, subtitle);
+
+    const closeButton = document.createElement('button');
+    closeButton.type = 'button';
+    closeButton.className = 'analytics-side-close';
+    closeButton.setAttribute('aria-label', 'Close detail panel');
+    closeButton.title = 'Close';
+    closeButton.innerHTML = '<i class="bi bi-x-lg" aria-hidden="true"></i>';
+    closeButton.addEventListener('click', onClose);
+
+    header.append(titleWrap, closeButton);
+
+    const meta = document.createElement('div');
+    meta.className = 'analytics-side-meta-grid';
+    meta.append(
+        createBadgeDetailField('Status', createStatusBadge(audit.quality_status)),
+        createBadgeDetailField('Confidence', createStatusBadge(audit.confidence_level, {
+            tone: `confidence-${audit.confidence_level ?? 'unknown'}`,
+        })),
+        createDetailField('Retrieval', formatScore(audit.retrieval_score)),
+        createDetailField('Score', formatScore(getConfidenceScore(audit))),
+        createDetailField('User', getAuditUserLabel(audit)),
+        createDetailField('Created', formatRelativeTime(audit.created_at)),
+    );
+
+    const body = document.createElement('div');
+    body.className = 'analytics-side-body';
+    body.append(
+        createDetailField('User Query', audit.user_message?.content, { multiline: true }),
+        createDetailField('Response', audit.assistant_message?.content, { multiline: true }),
+        createReasonDetailField('Reason', getAuditReason(audit)),
+        createDetailField('Audit Reason', humanizeAuditReasonText(audit.audit_reason), { multiline: true }),
+    );
+
+    const signals = audit.assistant_message?.confidence_reasons?.signals;
+
+    if (Array.isArray(signals) && signals.length > 0) {
+        const signalList = document.createElement('div');
+        signalList.className = 'analytics-side-signals';
+
+        const signalTitle = document.createElement('span');
+        signalTitle.textContent = 'Signals';
+        signalList.append(signalTitle);
+
+        signals.forEach((signal) => {
+            const item = document.createElement('div');
+            item.className = 'analytics-side-signal';
+
+            const reason = document.createElement('span');
+            reason.textContent = humanizeReasonKey(signal.reason);
+            reason.title = signal.reason ?? '';
+
+            const weight = document.createElement('strong');
+            const number = Number(signal.weight);
+            weight.textContent = Number.isFinite(number) ? number.toFixed(2) : '-';
+
+            item.append(reason, weight);
+            signalList.append(item);
+        });
+
+        body.append(signalList);
+    }
+
+    panel.append(header, meta, body);
+    return panel;
+}
+
+function createSelectionHeaderCheckbox({ rows, selectedIds, label, onToggleAll }) {
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = rows.length > 0 && selectedIds.size === rows.length;
+    checkbox.indeterminate = selectedIds.size > 0 && selectedIds.size < rows.length;
+    checkbox.disabled = rows.length === 0;
+    checkbox.setAttribute('aria-label', label);
+    checkbox.addEventListener('change', onToggleAll);
+    return checkbox;
+}
+
+function createUnresolvedTable({ rows, selectedIds, detailAuditId, onOpenDetail, onToggle, onToggleAll }) {
+    const section = document.createElement('section');
+    section.className = 'analytics-detail-section';
+
+    const header = document.createElement('div');
+    header.className = 'analytics-detail-header';
+
+    const title = document.createElement('h3');
+    title.textContent = `Unresolved Queries (${rows.length})`;
+    header.append(title);
+
+    const tableShell = document.createElement('div');
+    tableShell.className = 'analytics-table-shell';
+
+    const table = document.createElement('table');
+    table.className = 'analytics-table';
+
+    const thead = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+    ['select', 'User Query', 'Response', 'User', 'Created At', 'Status'].forEach((label, index) => {
+        const th = document.createElement('th');
+
+        if (index === 0) {
+            th.append(createSelectionHeaderCheckbox({
+                rows,
+                selectedIds,
+                label: 'Select all unresolved queries',
+                onToggleAll,
+            }));
+        } else {
+            th.textContent = label;
+        }
+
+        headerRow.append(th);
+    });
+    thead.append(headerRow);
+
+    const tbody = document.createElement('tbody');
+
+    if (rows.length === 0) {
+        const emptyRow = document.createElement('tr');
+        const emptyCell = document.createElement('td');
+        emptyCell.colSpan = 6;
+        emptyCell.className = 'analytics-table-empty';
+        emptyCell.textContent = 'No unresolved queries.';
+        emptyRow.append(emptyCell);
+        tbody.append(emptyRow);
+    } else {
+        rows.forEach((audit) => {
+            const row = document.createElement('tr');
+            const isSelected = selectedIds.has(String(audit.id));
+            const isDetailOpen = String(audit.id) === String(detailAuditId);
+
+            if (isSelected) {
+                row.classList.add('selected');
+            }
+
+            if (isDetailOpen) {
+                row.classList.add('detail-open');
+            }
+
+            row.tabIndex = 0;
+            row.addEventListener('click', () => onOpenDetail(audit.id));
+            row.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    onOpenDetail(audit.id);
+                }
+            });
+
+            const selectCell = document.createElement('td');
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.checked = isSelected;
+            checkbox.setAttribute('aria-label', 'Select unresolved query');
+            checkbox.addEventListener('click', (event) => event.stopPropagation());
+            checkbox.addEventListener('keydown', (event) => event.stopPropagation());
+            checkbox.addEventListener('change', (event) => {
+                event.stopPropagation();
+                onToggle(audit.id);
+            });
+            selectCell.append(checkbox);
+
+            const queryCell = document.createElement('td');
+            queryCell.textContent = truncateText(audit.user_message?.content);
+            queryCell.title = audit.user_message?.content ?? '';
+
+            const responseCell = document.createElement('td');
+            responseCell.textContent = truncateText(audit.assistant_message?.content);
+            responseCell.title = audit.assistant_message?.content ?? '';
+
+            const userCell = document.createElement('td');
+            userCell.textContent = getAuditUserLabel(audit);
+
+            const createdCell = document.createElement('td');
+            createdCell.textContent = formatRelativeTime(audit.created_at);
+
+            const statusCell = document.createElement('td');
+            statusCell.append(createStatusBadge('unresolved'));
+
+            row.append(selectCell, queryCell, responseCell, userCell, createdCell, statusCell);
+            tbody.append(row);
+        });
+    }
+
+    table.append(thead, tbody);
+    tableShell.append(table);
+
+    const actions = document.createElement('div');
+    actions.className = 'analytics-table-actions';
+
+    const markResolvedButton = document.createElement('button');
+    markResolvedButton.type = 'button';
+    markResolvedButton.className = 'analytics-mark-resolved-button';
+    markResolvedButton.textContent = 'Mark resolved';
+    markResolvedButton.disabled = true;
+    markResolvedButton.title = selectedIds.size > 0
+        ? 'Resolving selected queries is not implemented yet.'
+        : 'Select unresolved queries to review.';
+    actions.append(markResolvedButton);
+
+    section.append(header, tableShell, actions);
+    return section;
+}
+
+function createLowConfidenceTable({ rows, selectedIds, detailAuditId, onOpenDetail, onToggle, onToggleAll }) {
+    const section = document.createElement('section');
+    section.className = 'analytics-detail-section';
+
+    const header = document.createElement('div');
+    header.className = 'analytics-detail-header';
+
+    const title = document.createElement('h3');
+    title.textContent = `Low Confidence Queries (${rows.length})`;
+    header.append(title);
+
+    const tableShell = document.createElement('div');
+    tableShell.className = 'analytics-table-shell analytics-table-shell-wide';
+
+    const table = document.createElement('table');
+    table.className = 'analytics-table analytics-low-confidence-table';
+
+    const thead = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+    [
+        'select',
+        'User Query',
+        'Response',
+        'Retrieval',
+        'Confidence',
+        'Level',
+        'Status',
+        'Reason',
+        'Created At',
+    ].forEach((label, index) => {
+        const th = document.createElement('th');
+
+        if (index === 0) {
+            th.append(createSelectionHeaderCheckbox({
+                rows,
+                selectedIds,
+                label: 'Select all low confidence queries',
+                onToggleAll,
+            }));
+        } else {
+            th.textContent = label;
+        }
+
+        headerRow.append(th);
+    });
+    thead.append(headerRow);
+
+    const tbody = document.createElement('tbody');
+
+    if (rows.length === 0) {
+        const emptyRow = document.createElement('tr');
+        const emptyCell = document.createElement('td');
+        emptyCell.colSpan = 9;
+        emptyCell.className = 'analytics-table-empty';
+        emptyCell.textContent = 'No low confidence queries.';
+        emptyRow.append(emptyCell);
+        tbody.append(emptyRow);
+    } else {
+        rows.forEach((audit) => {
+            const row = document.createElement('tr');
+            const isSelected = selectedIds.has(String(audit.id));
+            const isDetailOpen = String(audit.id) === String(detailAuditId);
+            const reason = getAuditReason(audit);
+
+            if (isSelected) {
+                row.classList.add('selected');
+            }
+
+            if (isDetailOpen) {
+                row.classList.add('detail-open');
+            }
+
+            row.tabIndex = 0;
+            row.addEventListener('click', () => onOpenDetail(audit.id));
+            row.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    onOpenDetail(audit.id);
+                }
+            });
+
+            const selectCell = document.createElement('td');
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.checked = isSelected;
+            checkbox.setAttribute('aria-label', 'Select low confidence query');
+            checkbox.addEventListener('click', (event) => event.stopPropagation());
+            checkbox.addEventListener('keydown', (event) => event.stopPropagation());
+            checkbox.addEventListener('change', (event) => {
+                event.stopPropagation();
+                onToggle(audit.id);
+            });
+            selectCell.append(checkbox);
+
+            const queryCell = document.createElement('td');
+            queryCell.textContent = truncateText(audit.user_message?.content);
+            queryCell.title = audit.user_message?.content ?? '';
+
+            const responseCell = document.createElement('td');
+            responseCell.textContent = truncateText(audit.assistant_message?.content);
+            responseCell.title = audit.assistant_message?.content ?? '';
+
+            const retrievalCell = document.createElement('td');
+            retrievalCell.textContent = formatScore(audit.retrieval_score);
+
+            const confidenceCell = document.createElement('td');
+            confidenceCell.textContent = formatScore(getConfidenceScore(audit));
+
+            const levelCell = document.createElement('td');
+            levelCell.append(createStatusBadge(audit.confidence_level, {
+                tone: `confidence-${audit.confidence_level ?? 'unknown'}`,
+            }));
+
+            const statusCell = document.createElement('td');
+            statusCell.append(createStatusBadge(audit.quality_status));
+
+            const reasonCell = document.createElement('td');
+            reasonCell.textContent = truncateText(humanizeReasonKey(reason), 42);
+            reasonCell.title = audit.audit_reason ?? reason ?? '';
+
+            const createdCell = document.createElement('td');
+            createdCell.textContent = formatRelativeTime(audit.created_at);
+
+            row.append(
+                selectCell,
+                queryCell,
+                responseCell,
+                retrievalCell,
+                confidenceCell,
+                levelCell,
+                statusCell,
+                reasonCell,
+                createdCell,
+            );
+            tbody.append(row);
+        });
+    }
+
+    table.append(thead, tbody);
+    tableShell.append(table);
+    section.append(header, tableShell);
+    return section;
+}
+
+function createInitialAnalyticsView(previousActiveMetric = 'unresolved') {
+    return {
+        activeMetric: previousActiveMetric,
+        unresolvedRows: [],
+        unresolvedSelectedIds: new Set(),
+        unresolvedLoading: false,
+        unresolvedLoaded: false,
+        unresolvedError: null,
+        lowConfidenceRows: [],
+        lowConfidenceSelectedIds: new Set(),
+        lowConfidenceLoading: false,
+        lowConfidenceLoaded: false,
+        lowConfidenceError: null,
+        detailMode: null,
+        detailAuditId: null,
+    };
+}
+
+function getActiveSelectedAudit(state) {
+    if (state.analyticsView.detailMode === 'unresolved') {
+        return {
+            audit: getAuditById(
+                state.analyticsView.unresolvedRows,
+                state.analyticsView.detailAuditId,
+            ),
+            mode: 'unresolved',
+            onClose: null,
+        };
+    }
+
+    if (state.analyticsView.detailMode === 'low_confidence') {
+        return {
+            audit: getAuditById(
+                state.analyticsView.lowConfidenceRows,
+                state.analyticsView.detailAuditId,
+            ),
+            mode: 'low_confidence',
+            onClose: null,
+        };
+    }
+
+    return { audit: null, mode: null, onClose: null };
+}
+
 export function renderAnalyticsDashboardScreen(context, options = {}) {
     const { dom, controllers, state } = context;
     const { closeAllPanels } = controllers;
     const { messages, form, sidebarSection, adminProjectField, environmentField } = dom;
     const data = options.data ?? null;
     const isLoading = options.loading === true;
+
+    if (isLoading) {
+        state.analyticsView = createInitialAnalyticsView(state.analyticsView?.activeMetric ?? 'unresolved');
+    }
+
+    state.analyticsView ??= createInitialAnalyticsView();
 
     closeAllPanels();
     messages.classList.add('crud-canvas');
@@ -84,6 +715,11 @@ export function renderAnalyticsDashboardScreen(context, options = {}) {
 
     const screen = document.createElement('section');
     screen.className = 'analytics-dashboard-screen';
+
+    const selectedDetail = getActiveSelectedAudit(state);
+    if (selectedDetail.audit) {
+        screen.classList.add('has-side-panel');
+    }
 
     const content = document.createElement('div');
     content.className = 'analytics-dashboard-content';
@@ -110,9 +746,210 @@ export function renderAnalyticsDashboardScreen(context, options = {}) {
 
     const metricGrid = document.createElement('div');
     metricGrid.className = 'analytics-metric-grid';
-    buildMetrics(data).forEach((metric) => metricGrid.append(createMetricCard(metric)));
+    buildMetrics(data).forEach((metric) => metricGrid.append(createMetricCard(metric, {
+        activeMetric: state.analyticsView.activeMetric,
+        onSelect: async (metricKey) => {
+            state.analyticsView.activeMetric = metricKey;
+            state.analyticsView.unresolvedSelectedIds = new Set();
+            state.analyticsView.lowConfidenceSelectedIds = new Set();
+            state.analyticsView.detailMode = null;
+            state.analyticsView.detailAuditId = null;
+
+            if (metricKey === 'unresolved' && !state.analyticsView.unresolvedLoaded) {
+                await loadUnresolvedRows(context, options);
+                return;
+            }
+
+            if (metricKey === 'low_confidence' && !state.analyticsView.lowConfidenceLoaded) {
+                await loadLowConfidenceRows(context, options);
+                return;
+            }
+
+            renderAnalyticsDashboardScreen(context, options);
+        },
+    })));
 
     content.append(metricGrid);
+
+    const spacing = document.createElement('div');
+    spacing.className = 'analytics-dashboard-spacing';
+    content.append(spacing);
+
+    if (state.analyticsView.activeMetric === 'unresolved') {
+        if (state.analyticsView.unresolvedLoading) {
+            content.append(createEmptyState('Loading unresolved queries...'));
+        } else if (state.analyticsView.unresolvedError) {
+            content.append(createEmptyState(state.analyticsView.unresolvedError));
+        } else {
+            const table = createUnresolvedTable({
+                rows: state.analyticsView.unresolvedRows,
+                selectedIds: state.analyticsView.unresolvedSelectedIds,
+                detailAuditId: state.analyticsView.detailMode === 'unresolved'
+                    ? state.analyticsView.detailAuditId
+                    : null,
+                onOpenDetail: (auditId) => {
+                    state.analyticsView.detailMode = 'unresolved';
+                    state.analyticsView.detailAuditId = String(auditId);
+                    renderAnalyticsDashboardScreen(context, options);
+                },
+                onToggle: (auditId) => {
+                    const id = String(auditId);
+
+                    if (state.analyticsView.unresolvedSelectedIds.has(id)) {
+                        state.analyticsView.unresolvedSelectedIds.delete(id);
+                    } else {
+                        state.analyticsView.unresolvedSelectedIds.add(id);
+                    }
+
+                    renderAnalyticsDashboardScreen(context, options);
+                },
+                onToggleAll: () => {
+                    if (state.analyticsView.unresolvedSelectedIds.size === state.analyticsView.unresolvedRows.length) {
+                        state.analyticsView.unresolvedSelectedIds = new Set();
+                    } else {
+                        state.analyticsView.unresolvedSelectedIds = new Set(
+                            state.analyticsView.unresolvedRows.map((row) => String(row.id))
+                        );
+                    }
+
+                    renderAnalyticsDashboardScreen(context, options);
+                },
+            });
+
+            content.append(table);
+        }
+    }
+
+    if (state.analyticsView.activeMetric === 'low_confidence') {
+        if (state.analyticsView.lowConfidenceLoading) {
+            content.append(createEmptyState('Loading low confidence queries...'));
+        } else if (state.analyticsView.lowConfidenceError) {
+            content.append(createEmptyState(state.analyticsView.lowConfidenceError));
+        } else {
+            const table = createLowConfidenceTable({
+                rows: state.analyticsView.lowConfidenceRows,
+                selectedIds: state.analyticsView.lowConfidenceSelectedIds,
+                detailAuditId: state.analyticsView.detailMode === 'low_confidence'
+                    ? state.analyticsView.detailAuditId
+                    : null,
+                onOpenDetail: (auditId) => {
+                    state.analyticsView.detailMode = 'low_confidence';
+                    state.analyticsView.detailAuditId = String(auditId);
+                    renderAnalyticsDashboardScreen(context, options);
+                },
+                onToggle: (auditId) => {
+                    const id = String(auditId);
+
+                    if (state.analyticsView.lowConfidenceSelectedIds.has(id)) {
+                        state.analyticsView.lowConfidenceSelectedIds.delete(id);
+                    } else {
+                        state.analyticsView.lowConfidenceSelectedIds.add(id);
+                    }
+
+                    renderAnalyticsDashboardScreen(context, options);
+                },
+                onToggleAll: () => {
+                    if (state.analyticsView.lowConfidenceSelectedIds.size === state.analyticsView.lowConfidenceRows.length) {
+                        state.analyticsView.lowConfidenceSelectedIds = new Set();
+                    } else {
+                        state.analyticsView.lowConfidenceSelectedIds = new Set(
+                            state.analyticsView.lowConfidenceRows.map((row) => String(row.id))
+                        );
+                    }
+
+                    renderAnalyticsDashboardScreen(context, options);
+                },
+            });
+
+            content.append(table);
+        }
+    }
+
     screen.append(content);
+
+    if (selectedDetail.audit) {
+        screen.append(createSelectedAuditPanel({
+            audit: selectedDetail.audit,
+            mode: selectedDetail.mode,
+            onClose: () => {
+                state.analyticsView.detailMode = null;
+                state.analyticsView.detailAuditId = null;
+                renderAnalyticsDashboardScreen(context, options);
+            },
+        }));
+    }
+
     messages.append(screen);
+
+    if (
+        state.analyticsView.activeMetric === 'unresolved'
+        && !state.analyticsView.unresolvedLoading
+        && !state.analyticsView.unresolvedLoaded
+        && !state.analyticsView.unresolvedError
+    ) {
+        loadUnresolvedRows(context, options);
+    }
+
+    if (
+        state.analyticsView.activeMetric === 'low_confidence'
+        && !state.analyticsView.lowConfidenceLoading
+        && !state.analyticsView.lowConfidenceLoaded
+        && !state.analyticsView.lowConfidenceError
+    ) {
+        loadLowConfidenceRows(context, options);
+    }
+}
+
+async function loadUnresolvedRows(context, options = {}) {
+    const { state } = context;
+
+    if (state.analyticsView.unresolvedLoading) {
+        return;
+    }
+
+    state.analyticsView.unresolvedLoading = true;
+    state.analyticsView.unresolvedError = null;
+    renderAnalyticsDashboardScreen(context, options);
+
+    try {
+        state.analyticsView.unresolvedRows = await fetchChatResponseAudits({
+            project_id: options.includeProjectFilter === false ? null : state.activeProjectId,
+            environment_id: state.selectedEnvironmentId,
+            quality_status: 'unresolved',
+        });
+        state.analyticsView.unresolvedLoaded = true;
+    } catch (error) {
+        state.analyticsView.unresolvedError = error.message;
+        state.analyticsView.unresolvedLoaded = true;
+    } finally {
+        state.analyticsView.unresolvedLoading = false;
+        renderAnalyticsDashboardScreen(context, options);
+    }
+}
+
+async function loadLowConfidenceRows(context, options = {}) {
+    const { state } = context;
+
+    if (state.analyticsView.lowConfidenceLoading) {
+        return;
+    }
+
+    state.analyticsView.lowConfidenceLoading = true;
+    state.analyticsView.lowConfidenceError = null;
+    renderAnalyticsDashboardScreen(context, options);
+
+    try {
+        state.analyticsView.lowConfidenceRows = await fetchChatResponseAudits({
+            project_id: options.includeProjectFilter === false ? null : state.activeProjectId,
+            environment_id: state.selectedEnvironmentId,
+            confidence_levels: 'medium,low',
+        });
+        state.analyticsView.lowConfidenceLoaded = true;
+    } catch (error) {
+        state.analyticsView.lowConfidenceError = error.message;
+        state.analyticsView.lowConfidenceLoaded = true;
+    } finally {
+        state.analyticsView.lowConfidenceLoading = false;
+        renderAnalyticsDashboardScreen(context, options);
+    }
 }

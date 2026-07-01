@@ -145,12 +145,37 @@
     padding: 28px 18px 40px;
   }
 
+  .analytics-dashboard-screen.has-side-panel {
+    padding: 0 18px 40px;
+  }
+
+  .analytics-dashboard-screen.has-side-panel .analytics-dashboard-content {
+    padding: 28px 0 0;
+  }
+
+  .analytics-dashboard-screen.has-side-panel > .analytics-side-panel {
+    position: static;
+    width: 100%;
+    max-height: none;
+    margin-top: 0;
+    animation: none;
+  }
+
   .analytics-metric-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .analytics-query-row {
     grid-template-columns: minmax(0, 1fr) auto auto 30px;
+  }
+
+  .analytics-side-panel {
+    max-height: none;
+    overflow: visible;
+  }
+
+  .analytics-side-body {
+    overflow: visible;
   }
 
   .analytics-chart-body {

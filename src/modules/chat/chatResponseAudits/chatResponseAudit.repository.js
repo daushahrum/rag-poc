@@ -5,6 +5,9 @@ import { models } from '../../../database/db.js';
 
 const {
     ChatResponseAudits,
+    ChatMessages,
+    ChatSessions,
+    ProjectUser,
     QueryQualityCounts,
     QueryQualityDaily,
     QueryQualityStatusBreakdown,
@@ -35,7 +38,7 @@ export async function getChatResponseAuditById(id) {
     return ChatResponseAudits.findByPk(id);
 }
 
-export async function getChatResponseAudits(filters = {}) {
+function buildAuditWhere(filters = {}) {
     const where = {};
 
     if (filters.project_id) {
@@ -58,7 +61,14 @@ export async function getChatResponseAudits(filters = {}) {
         where.user_message_id = filters.user_message_id;
     }
 
-    if (filters.confidence_level) {
+    if (filters.confidence_levels) {
+        where.confidence_level = {
+            [Op.in]: String(filters.confidence_levels)
+                .split(',')
+                .map((level) => level.trim())
+                .filter(Boolean),
+        };
+    } else if (filters.confidence_level) {
         where.confidence_level = filters.confidence_level;
     }
 
@@ -74,8 +84,42 @@ export async function getChatResponseAudits(filters = {}) {
         where.reviewed_by = filters.reviewed_by;
     }
 
+    return where;
+}
+
+export async function getChatResponseAudits(filters = {}) {
+    const where = buildAuditWhere(filters);
+
     return ChatResponseAudits.findAll({
         where,
+        include: [
+            {
+                model: ChatMessages,
+                as: 'assistant_message',
+                required: false,
+                attributes: ['id', 'content', 'created_at', 'low_confidence', 'confidence_reasons'],
+            },
+            {
+                model: ChatMessages,
+                as: 'user_message',
+                required: false,
+                attributes: ['id', 'content', 'created_at'],
+            },
+            {
+                model: ChatSessions,
+                as: 'chat_session',
+                required: false,
+                attributes: ['id', 'project_user_id'],
+                include: [
+                    {
+                        model: ProjectUser,
+                        as: 'project_user',
+                        required: false,
+                        attributes: ['id', 'external_user_id'],
+                    },
+                ],
+            },
+        ],
         order: [['created_at', 'DESC']],
     });
 }

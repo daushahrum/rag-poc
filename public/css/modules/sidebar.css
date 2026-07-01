@@ -8,10 +8,9 @@
   height: 100vh;
   min-height: 0;
   /* padding: 12px 10px; */
-  overflow-y: auto;
+  overflow: hidden;
   background: var(--sidebar);
   color: var(--sidebar-text);
-  overflow-x: hidden;
   /* border-right removed — resizer div acts as the separator */
 }
 
@@ -245,6 +244,10 @@
   display: grid;
 }
 
+.project-menu-group.submenu-collapsed {
+  padding-bottom: 8px;
+}
+
 .project-menu-toggle .project-menu-chevron {
   width: auto;
   margin-left: auto;
@@ -266,13 +269,22 @@
   align-items: center;
   gap: 10px;
   width: 100%;
-  min-height: 34px;
+  min-height: 40px;
   padding: 7px 18px 7px 46px;
   border: 0;
   background: transparent;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 14px;
   text-align: left;
+}
+
+.developer-menu-button i {
+  display: grid;
+  width: 18px;
+  flex-shrink: 0;
+  place-items: center;
+  font-size: 18px;
+  /* opacity: 0.85; */
 }
 
 .project-submenu-button:hover {
@@ -364,12 +376,23 @@
 /* ── Sidebar section ── */
 .sidebar-section {
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  flex: 1 1 auto;
   gap: 0;
   min-height: 0;
   margin-top: 8px;
+  overflow: hidden;
 }
 
 .section-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
   color: var(--sidebar-muted);
   font-size: 10px;
   font-weight: 700;
@@ -382,10 +405,42 @@
               padding-top 0.22s ease-in-out, padding-bottom 0.22s ease-in-out;
 }
 
+.history-section-toggle {
+  cursor: pointer;
+  text-align: left;
+}
+
+.history-section-toggle::after {
+  content: '\F282';
+  flex: 0 0 auto;
+  font-family: "bootstrap-icons";
+  font-size: 11px;
+  line-height: 1;
+  text-transform: none;
+  transition: transform 0.16s ease;
+}
+
+.sidebar-section.is-collapsed .history-section-toggle::after {
+  transform: rotate(-90deg);
+}
+
 /* ── History list ── */
 .history-list {
   display: grid;
   gap: 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.sidebar-section.is-collapsed {
+  grid-template-rows: auto 0fr;
+  flex: 0 0 auto;
+}
+
+.sidebar-section.is-collapsed .history-list {
+  overflow: hidden;
 }
 
 .history-loading {
@@ -410,10 +465,12 @@
 .history-item {
   display: flex;
   flex-direction: column;
+  justify-content: center;
   align-items: flex-start;
   width: 100%;
-  min-height: 38px;
-  padding: 10px 18px;
+  height: 40px;
+  min-height: 40px;
+  padding: 0 18px;
   background: transparent;
   color: var(--sidebar-text);
   border: none;
@@ -464,6 +521,7 @@
 .history-title {
   font-size: 14px;
   font-weight: 400;
+  line-height: 20px;
   color: inherit;
   overflow: hidden;
   max-height: 2.5em;
