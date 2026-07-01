@@ -1,4 +1,4 @@
-import { createChatSession, fetchSessionMessages, fetchSessions } from '../../../domain/use-cases/chat.use-cases.js';
+import { createChatResponseAudit, createChatSession, fetchSessionMessages, fetchSessions } from '../../../domain/use-cases/chat.use-cases.js';
 import { scrollToBottom } from '../../../core/utils/dom.js';
 import { createMessage, createTypingMessage } from '../../components/message.js';
 import { renderHistoryList } from '../history.renderer.js';
@@ -86,7 +86,20 @@ export function createChatScreen(context) {
                 renderWelcomeMessage();
             } else {
                 for (const message of sessionMessages) {
-                    messages.append(createMessage(message.role, message.content));
+                    if (message.role === 'user') {
+                        messages.append(createMessage(message.role, message.content));
+                        continue;
+                    }
+
+                    messages.append(createMessage(
+                        message.role,
+                        message.content,
+                        [],
+                        {
+                            ...buildResponseFeedbackOptions(message),
+                            lowConfidence: message.low_confidence,
+                        },
+                    ));
                 }
             }
 
@@ -107,7 +120,47 @@ export function createChatScreen(context) {
         });
     }
 
+    function buildResponseFeedbackOptions(message) {
+        if (message.role !== 'assistant') {
+            return {};
+        }
+
+        return {
+            onFeedback: (feedback) => createChatResponseAudit(
+                buildAuditPayload({
+                    feedback,
+                    sessionId: message.session_id ?? state.sessionId,
+                    messageId: message.id,
+                })
+            ),
+        };
+    }
+
+    function buildAuditPayload({ feedback, sessionId, messageId }) {
+        const payload = {
+            chat_session_id: sessionId,
+            message_id: messageId,
+        };
+
+        if (feedback === 'thumbs_up') {
+            payload.user_feedback = 'positive';
+            payload.quality_status = 'normal';
+            return payload;
+        }
+
+        if (feedback === 'thumbs_down') {
+            payload.user_feedback = 'negative';
+            payload.quality_status = 'needs_review';
+            return payload;
+        }
+
+        payload.quality_status = 'unresolved';
+        payload.audit_reason = 'Marked unresolved from chat screen';
+        return payload;
+    }
+
     return {
+        buildAuditPayload,
         loadSession,
         refreshSessions,
         renderHistory,

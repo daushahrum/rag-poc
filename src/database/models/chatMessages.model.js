@@ -15,6 +15,8 @@ export default function ChatMessagesModel(sequelize) {
             },
             role: { type: DataTypes.TEXT, allowNull: false },
             content: { type: DataTypes.TEXT, allowNull: false },
+            low_confidence: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
+            confidence_reasons: { type: DataTypes.JSONB, allowNull: true },
             created_at: { type: DataTypes.DATE, allowNull: true, defaultValue: DataTypes.NOW }
         },
         {

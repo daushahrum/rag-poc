@@ -44,15 +44,15 @@ function initParticleField() {
     const ctx = particleField.getContext('2d');
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const DEFAULT_CONFIG = {
-        count: 90,
+        count: 130,
         maxSpeed: 0.35,
-        connectionDist: 110,
+        connectionDist: 180,
         mouseRadius: 130,
         mouseRepel: 0.014,
         dotColor: [52, 174, 242],
         dotAlpha: 0.85,
         lineColor: [45, 157, 235],
-        dotSize: 1.4,
+        dotSize: 2,
         bgColor: '#0d0d18'
     };
     const CONFIG = { ...DEFAULT_CONFIG };

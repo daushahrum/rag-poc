@@ -45,4 +45,16 @@ db.testConnection = async function() {
   }
 }
 
+db.ensureChatMessageConfidenceColumns = async function() {
+  await sequelize.query(`
+    ALTER TABLE chat_messages
+    ADD COLUMN IF NOT EXISTS low_confidence BOOLEAN NOT NULL DEFAULT false
+  `);
+
+  await sequelize.query(`
+    ALTER TABLE chat_messages
+    ADD COLUMN IF NOT EXISTS confidence_reasons JSONB
+  `);
+}
+
 export { sequelize, models, db };

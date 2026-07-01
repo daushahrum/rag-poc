@@ -1,6 +1,7 @@
 // modules/chat/chat.service.js
 
 import { chatCompletion } from '../../../lib/llm.js';
+import { openai } from '../../../lib/openai.js';
 import { buildContext } from '../rag/rag.service.js';
 
 import * as chatSessionRepository from './chatSession/chatSession.repository.js';
@@ -9,6 +10,7 @@ import * as chatMessageService from './chatMessages/chatMessage.service.js';
 import * as toolRepository from '../tool/tool.repository.js';
 import * as projectRepository from '../project/project.repository.js';
 import * as projectEnvironmentRepository from '../project/projectEnvironment/projectEnvironment.repository.js';
+import * as chatResponseAuditService from './chatResponseAudits/chatResponseAudit.service.js';
 
 export async function sendMessage(session_id, message, userToken, isPortalAdmin) {
     if (!session_id) {
@@ -62,9 +64,10 @@ const { project_id, environment_id } = session;
     const history = await chatMessageRepository.getChatMessages({ session_id });
 
     // 6. Retrieve RAG context relevant to this message
-    const { context } = await buildContext(message, project_id);
+    const { context, chunks } = await buildContext(message, project_id);
 
     // 7. Load project settings and available tools for this project.
+    //TODO: Consider caching the tool catalog for performance, as it is unlikely to change frequently.
     const [project, availableTools] = await Promise.all([
         projectRepository.getProjectById(project_id),
         toolRepository.getTools({ project_id, is_enabled: true }),
@@ -117,14 +120,149 @@ const { project_id, environment_id } = session;
         assistantMessage = await chatCompletion(messages);
     }
 
+    const confidence = await evaluateLowConfidence({
+        answer: assistantMessage.content,
+        chunks,
+    });
+
     // 13. Save assistant's final response
     const savedMessage = await chatMessageService.createChatMessage({
         session_id,
         role: 'assistant',
         content: assistantMessage.content,
+        low_confidence: confidence.low_confidence,
+        confidence_reasons: confidence.reasons,
     });
 
+    if (confidence.low_confidence) {
+        await createLowConfidenceAudit({
+            session_id,
+            message_id: savedMessage.id,
+            confidence,
+        });
+    }
+
     return savedMessage;
+}
+
+async function evaluateLowConfidence({ answer, chunks }) {
+    const reasons = [];
+    const normalizedChunks = Array.isArray(chunks) ? chunks : [];
+    const topSimilarity = normalizedChunks.length > 0
+        ? Number(normalizedChunks[0]?.similarity ?? 0)
+        : 0;
+
+    if (normalizedChunks.length === 0) {
+        reasons.push('no_chunks_found');
+    }
+
+    if (normalizedChunks.length > 0 && topSimilarity < 0.65) {
+        reasons.push('top_similarity_below_0_65');
+    }
+
+    if (isDontKnowAnswer(answer)) {
+        reasons.push('andi_answered_i_dont_know');
+    }
+
+    if (normalizedChunks.length > 0) {
+        const verifierResult = await verifyRetrievedEvidence({
+            answer,
+            chunks: normalizedChunks.slice(0, 5),
+        });
+
+        if (verifierResult.direct_answer_present === false) {
+            reasons.push('chunks_do_not_contain_direct_answer');
+        }
+
+        if (verifierResult.chunks_contradict === true) {
+            reasons.push('top_chunks_contradict_each_other');
+        }
+    }
+
+    return {
+        low_confidence: reasons.length > 0,
+        reasons: [...new Set(reasons)],
+        retrieval_score: normalizedChunks.length > 0 ? topSimilarity : null,
+        retrieved_chunk_count: normalizedChunks.length,
+    };
+}
+
+async function createLowConfidenceAudit({ session_id, message_id, confidence }) {
+    try {
+        await chatResponseAuditService.createChatResponseAudit({
+            chat_session_id: session_id,
+            message_id,
+            retrieval_score: confidence.retrieval_score,
+            retrieved_chunk_count: confidence.retrieved_chunk_count,
+            confidence_level: 'low',
+            quality_status: 'needs_review',
+            audit_reason: `Automatically marked low confidence: ${confidence.reasons.join(', ')}`,
+            reviewed_by: 'system',
+            reviewed_at: new Date(),
+        });
+    } catch (error) {
+        console.error('Failed to create low confidence audit:', error.message);
+    }
+}
+
+function isDontKnowAnswer(answer = '') {
+    const normalized = String(answer).trim().toLowerCase();
+
+    return /\bi\s+(do not|don't|dont)\s+know\b/.test(normalized)
+        || /\bi(?:'|’)m\s+not\s+sure\b/.test(normalized);
+}
+
+async function verifyRetrievedEvidence({ answer, chunks }) {
+    const fallback = {
+        direct_answer_present: true,
+        chunks_contradict: false,
+    };
+
+    try {
+        const response = await openai.chat.completions.create({
+            model: 'gpt-4o-mini',
+            response_format: { type: 'json_object' },
+            messages: [
+                {
+                    role: 'system',
+                    content: `You verify whether retrieved knowledge chunks support an assistant answer.
+Return only JSON with:
+{
+  "direct_answer_present": boolean,
+  "chunks_contradict": boolean
+}
+
+Set direct_answer_present to true only when at least one chunk directly contains the information needed for the assistant's answer.
+Set chunks_contradict to true when the top chunks make conflicting claims about the same answer-critical fact.`,
+                },
+                {
+                    role: 'user',
+                    content: JSON.stringify({
+                        answer,
+                        chunks: chunks.map((chunk, index) => ({
+                            rank: index + 1,
+                            similarity: chunk.similarity,
+                            content: chunk.content,
+                        })),
+                    }),
+                },
+            ],
+        });
+
+        const parsed = JSON.parse(response.choices[0]?.message?.content ?? '{}');
+
+        return {
+            direct_answer_present: typeof parsed.direct_answer_present === 'boolean'
+                ? parsed.direct_answer_present
+                : fallback.direct_answer_present,
+            chunks_contradict: typeof parsed.chunks_contradict === 'boolean'
+                ? parsed.chunks_contradict
+                : fallback.chunks_contradict,
+        };
+    } catch (error) {
+        console.error('Failed to verify retrieved evidence:', error.message);
+        return fallback;
+    }
 }
 
 async function generateAndSaveTopic(session_id, firstMessage) {
@@ -154,7 +292,7 @@ Use these project-specific instructions when answering, as long as they do not c
 `
         : 'No project-specific instructions are configured.';
 
-    return `You are ANDI, a helpful assistant for hotel and laundry operations.
+    return `You are ANDI, a helpful AI assistant to help users with accomplish their tasks.
 
 ${projectInstructions}
 

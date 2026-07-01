@@ -101,3 +101,50 @@ export async function createChatSession(user, environmentId) {
 
     return responseBody;
 }
+
+export async function createChatResponseAudit(payload) {
+    const response = await fetch('/api/chat/response-audits/create', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            ...getAuthHeaders(),
+        },
+        body: JSON.stringify(payload),
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+        throw new Error(data.error ?? data.message ?? 'Could not save response feedback.');
+    }
+
+    return data;
+}
+
+export async function fetchQueryQualityAnalytics({
+    project_id,
+    environment_id,
+    days,
+} = {}) {
+    const params = new URLSearchParams();
+
+    if (project_id) params.set('project_id', project_id);
+    if (environment_id) params.set('environment_id', environment_id);
+    if (days) params.set('days', days);
+
+    const query = params.toString();
+    const url = query
+        ? `/api/chat/response-audits/analytics?${query}`
+        : '/api/chat/response-audits/analytics';
+
+    const response = await fetch(url, {
+        headers: getAuthHeaders(),
+    });
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+        throw new Error(data.error ?? data.message ?? 'Could not load analytics.');
+    }
+
+    return data;
+}

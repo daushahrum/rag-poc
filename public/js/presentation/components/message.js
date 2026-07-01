@@ -4,20 +4,35 @@
 
 import { renderFormattedText } from './formatter.js';
 
-export function createMessage(role, content, sources = []) {
+export function createMessage(role, content, sources = [], options = {}) {
     const article = document.createElement('article');
     article.className = `message ${role}`;
+    const lowConfidence = Boolean(options.lowConfidence);
+
+    if (lowConfidence) {
+        article.classList.add('low-confidence');
+    }
 
     const bubble = document.createElement('div');
     bubble.className = 'bubble';
 
-    bubble.append(renderFormattedText(content));
+    const formattedContent = renderFormattedText(content);
+    bubble.append(formattedContent);
+
+    if (role === 'assistant' && lowConfidence) {
+        appendLowConfidenceMarker(bubble);
+    }
 
     if (sources.length > 0) {
         bubble.append(createSources(sources));
     }
 
     article.append(bubble);
+
+    if (role === 'assistant' && typeof options.onFeedback === 'function') {
+        article.append(createResponseActions(options.onFeedback, { lowConfidence }));
+    }
+
     return article;
 }
 
@@ -59,4 +74,110 @@ export function createSources(sources) {
 
     wrapper.append(heading, list);
     return wrapper;
+}
+
+function createResponseActions(onFeedback, { lowConfidence = false } = {}) {
+    const actions = document.createElement('div');
+    actions.className = 'response-actions';
+    actions.setAttribute('aria-label', 'Response feedback');
+
+    const upButton = createActionButton({
+        label: 'Thumbs up',
+        icon: 'bi-hand-thumbs-up',
+        value: 'thumbs_up',
+    });
+
+    const downButton = createActionButton({
+        label: 'Thumbs down',
+        icon: 'bi-hand-thumbs-down',
+        value: 'thumbs_down',
+    });
+
+    const unresolvedButton = createActionButton({
+        label: 'Mark unresolved',
+        value: 'unresolved',
+        text: 'Mark unresolved',
+    });
+
+    actions.append(upButton, downButton, unresolvedButton);
+
+    if (lowConfidence) {
+        const note = document.createElement('span');
+        note.className = 'low-confidence-note';
+        note.textContent = 'This generated response might not be accurate. Double check it';
+        actions.append(note);
+    }
+
+    actions.addEventListener('click', async (event) => {
+        const button = event.target.closest('button[data-feedback]');
+
+        if (!button || button.disabled) {
+            return;
+        }
+
+        const buttons = actions.querySelectorAll('button');
+        buttons.forEach((item) => {
+            item.disabled = true;
+            item.classList.remove('selected');
+        });
+
+        button.classList.add('selected');
+        actions.dataset.status = 'saving';
+
+        try {
+            await onFeedback(button.dataset.feedback);
+            actions.dataset.status = 'saved';
+        } catch (error) {
+            buttons.forEach((item) => {
+                item.disabled = false;
+            });
+            button.classList.remove('selected');
+            actions.dataset.status = 'error';
+            actions.title = error.message;
+        }
+    });
+
+    return actions;
+}
+
+function appendLowConfidenceMarker(bubble) {
+    const marker = document.createElement('i');
+    marker.className = 'low-confidence-marker';
+    marker.classList.add('bi', 'bi-exclamation-triangle-fill');
+    marker.setAttribute('aria-label', 'Low confidence warning');
+    marker.title = 'This generated response might not be accurate. Double check it';
+
+    const candidates = [...bubble.querySelectorAll('p, li, h3, h4, h5')];
+    const target = candidates[candidates.length - 1];
+
+    if (target) {
+        target.append(document.createTextNode(' '), marker);
+        return;
+    }
+
+    bubble.append(marker);
+}
+
+function createActionButton({ label, icon, value, text }) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'response-action-button';
+    button.dataset.feedback = value;
+    button.setAttribute('aria-label', label);
+    button.title = label;
+
+    if (icon) {
+        const iconEl = document.createElement('i');
+        iconEl.className = `bi ${icon}`;
+        iconEl.setAttribute('aria-hidden', 'true');
+        button.append(iconEl);
+    }
+
+    if (text) {
+        const textEl = document.createElement('span');
+        textEl.textContent = text;
+        button.append(textEl);
+    }
+
+    return button;
 }

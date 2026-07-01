@@ -8,6 +8,7 @@ import appRoutes from "./src/modules/apps/app.route.js";
 import chatRoutes from "./src/modules/chat/chat.route.js";
 import chatSessionRoutes from "./src/modules/chat/chatSession/chatSession.route.js";
 import chatMessageRoutes from "./src/modules/chat/chatMessages/chatMessage.route.js";
+import chatResponseAuditRoutes from "./src/modules/chat/chatResponseAudits/chatResponseAudit.route.js";
 import toolRoutes from "./src/modules/tool/tool.route.js";
 import documentChunkRoutes from "./src/modules/knowledge/documentChunk/documentChunk.route.js";
 import knowledgeDocumentRoutes from "./src/modules/knowledge/knowledgeDocument/knowledgeDocument.route.js";
@@ -25,6 +26,11 @@ import { db } from "./src/database/db.js";
 
 dotenv.config({ path: "./config/.env" });
 db.testConnection();
+try {
+  await db.ensureChatMessageConfidenceColumns();
+} catch (error) {
+  console.error("Unable to ensure chat message confidence columns:", error);
+}
 
 const app = express();
 
@@ -48,6 +54,7 @@ app.use("/api/apps", appRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/chat/sessions", chatSessionRoutes);
 app.use("/api/chat/messages", chatMessageRoutes);
+app.use("/api/chat/response-audits", chatResponseAuditRoutes);
 app.use("/api/tool", toolRoutes);
 app.use("/api/documentChunk", documentChunkRoutes);
 app.use("/api/knowledge_document", knowledgeDocumentRoutes);

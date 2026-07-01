@@ -21,7 +21,7 @@ async function verifyActiveProjectApp(projectId, projectKey) {
 export async function verifyProjectAndSessionKey(req, res, next) {
     try {
         const projectKey = req.headers['x-project-key'];
-        const { session_id } = req.body;
+        const session_id = req.body?.session_id ?? req.body?.chat_session_id;
 
         if (!projectKey) {
             return res.status(401).json({ message: 'Project key is required' });

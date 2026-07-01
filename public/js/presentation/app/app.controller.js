@@ -6,7 +6,11 @@ import {
     clearAuth,
 } from '../../domain/use-cases/auth.use-cases.js';
 
-import { sendMessage } from '../../domain/use-cases/chat.use-cases.js';
+import {
+    createChatResponseAudit,
+    fetchQueryQualityAnalytics,
+    sendMessage,
+} from '../../domain/use-cases/chat.use-cases.js';
 import {
     createProject,
     fetchProject,
@@ -37,6 +41,7 @@ import { createChatScreen } from './screens/chat.screen.js';
 import { renderCreateUserScreen } from './screens/admin-create-user.screen.js';
 import { renderProjectEnvironmentsScreen } from './screens/project-environments.screen.js';
 import { renderProjectAppsScreen } from './screens/project-apps.screen.js';
+import { renderAnalyticsDashboardScreen } from './screens/analytics-dashboard.screen.js';
 import { renderProjectKnowledgeScreen } from './screens/project-knowledge.screen.js';
 import { renderProjectPromptScreen } from './screens/project-prompt.screen.js';
 import { renderProjectToolsScreen } from './screens/project-tools.screen.js';
@@ -579,11 +584,41 @@ function initializeRoleView() {
         projectName.hidden = false;
         projectName.textContent = 'Dashboard';
         setSidebarSelection('menu', 'dashboard');
-        renderPlaceholder('Dashboard', 'Admin dashboard is coming soon.');
+        loadAnalyticsDashboard({
+            title: 'Query Metrics',
+            description: 'How well ANDI performs across project knowledge sources',
+            includeProjectFilter: false,
+        }).catch((error) => {
+            renderPlaceholder('Analytics unavailable', error.message);
+        });
         return;
     }
 
     initializeProjectOwnerChat();
+}
+
+async function loadAnalyticsDashboard({
+    title = 'Query Metrics',
+    description = 'How well does ANDI perform based on ingested knowledge',
+    includeProjectFilter = true,
+} = {}) {
+    renderAnalyticsDashboardScreen(appContext, {
+        title,
+        description,
+        loading: true,
+    });
+
+    const analytics = await fetchQueryQualityAnalytics({
+        project_id: includeProjectFilter ? state.activeProjectId : null,
+        environment_id: state.selectedEnvironmentId,
+        days: 14,
+    });
+
+    renderAnalyticsDashboardScreen(appContext, {
+        title,
+        description,
+        data: analytics,
+    });
 }
 
 // ─── Event listeners: chat form ───────────────────────────────────────────────
@@ -606,7 +641,21 @@ form.addEventListener('submit', async (event) => {
 
     try {
         const data = await sendMessage(state.sessionId, message);
-        typing.replaceWith(createMessage('assistant', data.content, data.sources));
+        typing.replaceWith(createMessage(
+            'assistant',
+            data.content,
+            data.sources,
+            {
+                lowConfidence: data.low_confidence,
+                onFeedback: (feedback) => createChatResponseAudit(
+                    buildResponseAuditPayload({
+                        feedback,
+                        sessionId: data.session_id ?? state.sessionId,
+                        messageId: data.id,
+                    })
+                ),
+            },
+        ));
         await refreshSessions();
     } catch (error) {
         typing.replaceWith(createMessage('assistant', error.message));
@@ -616,6 +665,29 @@ form.addEventListener('submit', async (event) => {
         scrollToBottom(messages);
     }
 });
+
+function buildResponseAuditPayload({ feedback, sessionId, messageId }) {
+    const payload = {
+        chat_session_id: sessionId,
+        message_id: messageId,
+    };
+
+    if (feedback === 'thumbs_up') {
+        payload.user_feedback = 'positive';
+        payload.quality_status = 'normal';
+        return payload;
+    }
+
+    if (feedback === 'thumbs_down') {
+        payload.user_feedback = 'negative';
+        payload.quality_status = 'needs_review';
+        return payload;
+    }
+
+    payload.quality_status = 'unresolved';
+    payload.audit_reason = 'Marked unresolved from chat screen';
+    return payload;
+}
 
 input.addEventListener('input', () => resizeTextarea(input));
 
@@ -845,23 +917,39 @@ projectKnowledgeButton.addEventListener('click', async () => {
     }
 });
 
-analyticsButton.addEventListener('click', () => {
+analyticsButton.addEventListener('click', async () => {
     state.adminProjectView = null;
     projectName.hidden = false;
     adminProjectField.hidden = true;
     projectName.textContent = 'Analytics';
     setSidebarSelection('menu', 'analytics');
-    renderPlaceholder('Analytics', 'Project analytics are coming soon.');
+
+    try {
+        if (!state.activeProjectId) {
+            await initializeProjectOwnerContext();
+        }
+        await loadAnalyticsDashboard();
+    } catch (error) {
+        renderPlaceholder('Analytics unavailable', error.message);
+    }
 });
 
-adminDashboardButton.addEventListener('click', () => {
+adminDashboardButton.addEventListener('click', async () => {
     state.adminProjectView = null;
     renderHistory();
     projectName.hidden = false;
     adminProjectField.hidden = true;
     projectName.textContent = 'Dashboard';
     setSidebarSelection('menu', 'dashboard');
-    renderPlaceholder('Dashboard', 'Admin dashboard is coming soon.');
+    try {
+        await loadAnalyticsDashboard({
+            title: 'Query Metrics',
+            description: 'How well ANDI performs across project knowledge sources',
+            includeProjectFilter: false,
+        });
+    } catch (error) {
+        renderPlaceholder('Analytics unavailable', error.message);
+    }
 });
 
 adminProjectsButton.addEventListener('click', () => {
