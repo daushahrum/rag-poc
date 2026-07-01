@@ -11,6 +11,11 @@ import * as toolRepository from '../tool/tool.repository.js';
 import * as projectRepository from '../project/project.repository.js';
 import * as projectEnvironmentRepository from '../project/projectEnvironment/projectEnvironment.repository.js';
 import * as chatResponseAuditService from './chatResponseAudits/chatResponseAudit.service.js';
+import {
+    buildConfidenceAuditReason,
+    classifyConfidence,
+    topChunksLookUnrelated,
+} from './confidence.service.js';
 
 export async function sendMessage(session_id, message, userToken, isPortalAdmin) {
     if (!session_id) {
@@ -121,6 +126,7 @@ const { project_id, environment_id } = session;
     }
 
     const confidence = await evaluateLowConfidence({
+        query: message,
         answer: assistantMessage.content,
         chunks,
     });
@@ -131,78 +137,203 @@ const { project_id, environment_id } = session;
         role: 'assistant',
         content: assistantMessage.content,
         low_confidence: confidence.low_confidence,
-        confidence_reasons: confidence.reasons,
+        confidence_reasons: {
+            score: confidence.score,
+            classification: confidence.classification,
+            reasons: confidence.reasons,
+            signals: confidence.signals,
+        },
     });
 
-    if (confidence.low_confidence) {
-        await createLowConfidenceAudit({
-            session_id,
-            message_id: savedMessage.id,
-            confidence,
-        });
-    }
+    await createConfidenceAudit({
+        session_id,
+        message_id: savedMessage.id,
+        confidence,
+    });
 
     return savedMessage;
 }
 
-async function evaluateLowConfidence({ answer, chunks }) {
+async function evaluateLowConfidence({ query, answer, chunks }) {
+    const signals = [];
     const reasons = [];
+    const hardLowConfidenceReasons = [];
     const normalizedChunks = Array.isArray(chunks) ? chunks : [];
     const topSimilarity = normalizedChunks.length > 0
         ? Number(normalizedChunks[0]?.similarity ?? 0)
         : 0;
+    const secondSimilarity = normalizedChunks.length > 1
+        ? Number(normalizedChunks[1]?.similarity ?? 0)
+        : null;
+    let score = Math.min(0.95, Math.max(0, topSimilarity || 0));
 
     if (normalizedChunks.length === 0) {
-        reasons.push('no_chunks_found');
-    }
-
-    if (normalizedChunks.length > 0 && topSimilarity < 0.65) {
-        reasons.push('top_similarity_below_0_65');
+        score = 0;
+        signals.push(createConfidenceSignal('no_chunks_found', -0.8));
+        hardLowConfidenceReasons.push('no_chunks_found');
     }
 
     if (isDontKnowAnswer(answer)) {
-        reasons.push('andi_answered_i_dont_know');
+        signals.push(createConfidenceSignal('andi_answered_i_dont_know', -0.8));
+        hardLowConfidenceReasons.push('andi_answered_i_dont_know');
+    }
+
+    if (normalizedChunks.length > 0) {
+        if (queryKeywordsAppearInChunks(query, normalizedChunks)) {
+            signals.push(createConfidenceSignal('query_keyword_or_entity_found_in_chunks', 0.08));
+        }
+
+        if (hasStrongSimilarityGap(topSimilarity, secondSimilarity)) {
+            signals.push(createConfidenceSignal('top_result_has_strong_gap_from_second', 0.07));
+        }
+
+        if (chunkContainsDirectAnswerWords(normalizedChunks[0])) {
+            signals.push(createConfidenceSignal('top_chunk_contains_direct_answer_words', 0.06));
+        }
+
+        if (normalizedChunks.some((chunk) => chunk.project_id)) {
+            signals.push(createConfidenceSignal('retrieved_chunk_from_trusted_project_document', 0.05));
+        }
+
+        if (hasVaguePronouns(query)) {
+            signals.push(createConfidenceSignal('query_uses_vague_pronouns', -0.08));
+        }
+
+        if (hasCloseSimilarityScores(topSimilarity, secondSimilarity)) {
+            signals.push(createConfidenceSignal('top_score_and_second_score_are_close', -0.08));
+        }
+
+        if (topChunksLookUnrelated(normalizedChunks)) {
+            signals.push(createConfidenceSignal('top_chunks_from_unrelated_documents', -0.12));
+        }
     }
 
     if (normalizedChunks.length > 0) {
         const verifierResult = await verifyRetrievedEvidence({
+            query,
             answer,
             chunks: normalizedChunks.slice(0, 5),
         });
 
         if (verifierResult.direct_answer_present === false) {
-            reasons.push('chunks_do_not_contain_direct_answer');
+            signals.push(createConfidenceSignal('chunks_do_not_contain_direct_answer', -0.22));
+            hardLowConfidenceReasons.push('chunks_do_not_contain_direct_answer');
         }
 
         if (verifierResult.chunks_contradict === true) {
-            reasons.push('top_chunks_contradict_each_other');
+            signals.push(createConfidenceSignal('top_chunks_contradict_each_other', -0.28));
+            hardLowConfidenceReasons.push('top_chunks_contradict_each_other');
+        }
+
+        if (verifierResult.multiple_chunks_agree === true) {
+            signals.push(createConfidenceSignal('multiple_retrieved_chunks_agree', 0.1));
+        }
+
+        if (verifierResult.requires_missing_policy_or_process === true) {
+            signals.push(createConfidenceSignal('answer_requires_policy_or_process_not_present_in_kb', -0.18));
+        }
+
+        if (verifierResult.partially_answers_question === true) {
+            signals.push(createConfidenceSignal('retrieved_text_only_partially_answers_question', -0.14));
         }
     }
 
+    score = Math.min(1, Math.max(0, score + signals.reduce(
+        (total, signal) => total + signal.weight,
+        0,
+    )));
+
+    const classification = classifyConfidence({
+        chunks: normalizedChunks,
+        confidenceScore: score,
+        hardLowConfidenceReasons,
+    });
+
+    reasons.push(classification.reason, ...hardLowConfidenceReasons);
+
     return {
-        low_confidence: reasons.length > 0,
+        low_confidence: classification.show_low_confidence_marker,
+        score,
+        classification,
+        signals,
         reasons: [...new Set(reasons)],
         retrieval_score: normalizedChunks.length > 0 ? topSimilarity : null,
         retrieved_chunk_count: normalizedChunks.length,
     };
 }
 
-async function createLowConfidenceAudit({ session_id, message_id, confidence }) {
+async function createConfidenceAudit({ session_id, message_id, confidence }) {
     try {
         await chatResponseAuditService.createChatResponseAudit({
             chat_session_id: session_id,
             message_id,
             retrieval_score: confidence.retrieval_score,
             retrieved_chunk_count: confidence.retrieved_chunk_count,
-            confidence_level: 'low',
-            quality_status: 'needs_review',
-            audit_reason: `Automatically marked low confidence: ${confidence.reasons.join(', ')}`,
+            confidence_level: confidence.classification.confidence_level,
+            quality_status: confidence.classification.quality_status,
+            audit_reason: buildConfidenceAuditReason(confidence),
             reviewed_by: 'system',
             reviewed_at: new Date(),
         });
     } catch (error) {
-        console.error('Failed to create low confidence audit:', error.message);
+        console.error('Failed to create confidence audit:', error.message);
     }
+}
+
+function createConfidenceSignal(reason, weight) {
+    return { reason, weight };
+}
+
+function normalizeForKeywordMatch(value = '') {
+    return String(value)
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function getQueryKeywords(query = '') {
+    const stopWords = new Set([
+        'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from', 'how',
+        'i', 'in', 'is', 'it', 'of', 'on', 'or', 'the', 'to', 'was', 'what',
+        'when', 'where', 'which', 'who', 'why', 'with',
+    ]);
+
+    return normalizeForKeywordMatch(query)
+        .split(' ')
+        .filter((word) => word.length > 2 && !stopWords.has(word));
+}
+
+function queryKeywordsAppearInChunks(query, chunks) {
+    const keywords = getQueryKeywords(query);
+
+    if (keywords.length === 0) {
+        return false;
+    }
+
+    const combinedChunkText = normalizeForKeywordMatch(
+        chunks.slice(0, 3).map((chunk) => chunk.content).join(' '),
+    );
+
+    return keywords.some((keyword) => combinedChunkText.includes(keyword));
+}
+
+function hasStrongSimilarityGap(topSimilarity, secondSimilarity) {
+    return secondSimilarity !== null && topSimilarity - secondSimilarity >= 0.08;
+}
+
+function hasCloseSimilarityScores(topSimilarity, secondSimilarity) {
+    return secondSimilarity !== null && Math.abs(topSimilarity - secondSimilarity) <= 0.03;
+}
+
+function chunkContainsDirectAnswerWords(chunk) {
+    const text = normalizeForKeywordMatch(chunk?.content);
+
+    return /\b(is|means|lives|can|cannot|allowed|not allowed)\b/.test(text);
+}
+
+function hasVaguePronouns(query = '') {
+    return /\b(it|this|that|there)\b/i.test(query);
 }
 
 function isDontKnowAnswer(answer = '') {
@@ -212,10 +343,13 @@ function isDontKnowAnswer(answer = '') {
         || /\bi(?:'|’)m\s+not\s+sure\b/.test(normalized);
 }
 
-async function verifyRetrievedEvidence({ answer, chunks }) {
+async function verifyRetrievedEvidence({ query, answer, chunks }) {
     const fallback = {
         direct_answer_present: true,
         chunks_contradict: false,
+        multiple_chunks_agree: false,
+        requires_missing_policy_or_process: false,
+        partially_answers_question: false,
     };
 
     try {
@@ -229,19 +363,28 @@ async function verifyRetrievedEvidence({ answer, chunks }) {
 Return only JSON with:
 {
   "direct_answer_present": boolean,
-  "chunks_contradict": boolean
+  "chunks_contradict": boolean,
+  "multiple_chunks_agree": boolean,
+  "requires_missing_policy_or_process": boolean,
+  "partially_answers_question": boolean
 }
 
 Set direct_answer_present to true only when at least one chunk directly contains the information needed for the assistant's answer.
-Set chunks_contradict to true when the top chunks make conflicting claims about the same answer-critical fact.`,
+Set chunks_contradict to true when the top chunks make conflicting claims about the same answer-critical fact.
+Set multiple_chunks_agree to true when two or more chunks support the same answer-critical fact.
+Set requires_missing_policy_or_process to true when the user asks for a policy/process/permission/requirement and the chunks do not contain that policy/process.
+Set partially_answers_question to true when the chunks answer only part of what the user asked.`,
                 },
                 {
                     role: 'user',
                     content: JSON.stringify({
+                        query,
                         answer,
                         chunks: chunks.map((chunk, index) => ({
                             rank: index + 1,
                             similarity: chunk.similarity,
+                            document_id: chunk.document_id,
+                            document_title: chunk.document_title,
                             content: chunk.content,
                         })),
                     }),
@@ -258,6 +401,15 @@ Set chunks_contradict to true when the top chunks make conflicting claims about 
             chunks_contradict: typeof parsed.chunks_contradict === 'boolean'
                 ? parsed.chunks_contradict
                 : fallback.chunks_contradict,
+            multiple_chunks_agree: typeof parsed.multiple_chunks_agree === 'boolean'
+                ? parsed.multiple_chunks_agree
+                : fallback.multiple_chunks_agree,
+            requires_missing_policy_or_process: typeof parsed.requires_missing_policy_or_process === 'boolean'
+                ? parsed.requires_missing_policy_or_process
+                : fallback.requires_missing_policy_or_process,
+            partially_answers_question: typeof parsed.partially_answers_question === 'boolean'
+                ? parsed.partially_answers_question
+                : fallback.partially_answers_question,
         };
     } catch (error) {
         console.error('Failed to verify retrieved evidence:', error.message);

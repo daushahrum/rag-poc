@@ -71,6 +71,8 @@ export async function similaritySearch(embedding, project_id, limit = 5) {
         SELECT
             dc.id,
             dc.document_id,
+            kd.title AS document_title,
+            kd.project_id,
             dc.content,
             dc.chunk_index,
             1 - (dc.embedding <=> :embedding::vector) AS similarity

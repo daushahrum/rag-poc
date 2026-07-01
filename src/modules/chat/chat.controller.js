@@ -1,6 +1,7 @@
 // modules/chat/chat.controller.js
 
 import * as chatService from './chat.service.js';
+import { serializePublicChatMessage } from './chatMessage.serializer.js';
 
 export async function sendMessage(req, res) {
 
@@ -20,7 +21,11 @@ export async function sendMessage(req, res) {
         console.log('calling send message with\nuser token:', userToken, '\nisPortalAdmin:',isPortalAdmin)
         const result = await chatService.sendMessage(session_id, message, userToken, isPortalAdmin);
 
-        return res.json(result);
+        return res.json(
+            routeSource === 'public'
+                ? serializePublicChatMessage(result)
+                : result
+        );
     } catch (error) {
         return res.status(400).json({
             message: error.message,
