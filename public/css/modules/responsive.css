@@ -169,6 +169,28 @@
     grid-template-columns: minmax(0, 1fr) auto auto 30px;
   }
 
+  .analytics-topic-chart-section {
+    padding: 14px;
+  }
+
+  .analytics-topic-chart-row {
+    grid-template-columns: 1fr;
+    gap: 9px;
+  }
+
+  .analytics-topic-chart-stats {
+    justify-content: flex-start;
+  }
+
+  .analytics-feedback-chart-section {
+    padding: 14px;
+  }
+
+  .analytics-feedback-bar-row {
+    grid-template-columns: minmax(76px, 104px) minmax(0, 1fr);
+    gap: 8px;
+  }
+
   .analytics-side-panel {
     max-height: none;
     overflow: visible;

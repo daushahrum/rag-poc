@@ -88,6 +88,120 @@ function createEmptyState(text) {
     return empty;
 }
 
+function bucketFeedbackByTopic(rows) {
+    const buckets = new Map();
+
+    rows.forEach((row) => {
+        const topic = row.topic || 'Unknown';
+
+        if (!buckets.has(topic)) {
+            buckets.set(topic, { topic, positive: 0, negative: 0 });
+        }
+
+        const bucket = buckets.get(topic);
+
+        if (row.user_feedback === 'positive') {
+            bucket.positive += 1;
+        } else if (row.user_feedback === 'negative') {
+            bucket.negative += 1;
+        }
+    });
+
+    return Array.from(buckets.values())
+        .sort((a, b) => (b.positive + b.negative) - (a.positive + a.negative)); // busiest topics first
+}
+
+function hasTopicBreakdown(data) {
+    return Array.isArray(data?.topic_breakdown);
+}
+
+function getFeedbackChartBuckets(rows, activeMetric) {
+    const countKey = activeMetric === 'negative'
+        ? 'negative_feedback_count'
+        : 'positive_feedback_count';
+
+    if (rows.some((row) => Object.prototype.hasOwnProperty.call(row, countKey))) {
+        return rows
+            .map((row) => ({
+                topic: row.topic,
+                count: Number(row[countKey] ?? 0),
+            }))
+            .filter((bucket) => bucket.count > 0)
+            .sort((a, b) => b.count - a.count);
+    }
+
+    return bucketFeedbackByTopic(rows)
+        .map((bucket) => ({
+            topic: bucket.topic,
+            count: activeMetric === 'negative' ? bucket.negative : bucket.positive,
+        }))
+        .filter((bucket) => bucket.count > 0)
+        .sort((a, b) => b.count - a.count);
+}
+
+function createFeedbackChartSection({ rows = [], activeMetric }) {
+    const panel = document.createElement('div');
+    panel.className = 'analytics-feedback-chart-panel';
+
+    const buckets = getFeedbackChartBuckets(rows, activeMetric);
+
+    const header = document.createElement('div');
+    header.className = 'analytics-detail-header';
+
+    const title = document.createElement('h3');
+    title.textContent = activeMetric === 'negative'
+        ? `Negative Feedback by Topic (${buckets.length})`
+        : `Positive Feedback by Topic (${buckets.length})`;
+    header.append(title);
+
+    const section = document.createElement('section');
+    section.className = `analytics-detail-section analytics-feedback-chart-section ${activeMetric}`;
+
+    panel.append(header, section);
+
+    if (buckets.length === 0) {
+        section.append(createEmptyState(`No ${activeMetric} feedback data yet.`));
+        return panel;
+    }
+
+    const maxCount = Math.max(...buckets.map((bucket) => bucket.count), 1);
+
+    const chart = document.createElement('div');
+    chart.className = 'analytics-feedback-bars';
+
+    buckets.slice(0, 12).forEach((bucket) => {
+        const width = Math.max(4, Math.round((bucket.count / maxCount) * 100));
+        const row = document.createElement('div');
+        row.className = 'analytics-feedback-bar-row';
+
+        const label = document.createElement('div');
+        label.className = 'analytics-feedback-bar-label';
+        const topic = document.createElement('strong');
+        topic.textContent = bucket.topic || 'Unknown';
+        label.append(topic);
+
+        const track = document.createElement('div');
+        track.className = 'analytics-feedback-bar-track';
+
+        const bar = document.createElement('div');
+        bar.className = `analytics-feedback-bar ${activeMetric}`;
+        bar.style.width = `${width}%`;
+
+        const count = document.createElement('span');
+        count.className = 'analytics-feedback-bar-count';
+        count.textContent = formatCount(bucket.count);
+        bar.append(count);
+
+        track.append(bar);
+        row.append(label, track);
+        chart.append(row);
+    });
+
+    section.append(chart);
+
+    return panel;
+}
+
 function buildMetrics(data) {
     const counts = data?.counts ?? {};
 
@@ -772,6 +886,11 @@ function createInitialAnalyticsView(previousActiveMetric = 'unresolved') {
         lowConfidenceError: null,
         detailMode: null,
         detailAuditId: null,
+        feedbackRows: [],
+        feedbackChartMode: null,
+        feedbackChartLoading: false,
+        feedbackChartLoaded: false,
+        feedbackChartError: null,
     };
 }
 
@@ -875,6 +994,18 @@ export function renderAnalyticsDashboardScreen(context, options = {}) {
 
             if (metricKey === 'low_confidence' && !state.analyticsView.lowConfidenceLoaded) {
                 await loadLowConfidenceRows(context, options);
+                return;
+            }
+
+            if (
+                (metricKey === 'positive' || metricKey === 'negative')
+                && !hasTopicBreakdown(data)
+                && (
+                    !state.analyticsView.feedbackChartLoaded
+                    || state.analyticsView.feedbackChartMode !== metricKey
+                )
+            ) {
+                await loadFeedbackRows(context, options);
                 return;
             }
 
@@ -1005,6 +1136,26 @@ export function renderAnalyticsDashboardScreen(context, options = {}) {
         }
     }
 
+    if (state.analyticsView.activeMetric === 'positive' || state.analyticsView.activeMetric === 'negative') {
+        if (hasTopicBreakdown(data)) {
+            content.append(createFeedbackChartSection({
+                rows: data.topic_breakdown,
+                activeMetric: state.analyticsView.activeMetric,
+            }));
+        } else if (state.analyticsView.feedbackChartLoading) {
+            // content.append(createEmptyState('Loading feedback trend...'));
+        } else if (state.analyticsView.feedbackChartError) {
+            content.append(createEmptyState(state.analyticsView.feedbackChartError));
+        } else if (!state.analyticsView.feedbackChartLoaded) {
+            // content.append(createEmptyState('Loading feedback trend...'));
+        } else {
+            content.append(createFeedbackChartSection({
+                rows: state.analyticsView.feedbackRows,
+                activeMetric: state.analyticsView.activeMetric,
+            }));
+        }
+    }
+
     screen.append(content);
 
     if (selectedDetail.audit) {
@@ -1037,6 +1188,16 @@ export function renderAnalyticsDashboardScreen(context, options = {}) {
         && !state.analyticsView.lowConfidenceError
     ) {
         loadLowConfidenceRows(context, options);
+    }
+
+    if (
+        (state.analyticsView.activeMetric === 'positive' || state.analyticsView.activeMetric === 'negative')
+        && !hasTopicBreakdown(data)
+        && !state.analyticsView.feedbackChartLoading
+        && !state.analyticsView.feedbackChartLoaded
+        && !state.analyticsView.feedbackChartError
+    ) {
+        loadFeedbackRows(context, options);
     }
 }
 
@@ -1092,6 +1253,35 @@ async function loadLowConfidenceRows(context, options = {}) {
         state.analyticsView.lowConfidenceLoaded = true;
     } finally {
         state.analyticsView.lowConfidenceLoading = false;
+        renderAnalyticsDashboardScreen(context, options);
+    }
+}
+
+async function loadFeedbackRows(context, options = {}) {
+    const { state } = context;
+    const feedback = state.analyticsView.activeMetric === 'negative' ? 'negative' : 'positive';
+
+    if (state.analyticsView.feedbackChartLoading) {
+        return;
+    }
+
+    state.analyticsView.feedbackChartLoading = true;
+    state.analyticsView.feedbackChartError = null;
+    renderAnalyticsDashboardScreen(context, options);
+
+    try {
+        state.analyticsView.feedbackRows = await fetchChatResponseAudits({
+            project_id: options.includeProjectFilter === false ? null : state.activeProjectId,
+            environment_id: state.selectedEnvironmentId,
+            user_feedback: feedback,
+        });
+        state.analyticsView.feedbackChartMode = feedback;
+        state.analyticsView.feedbackChartLoaded = true;
+    } catch (error) {
+        state.analyticsView.feedbackChartError = error.message;
+        state.analyticsView.feedbackChartLoaded = true;
+    } finally {
+        state.analyticsView.feedbackChartLoading = false;
         renderAnalyticsDashboardScreen(context, options);
     }
 }
