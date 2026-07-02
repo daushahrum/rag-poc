@@ -1,5 +1,7 @@
 import { fetchChatResponseAudits } from '../../../domain/use-cases/chat.use-cases.js';
 
+const analyticsTablePageSize = 10;
+
 const confidenceReasonLabels = {
     chunks_do_not_contain_direct_answer: 'No direct answer found in retrieved knowledge',
     top_chunks_contradict_each_other: 'Retrieved knowledge has conflicting information',
@@ -264,6 +266,45 @@ function createBadgeDetailField(label, badge) {
     return field;
 }
 
+// function createTopicBreakdown(topicRows = []) {
+//     const section = document.createElement('section');
+//     section.className = 'analytics-section';
+
+//     const title = document.createElement('h3');
+//     title.textContent = 'Topics';
+//     section.append(title);
+
+//     if (!Array.isArray(topicRows) || topicRows.length === 0) {
+//         section.append(createEmptyState('No topic data yet.'));
+//         return section;
+//     }
+
+//     const list = document.createElement('div');
+//     list.className = 'analytics-query-list';
+
+//     topicRows.slice(0, 8).forEach((row) => {
+//         const item = document.createElement('div');
+//         item.className = 'analytics-query-row';
+
+//         const text = document.createElement('div');
+//         const name = document.createElement('strong');
+//         name.textContent = row.topic || 'Unknown';
+//         const meta = document.createElement('span');
+//         meta.textContent = `${formatCount(row.query_count)} queries · ${formatCount(row.low_confidence_count)} low confidence · ${formatCount(row.unresolved_count)} unresolved`;
+//         text.append(name, meta);
+
+//         const badge = createStatusBadge(`${formatCount(row.negative_feedback_count)} negative`, {
+//             tone: row.negative_feedback_count > 0 ? 'needs-review' : 'normal',
+//         });
+
+//         item.append(text, badge);
+//         list.append(item);
+//     });
+
+//     section.append(list);
+//     return section;
+// }
+
 function createReasonDetailField(label, reasonKey) {
     const field = document.createElement('div');
     field.className = 'analytics-side-field multiline';
@@ -322,6 +363,7 @@ function createSelectedAuditPanel({ audit, mode, onClose }) {
         })),
         createDetailField('Retrieval', formatScore(audit.retrieval_score)),
         createDetailField('Score', formatScore(getConfidenceScore(audit))),
+        createDetailField('Topic', audit.topic || 'Unknown'),
         createDetailField('User', getAuditUserLabel(audit)),
         createDetailField('Created', formatRelativeTime(audit.created_at)),
     );
@@ -371,17 +413,73 @@ function createSelectedAuditPanel({ audit, mode, onClose }) {
 function createSelectionHeaderCheckbox({ rows, selectedIds, label, onToggleAll }) {
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
-    checkbox.checked = rows.length > 0 && selectedIds.size === rows.length;
-    checkbox.indeterminate = selectedIds.size > 0 && selectedIds.size < rows.length;
+    const selectedVisibleCount = rows.filter((row) => selectedIds.has(String(row.id))).length;
+    checkbox.checked = rows.length > 0 && selectedVisibleCount === rows.length;
+    checkbox.indeterminate = selectedVisibleCount > 0 && selectedVisibleCount < rows.length;
     checkbox.disabled = rows.length === 0;
     checkbox.setAttribute('aria-label', label);
     checkbox.addEventListener('change', onToggleAll);
     return checkbox;
 }
 
-function createUnresolvedTable({ rows, selectedIds, detailAuditId, onOpenDetail, onToggle, onToggleAll }) {
+function getTotalPages(rows) {
+    return Math.max(1, Math.ceil(rows.length / analyticsTablePageSize));
+}
+
+function getPageRows(rows, page) {
+    const safePage = Math.min(Math.max(Number(page) || 1, 1), getTotalPages(rows));
+    const start = (safePage - 1) * analyticsTablePageSize;
+    return rows.slice(start, start + analyticsTablePageSize);
+}
+
+function createTablePagination({ rows, page, onPageChange }) {
+    const totalPages = getTotalPages(rows);
+    const safePage = Math.min(Math.max(Number(page) || 1, 1), totalPages);
+    const start = rows.length === 0 ? 0 : ((safePage - 1) * analyticsTablePageSize) + 1;
+    const end = Math.min(safePage * analyticsTablePageSize, rows.length);
+
+    const pagination = document.createElement('div');
+    pagination.className = 'analytics-table-pagination';
+
+    const summary = document.createElement('span');
+    summary.textContent = rows.length === 0
+        ? 'Showing 0 results'
+        : `Showing ${formatCount(start)}-${formatCount(end)} of ${formatCount(rows.length)}`;
+
+    const controls = document.createElement('div');
+    controls.className = 'analytics-pagination-controls';
+
+    const previousButton = document.createElement('button');
+    previousButton.type = 'button';
+    previousButton.className = 'analytics-pagination-button';
+    previousButton.disabled = safePage <= 1;
+    previousButton.title = 'Previous page';
+    previousButton.setAttribute('aria-label', 'Previous page');
+    previousButton.innerHTML = '<i class="bi bi-chevron-left" aria-hidden="true"></i>';
+    previousButton.addEventListener('click', () => onPageChange(safePage - 1));
+
+    const pageLabel = document.createElement('span');
+    pageLabel.className = 'analytics-pagination-page';
+    pageLabel.textContent = `Page ${formatCount(safePage)} of ${formatCount(totalPages)}`;
+
+    const nextButton = document.createElement('button');
+    nextButton.type = 'button';
+    nextButton.className = 'analytics-pagination-button';
+    nextButton.disabled = safePage >= totalPages;
+    nextButton.title = 'Next page';
+    nextButton.setAttribute('aria-label', 'Next page');
+    nextButton.innerHTML = '<i class="bi bi-chevron-right" aria-hidden="true"></i>';
+    nextButton.addEventListener('click', () => onPageChange(safePage + 1));
+
+    controls.append(previousButton, pageLabel, nextButton);
+    pagination.append(summary, controls);
+    return pagination;
+}
+
+function createUnresolvedTable({ rows, page, selectedIds, detailAuditId, onPageChange, onOpenDetail, onToggle, onToggleAll }) {
     const section = document.createElement('section');
     section.className = 'analytics-detail-section';
+    const pageRows = getPageRows(rows, page);
 
     const header = document.createElement('div');
     header.className = 'analytics-detail-header';
@@ -398,12 +496,12 @@ function createUnresolvedTable({ rows, selectedIds, detailAuditId, onOpenDetail,
 
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
-    ['select', 'User Query', 'Response', 'User', 'Created At', 'Status'].forEach((label, index) => {
+    ['select', 'User Query', 'Response', 'Topic', 'User', 'Created At', 'Status'].forEach((label, index) => {
         const th = document.createElement('th');
 
         if (index === 0) {
             th.append(createSelectionHeaderCheckbox({
-                rows,
+                rows: pageRows,
                 selectedIds,
                 label: 'Select all unresolved queries',
                 onToggleAll,
@@ -421,13 +519,13 @@ function createUnresolvedTable({ rows, selectedIds, detailAuditId, onOpenDetail,
     if (rows.length === 0) {
         const emptyRow = document.createElement('tr');
         const emptyCell = document.createElement('td');
-        emptyCell.colSpan = 6;
+        emptyCell.colSpan = 7;
         emptyCell.className = 'analytics-table-empty';
         emptyCell.textContent = 'No unresolved queries.';
         emptyRow.append(emptyCell);
         tbody.append(emptyRow);
     } else {
-        rows.forEach((audit) => {
+        pageRows.forEach((audit) => {
             const row = document.createElement('tr');
             const isSelected = selectedIds.has(String(audit.id));
             const isDetailOpen = String(audit.id) === String(detailAuditId);
@@ -470,6 +568,9 @@ function createUnresolvedTable({ rows, selectedIds, detailAuditId, onOpenDetail,
             responseCell.textContent = truncateText(audit.assistant_message?.content);
             responseCell.title = audit.assistant_message?.content ?? '';
 
+            const topicCell = document.createElement('td');
+            topicCell.textContent = audit.topic || 'Unknown';
+
             const userCell = document.createElement('td');
             userCell.textContent = getAuditUserLabel(audit);
 
@@ -479,7 +580,7 @@ function createUnresolvedTable({ rows, selectedIds, detailAuditId, onOpenDetail,
             const statusCell = document.createElement('td');
             statusCell.append(createStatusBadge('unresolved'));
 
-            row.append(selectCell, queryCell, responseCell, userCell, createdCell, statusCell);
+            row.append(selectCell, queryCell, responseCell, topicCell, userCell, createdCell, statusCell);
             tbody.append(row);
         });
     }
@@ -500,13 +601,14 @@ function createUnresolvedTable({ rows, selectedIds, detailAuditId, onOpenDetail,
         : 'Select unresolved queries to review.';
     actions.append(markResolvedButton);
 
-    section.append(header, tableShell, actions);
+    section.append(header, tableShell, createTablePagination({ rows, page, onPageChange }), actions);
     return section;
 }
 
-function createLowConfidenceTable({ rows, selectedIds, detailAuditId, onOpenDetail, onToggle, onToggleAll }) {
+function createLowConfidenceTable({ rows, page, selectedIds, detailAuditId, onPageChange, onOpenDetail, onToggle, onToggleAll }) {
     const section = document.createElement('section');
     section.className = 'analytics-detail-section';
+    const pageRows = getPageRows(rows, page);
 
     const header = document.createElement('div');
     header.className = 'analytics-detail-header';
@@ -527,6 +629,7 @@ function createLowConfidenceTable({ rows, selectedIds, detailAuditId, onOpenDeta
         'select',
         'User Query',
         'Response',
+        'Topic',
         'Retrieval',
         'Confidence',
         'Level',
@@ -538,7 +641,7 @@ function createLowConfidenceTable({ rows, selectedIds, detailAuditId, onOpenDeta
 
         if (index === 0) {
             th.append(createSelectionHeaderCheckbox({
-                rows,
+                rows: pageRows,
                 selectedIds,
                 label: 'Select all low confidence queries',
                 onToggleAll,
@@ -556,13 +659,13 @@ function createLowConfidenceTable({ rows, selectedIds, detailAuditId, onOpenDeta
     if (rows.length === 0) {
         const emptyRow = document.createElement('tr');
         const emptyCell = document.createElement('td');
-        emptyCell.colSpan = 9;
+        emptyCell.colSpan = 10;
         emptyCell.className = 'analytics-table-empty';
         emptyCell.textContent = 'No low confidence queries.';
         emptyRow.append(emptyCell);
         tbody.append(emptyRow);
     } else {
-        rows.forEach((audit) => {
+        pageRows.forEach((audit) => {
             const row = document.createElement('tr');
             const isSelected = selectedIds.has(String(audit.id));
             const isDetailOpen = String(audit.id) === String(detailAuditId);
@@ -606,6 +709,9 @@ function createLowConfidenceTable({ rows, selectedIds, detailAuditId, onOpenDeta
             responseCell.textContent = truncateText(audit.assistant_message?.content);
             responseCell.title = audit.assistant_message?.content ?? '';
 
+            const topicCell = document.createElement('td');
+            topicCell.textContent = audit.topic || 'Unknown';
+
             const retrievalCell = document.createElement('td');
             retrievalCell.textContent = formatScore(audit.retrieval_score);
 
@@ -631,6 +737,7 @@ function createLowConfidenceTable({ rows, selectedIds, detailAuditId, onOpenDeta
                 selectCell,
                 queryCell,
                 responseCell,
+                topicCell,
                 retrievalCell,
                 confidenceCell,
                 levelCell,
@@ -644,7 +751,7 @@ function createLowConfidenceTable({ rows, selectedIds, detailAuditId, onOpenDeta
 
     table.append(thead, tbody);
     tableShell.append(table);
-    section.append(header, tableShell);
+    section.append(header, tableShell, createTablePagination({ rows, page, onPageChange }));
     return section;
 }
 
@@ -653,11 +760,13 @@ function createInitialAnalyticsView(previousActiveMetric = 'unresolved') {
         activeMetric: previousActiveMetric,
         unresolvedRows: [],
         unresolvedSelectedIds: new Set(),
+        unresolvedPage: 1,
         unresolvedLoading: false,
         unresolvedLoaded: false,
         unresolvedError: null,
         lowConfidenceRows: [],
         lowConfidenceSelectedIds: new Set(),
+        lowConfidencePage: 1,
         lowConfidenceLoading: false,
         lowConfidenceLoaded: false,
         lowConfidenceError: null,
@@ -704,6 +813,8 @@ export function renderAnalyticsDashboardScreen(context, options = {}) {
     }
 
     state.analyticsView ??= createInitialAnalyticsView();
+    state.analyticsView.unresolvedPage ??= 1;
+    state.analyticsView.lowConfidencePage ??= 1;
 
     closeAllPanels();
     messages.classList.add('crud-canvas');
@@ -752,6 +863,8 @@ export function renderAnalyticsDashboardScreen(context, options = {}) {
             state.analyticsView.activeMetric = metricKey;
             state.analyticsView.unresolvedSelectedIds = new Set();
             state.analyticsView.lowConfidenceSelectedIds = new Set();
+            state.analyticsView.unresolvedPage = 1;
+            state.analyticsView.lowConfidencePage = 1;
             state.analyticsView.detailMode = null;
             state.analyticsView.detailAuditId = null;
 
@@ -770,6 +883,7 @@ export function renderAnalyticsDashboardScreen(context, options = {}) {
     })));
 
     content.append(metricGrid);
+    // content.append(createTopicBreakdown(data?.topic_breakdown));
 
     const spacing = document.createElement('div');
     spacing.className = 'analytics-dashboard-spacing';
@@ -783,10 +897,17 @@ export function renderAnalyticsDashboardScreen(context, options = {}) {
         } else {
             const table = createUnresolvedTable({
                 rows: state.analyticsView.unresolvedRows,
+                page: state.analyticsView.unresolvedPage,
                 selectedIds: state.analyticsView.unresolvedSelectedIds,
                 detailAuditId: state.analyticsView.detailMode === 'unresolved'
                     ? state.analyticsView.detailAuditId
                     : null,
+                onPageChange: (page) => {
+                    state.analyticsView.unresolvedPage = page;
+                    state.analyticsView.detailMode = null;
+                    state.analyticsView.detailAuditId = null;
+                    renderAnalyticsDashboardScreen(context, options);
+                },
                 onOpenDetail: (auditId) => {
                     state.analyticsView.detailMode = 'unresolved';
                     state.analyticsView.detailAuditId = String(auditId);
@@ -804,12 +925,18 @@ export function renderAnalyticsDashboardScreen(context, options = {}) {
                     renderAnalyticsDashboardScreen(context, options);
                 },
                 onToggleAll: () => {
-                    if (state.analyticsView.unresolvedSelectedIds.size === state.analyticsView.unresolvedRows.length) {
-                        state.analyticsView.unresolvedSelectedIds = new Set();
+                    const pageRows = getPageRows(
+                        state.analyticsView.unresolvedRows,
+                        state.analyticsView.unresolvedPage,
+                    );
+                    const pageIds = pageRows.map((row) => String(row.id));
+                    const isPageSelected = pageIds.length > 0
+                        && pageIds.every((id) => state.analyticsView.unresolvedSelectedIds.has(id));
+
+                    if (isPageSelected) {
+                        pageIds.forEach((id) => state.analyticsView.unresolvedSelectedIds.delete(id));
                     } else {
-                        state.analyticsView.unresolvedSelectedIds = new Set(
-                            state.analyticsView.unresolvedRows.map((row) => String(row.id))
-                        );
+                        pageIds.forEach((id) => state.analyticsView.unresolvedSelectedIds.add(id));
                     }
 
                     renderAnalyticsDashboardScreen(context, options);
@@ -828,10 +955,17 @@ export function renderAnalyticsDashboardScreen(context, options = {}) {
         } else {
             const table = createLowConfidenceTable({
                 rows: state.analyticsView.lowConfidenceRows,
+                page: state.analyticsView.lowConfidencePage,
                 selectedIds: state.analyticsView.lowConfidenceSelectedIds,
                 detailAuditId: state.analyticsView.detailMode === 'low_confidence'
                     ? state.analyticsView.detailAuditId
                     : null,
+                onPageChange: (page) => {
+                    state.analyticsView.lowConfidencePage = page;
+                    state.analyticsView.detailMode = null;
+                    state.analyticsView.detailAuditId = null;
+                    renderAnalyticsDashboardScreen(context, options);
+                },
                 onOpenDetail: (auditId) => {
                     state.analyticsView.detailMode = 'low_confidence';
                     state.analyticsView.detailAuditId = String(auditId);
@@ -849,12 +983,18 @@ export function renderAnalyticsDashboardScreen(context, options = {}) {
                     renderAnalyticsDashboardScreen(context, options);
                 },
                 onToggleAll: () => {
-                    if (state.analyticsView.lowConfidenceSelectedIds.size === state.analyticsView.lowConfidenceRows.length) {
-                        state.analyticsView.lowConfidenceSelectedIds = new Set();
+                    const pageRows = getPageRows(
+                        state.analyticsView.lowConfidenceRows,
+                        state.analyticsView.lowConfidencePage,
+                    );
+                    const pageIds = pageRows.map((row) => String(row.id));
+                    const isPageSelected = pageIds.length > 0
+                        && pageIds.every((id) => state.analyticsView.lowConfidenceSelectedIds.has(id));
+
+                    if (isPageSelected) {
+                        pageIds.forEach((id) => state.analyticsView.lowConfidenceSelectedIds.delete(id));
                     } else {
-                        state.analyticsView.lowConfidenceSelectedIds = new Set(
-                            state.analyticsView.lowConfidenceRows.map((row) => String(row.id))
-                        );
+                        pageIds.forEach((id) => state.analyticsView.lowConfidenceSelectedIds.add(id));
                     }
 
                     renderAnalyticsDashboardScreen(context, options);
@@ -917,6 +1057,7 @@ async function loadUnresolvedRows(context, options = {}) {
             environment_id: state.selectedEnvironmentId,
             quality_status: 'unresolved',
         });
+        state.analyticsView.unresolvedPage = 1;
         state.analyticsView.unresolvedLoaded = true;
     } catch (error) {
         state.analyticsView.unresolvedError = error.message;
@@ -944,6 +1085,7 @@ async function loadLowConfidenceRows(context, options = {}) {
             environment_id: state.selectedEnvironmentId,
             confidence_levels: 'medium,low',
         });
+        state.analyticsView.lowConfidencePage = 1;
         state.analyticsView.lowConfidenceLoaded = true;
     } catch (error) {
         state.analyticsView.lowConfidenceError = error.message;

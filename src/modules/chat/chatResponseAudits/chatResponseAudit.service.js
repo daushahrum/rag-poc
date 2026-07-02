@@ -1,8 +1,10 @@
 // modules/chatResponseAudit/chatResponseAudit.service.js
 
+import { chatCompletion } from '../../../../lib/llm.js';
 import * as chatResponseAuditRepository from './chatResponseAudit.repository.js';
 import * as chatMessageRepository from '../chatMessages/chatMessage.repository.js';
 import * as chatSessionRepository from '../chatSession/chatSession.repository.js';
+import * as projectTopicService from '../../project/projectTopic/projectTopic.service.js';
 
 const updatableFields = [
     'environment_id',
@@ -16,6 +18,7 @@ const updatableFields = [
     'user_feedback_reason',
     'user_feedback_note',
     'audit_reason',
+    'topic',
     'reviewed_by',
     'reviewed_at',
 ];
@@ -64,6 +67,11 @@ export async function createChatResponseAudit(payload) {
         project_id: String(session.project_id),
         environment_id: session.environment_id,
         user_message_id: Number(userMessage.id),
+        topic: await resolveAuditTopic({
+            payloadTopic: payload.topic,
+            userMessageContent: userMessage.content,
+            projectId: session.project_id,
+        }),
     };
 
     const existingAudits = await chatResponseAuditRepository.getChatResponseAudits({
@@ -165,6 +173,114 @@ function normalizeQualityStatus(qualityStatus) {
     }
 
     return qualityStatus;
+}
+
+async function resolveAuditTopic({ payloadTopic, userMessageContent, projectId }) {
+    const activeTopics = await projectTopicService.getActiveProjectTopics(projectId);
+    const topics = activeTopics.map(toPlainRow);
+
+    if (topics.length === 0) {
+        return 'Unknown';
+    }
+
+    const explicitTopic = findMatchingTopic(payloadTopic, topics);
+
+    if (explicitTopic) {
+        return explicitTopic.name;
+    }
+
+    const keywordTopic = findTopicByKeywords(userMessageContent, topics);
+
+    if (keywordTopic) {
+        return keywordTopic.name;
+    }
+
+    const generatedTopic = await chooseTopicFromProjectTopics(userMessageContent, topics);
+
+    return generatedTopic?.name ?? 'Unknown';
+}
+
+function normalizeTopicForMatch(topic) {
+    if (topic === undefined || topic === null) {
+        return null;
+    }
+
+    const normalized = String(topic)
+        .toLowerCase()
+        .replace(/[_-]+/g, ' ')
+        .replace(/[^\w\s]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    return normalized || null;
+}
+
+function findMatchingTopic(value, topics) {
+    const normalized = normalizeTopicForMatch(value);
+
+    if (!normalized) {
+        return null;
+    }
+
+    return topics.find((topic) => normalizeTopicForMatch(topic.name) === normalized) ?? null;
+}
+
+function getTopicKeywordValues(topic) {
+    const keywords = Array.isArray(topic.keywords) ? topic.keywords : [];
+    return [
+        topic.name,
+        topic.description,
+        ...keywords,
+    ]
+        .map(normalizeTopicForMatch)
+        .filter(Boolean);
+}
+
+function findTopicByKeywords(content, topics) {
+    const normalizedContent = normalizeTopicForMatch(content);
+
+    if (!normalizedContent) {
+        return null;
+    }
+
+    return topics.find((topic) => getTopicKeywordValues(topic).some((keyword) => {
+        if (keyword.length < 3) {
+            return false;
+        }
+
+        return normalizedContent.includes(keyword);
+    })) ?? null;
+}
+
+async function chooseTopicFromProjectTopics(content, topics) {
+    if (!content) {
+        return null;
+    }
+
+    try {
+        const topicLines = topics
+            .map((topic, index) => {
+                const keywords = Array.isArray(topic.keywords) && topic.keywords.length > 0
+                    ? ` Keywords: ${topic.keywords.join(', ')}.`
+                    : '';
+                const description = topic.description ? ` Description: ${topic.description}.` : '';
+                return `${index + 1}. ${topic.name}.${description}${keywords}`;
+            })
+            .join('\n');
+
+        const response = await chatCompletion([
+            {
+                role: 'system',
+                content: `Choose the best topic for the user message from the allowed project topics below. Respond with exactly one topic name from the list, or Unknown if none match.\n\nAllowed topics:\n${topicLines}`,
+            },
+            { role: 'user', content: String(content) },
+        ]);
+
+        return findMatchingTopic(response.content, topics);
+    } catch (error) {
+        console.error('Failed to classify audit topic:', error.message);
+        return null;
+    }
 }
 
 function validateUuid(value, fieldName) {
@@ -378,25 +494,63 @@ function aggregateDaily(rows) {
         .sort((a, b) => String(b.audit_date).localeCompare(String(a.audit_date)));
 }
 
+function aggregateTopicBreakdown(rows) {
+    const byTopic = new Map();
+
+    rows.forEach((row) => {
+        const topic = row.topic || 'Unknown';
+        const existing = byTopic.get(topic) ?? {
+            topic,
+            query_count: 0,
+            normal_count: 0,
+            needs_review_count: 0,
+            unresolved_count: 0,
+            low_confidence_count: 0,
+            positive_feedback_count: 0,
+            negative_feedback_count: 0,
+        };
+
+        [
+            'query_count',
+            'normal_count',
+            'needs_review_count',
+            'unresolved_count',
+            'low_confidence_count',
+            'positive_feedback_count',
+            'negative_feedback_count',
+        ].forEach((key) => {
+            existing[key] += toNumber(row[key]);
+        });
+
+        byTopic.set(topic, existing);
+    });
+
+    return Array.from(byTopic.values())
+        .sort((a, b) => b.query_count - a.query_count);
+}
+
 export async function getQueryQualityAnalytics(filters = {}) {
     const normalizedFilters = normalizeAnalyticsFilters(filters);
-    const [countsRows, dailyRows, statusRows] = await Promise.all([
+    const [countsRows, dailyRows, statusRows, topicRows] = await Promise.all([
         chatResponseAuditRepository.getQueryQualityCounts(normalizedFilters),
         chatResponseAuditRepository.getQueryQualityDaily({
             ...normalizedFilters,
             days: normalizedFilters.days ?? 14,
         }),
         chatResponseAuditRepository.getQueryQualityStatusBreakdown(normalizedFilters),
+        chatResponseAuditRepository.getAuditTopicBreakdown(normalizedFilters),
     ]);
 
     const counts = countsRows.map(toPlainRow);
     const daily = dailyRows.map(toPlainRow);
     const statuses = statusRows.map(toPlainRow);
+    const topics = topicRows.map(toPlainRow);
 
     return {
         filters: normalizedFilters,
         counts: aggregateCounts(counts),
         status_breakdown: aggregateStatusBreakdown(statuses),
+        topic_breakdown: aggregateTopicBreakdown(topics),
         daily: aggregateDaily(daily),
         groups: counts,
     };

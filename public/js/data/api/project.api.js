@@ -117,6 +117,51 @@ export async function fetchProject(projectId) {
     return response.json();
 }
 
+export async function fetchProjectTopics(projectId) {
+    const response = await fetch(`/api/project/topics/list?project_id=${encodeURIComponent(projectId)}`, {
+        headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error ?? data.message ?? 'Could not load project topics.');
+    }
+
+    const data = await response.json();
+    return Array.isArray(data) ? data : (data.topics ?? []);
+}
+
+async function mutateProjectTopic(path, payload) {
+    const response = await fetch(`/api/project/topics/${path}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            ...getAuthHeaders(),
+        },
+        body: JSON.stringify(payload),
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+        throw new Error(data.error ?? data.message ?? `Could not ${path} topic.`);
+    }
+
+    return data;
+}
+
+export function createProjectTopic(payload) {
+    return mutateProjectTopic('create', payload);
+}
+
+export function updateProjectTopic(id, payload) {
+    return mutateProjectTopic('update', { id, ...payload });
+}
+
+export function deleteProjectTopic(id) {
+    return mutateProjectTopic('delete', { id });
+}
+
 export async function fetchProjects() {
     const response = await fetch('/api/project/list', {
         headers: getAuthHeaders(),

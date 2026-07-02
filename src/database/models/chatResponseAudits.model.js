@@ -61,6 +61,10 @@ export default function ChatResponseAuditsModel(sequelize) {
                 type: DataTypes.TEXT,
                 allowNull: true,
             },
+            topic: {
+                type: DataTypes.TEXT,
+                allowNull: true,
+            },
             reviewed_by: {
                 type: DataTypes.STRING,
                 allowNull: true,

@@ -28,8 +28,9 @@ dotenv.config({ path: "./config/.env" });
 db.testConnection();
 try {
   await db.ensureChatMessageConfidenceColumns();
+  await db.ensureProjectTopicProjectIdColumn();
 } catch (error) {
-  console.error("Unable to ensure chat message confidence columns:", error);
+  console.error("Unable to ensure database compatibility columns:", error);
 }
 
 const app = express();

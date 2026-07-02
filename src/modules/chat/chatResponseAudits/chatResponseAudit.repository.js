@@ -1,7 +1,7 @@
 // modules/chatResponseAudit/chatResponseAudit.repository.js
 
 import { Op } from 'sequelize';
-import { models } from '../../../database/db.js';
+import { models, sequelize } from '../../../database/db.js';
 
 const {
     ChatResponseAudits,
@@ -122,6 +122,62 @@ export async function getChatResponseAudits(filters = {}) {
         ],
         order: [['created_at', 'DESC']],
     });
+}
+
+export async function getAuditTopicBreakdown(filters = {}) {
+    const rows = await ChatResponseAudits.findAll({
+        where: buildAuditWhere(filters),
+        attributes: [
+            'topic',
+            [sequelize.fn('COUNT', sequelize.col('id')), 'query_count'],
+            [
+                sequelize.fn(
+                    'SUM',
+                    sequelize.literal("CASE WHEN quality_status = 'normal' THEN 1 ELSE 0 END"),
+                ),
+                'normal_count',
+            ],
+            [
+                sequelize.fn(
+                    'SUM',
+                    sequelize.literal("CASE WHEN quality_status = 'needs_review' THEN 1 ELSE 0 END"),
+                ),
+                'needs_review_count',
+            ],
+            [
+                sequelize.fn(
+                    'SUM',
+                    sequelize.literal("CASE WHEN quality_status = 'unresolved' THEN 1 ELSE 0 END"),
+                ),
+                'unresolved_count',
+            ],
+            [
+                sequelize.fn(
+                    'SUM',
+                    sequelize.literal("CASE WHEN confidence_level IN ('medium', 'low') THEN 1 ELSE 0 END"),
+                ),
+                'low_confidence_count',
+            ],
+            [
+                sequelize.fn(
+                    'SUM',
+                    sequelize.literal("CASE WHEN user_feedback = 'positive' THEN 1 ELSE 0 END"),
+                ),
+                'positive_feedback_count',
+            ],
+            [
+                sequelize.fn(
+                    'SUM',
+                    sequelize.literal("CASE WHEN user_feedback = 'negative' THEN 1 ELSE 0 END"),
+                ),
+                'negative_feedback_count',
+            ],
+        ],
+        group: ['topic'],
+        order: [[sequelize.literal('query_count'), 'DESC']],
+    });
+
+    return rows;
 }
 
 function buildQualityViewWhere(filters = {}) {

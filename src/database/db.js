@@ -57,4 +57,33 @@ db.ensureChatMessageConfidenceColumns = async function() {
   `);
 }
 
+db.ensureProjectTopicProjectIdColumn = async function() {
+  await sequelize.query(`
+    DO $$
+    DECLARE
+      project_id_type TEXT;
+      topic_count INTEGER;
+    BEGIN
+      SELECT data_type
+      INTO project_id_type
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'project_topics'
+        AND column_name = 'project_id';
+
+      IF project_id_type = 'uuid' THEN
+        SELECT COUNT(*) INTO topic_count FROM project_topics;
+
+        IF topic_count > 0 THEN
+          RAISE EXCEPTION 'project_topics.project_id is uuid but projects.id is bigint; clear or migrate existing topic rows before startup can convert the column';
+        END IF;
+
+        ALTER TABLE project_topics
+        ALTER COLUMN project_id TYPE BIGINT
+        USING NULL;
+      END IF;
+    END $$;
+  `);
+}
+
 export { sequelize, models, db };

@@ -674,8 +674,10 @@
 }
 
 .analytics-table-shell {
+  max-width: 100%;
   min-height: 268px;
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: auto;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface);
@@ -687,7 +689,7 @@
 
 .analytics-table {
   width: 100%;
-  min-width: 720px;
+  min-width: 980px;
   border-collapse: collapse;
   color: var(--text);
   font-size: 12px;
@@ -695,7 +697,7 @@
 }
 
 .analytics-low-confidence-table {
-  min-width: 1160px;
+  min-width: 1320px;
 }
 
 .analytics-low-confidence-table th:nth-child(1),
@@ -711,26 +713,31 @@
 }
 
 .analytics-low-confidence-table th:nth-child(4),
-.analytics-low-confidence-table td:nth-child(4),
+.analytics-low-confidence-table td:nth-child(4) {
+  width: 140px;
+}
+
 .analytics-low-confidence-table th:nth-child(5),
-.analytics-low-confidence-table td:nth-child(5) {
+.analytics-low-confidence-table td:nth-child(5),
+.analytics-low-confidence-table th:nth-child(6),
+.analytics-low-confidence-table td:nth-child(6) {
   width: 92px;
 }
 
-.analytics-low-confidence-table th:nth-child(6),
-.analytics-low-confidence-table td:nth-child(6),
 .analytics-low-confidence-table th:nth-child(7),
-.analytics-low-confidence-table td:nth-child(7) {
-  width: 116px;
-}
-
+.analytics-low-confidence-table td:nth-child(7),
 .analytics-low-confidence-table th:nth-child(8),
 .analytics-low-confidence-table td:nth-child(8) {
-  width: 190px;
+  width: 116px;
 }
 
 .analytics-low-confidence-table th:nth-child(9),
 .analytics-low-confidence-table td:nth-child(9) {
+  width: 190px;
+}
+
+.analytics-low-confidence-table th:nth-child(10),
+.analytics-low-confidence-table td:nth-child(10) {
   width: 98px;
 }
 
@@ -791,6 +798,51 @@
 .analytics-table-empty {
   height: 220px;
   color: var(--muted);
+  text-align: center;
+}
+
+.analytics-table-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 36px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.analytics-pagination-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.analytics-pagination-button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 14px;
+}
+
+.analytics-pagination-button:not(:disabled):hover {
+  border-color: color-mix(in srgb, var(--muted) 45%, transparent);
+  background: var(--surface-soft);
+}
+
+.analytics-pagination-button:disabled {
+  color: var(--muted);
+  opacity: 0.45;
+}
+
+.analytics-pagination-page {
+  min-width: 76px;
+  color: var(--text);
+  font-weight: 650;
   text-align: center;
 }
 

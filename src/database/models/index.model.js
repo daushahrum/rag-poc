@@ -13,6 +13,7 @@ import QueryQualityCountsModel from './queryQualityCounts.model.js';
 import QueryQualityDailyModel from './queryQualityDaily.model.js';
 import QueryQualityStatusBreakdownModel from './queryQualityStatusBreakdown.model.js';
 import ProjectUserModel from './projectUser.model.js';
+import ProjectTopicModel from './projectTopic.model.js';
 
 export function initModels(sequelize) {
     const models = {
@@ -30,6 +31,7 @@ export function initModels(sequelize) {
         QueryQualityDaily: QueryQualityDailyModel(sequelize),
         QueryQualityStatusBreakdown: QueryQualityStatusBreakdownModel(sequelize),
         ProjectUser: ProjectUserModel(sequelize),
+        ProjectTopic: ProjectTopicModel(sequelize),
     };
 
     Object.values(models).forEach((m) => {

@@ -45,6 +45,7 @@ import { renderAnalyticsDashboardScreen } from './screens/analytics-dashboard.sc
 import { renderProjectKnowledgeScreen } from './screens/project-knowledge.screen.js';
 import { renderProjectPromptScreen } from './screens/project-prompt.screen.js';
 import { renderProjectToolsScreen } from './screens/project-tools.screen.js';
+import { renderProjectTopicsScreen } from './screens/project-topics.screen.js';
 import { renderProjectUsersScreen } from './screens/project-users.screen.js';
 
 export function bootstrapApp() {
@@ -74,6 +75,7 @@ const {
     projectUsersButton,
     projectEnvironmentsButton,
     projectToolsButton,
+    projectTopicsButton,
     projectAppsButton,
     projectPromptButton,
     projectKnowledgeButton,
@@ -179,6 +181,7 @@ const sidebarController = createSidebarController({
         'project-users': projectUsersButton,
         'project-environments': projectEnvironmentsButton,
         'project-tools': projectToolsButton,
+        'project-topics': projectTopicsButton,
         'project-apps': projectAppsButton,
         'project-prompt': projectPromptButton,
         'project-knowledge': projectKnowledgeButton,
@@ -862,6 +865,25 @@ projectToolsButton.addEventListener('click', async () => {
         await renderProjectToolsScreen(appContext);
     } catch (error) {
         renderPlaceholder('Tools unavailable', error.message);
+    }
+});
+
+projectTopicsButton.addEventListener('click', async () => {
+    if (state.roleMode === 'admin') {
+        await renderAdminProjectScreen('project-topics', 'Topics', renderProjectTopicsScreen);
+        return;
+    }
+
+    projectName.textContent = 'Topics';
+    setSidebarSelection('menu', 'project-topics');
+
+    try {
+        if (!state.activeProjectId) {
+            await initializeProjectOwnerContext();
+        }
+        await renderProjectTopicsScreen(appContext);
+    } catch (error) {
+        renderPlaceholder('Topics unavailable', error.message);
     }
 });
 

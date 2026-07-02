@@ -1,12 +1,16 @@
 export {
     createProject,
     createProjectEnvironment,
+    createProjectTopic,
     deleteProject,
     deleteProjectEnvironment,
+    deleteProjectTopic,
     fetchProject,
     fetchProjectEnvironments,
     fetchProjects,
+    fetchProjectTopics,
     getProjectUser,
     updateProject,
     updateProjectEnvironment,
+    updateProjectTopic,
 } from '../../data/api/project.api.js';
