@@ -72,7 +72,14 @@ function buildAuditWhere(filters = {}) {
         where.confidence_level = filters.confidence_level;
     }
 
-    if (filters.quality_status) {
+    if (filters.quality_statuses) {
+        where.quality_status = {
+            [Op.in]: String(filters.quality_statuses)
+                .split(',')
+                .map((status) => status.trim())
+                .filter(Boolean),
+        };
+    } else if (filters.quality_status) {
         where.quality_status = filters.quality_status;
     }
 

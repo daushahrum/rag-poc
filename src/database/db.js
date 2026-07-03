@@ -55,6 +55,14 @@ db.ensureChatMessageConfidenceColumns = async function() {
     ALTER TABLE chat_messages
     ADD COLUMN IF NOT EXISTS confidence_reasons JSONB
   `);
+
+  await sequelize.query(`
+    ALTER TABLE chat_response_audits
+    ADD COLUMN IF NOT EXISTS jira_issue_key VARCHAR(255),
+    ADD COLUMN IF NOT EXISTS jira_issue_url VARCHAR(1024),
+    ADD COLUMN IF NOT EXISTS jira_created_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS jira_created_by VARCHAR(255)
+  `);
 }
 
 db.ensureProjectTopicProjectIdColumn = async function() {

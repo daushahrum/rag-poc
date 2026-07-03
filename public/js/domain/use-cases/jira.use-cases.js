@@ -1,4 +1,5 @@
 export {
+    createJiraIssue,
     disconnectJira,
     getJiraConnection,
     getJiraAuthorizationUrl,

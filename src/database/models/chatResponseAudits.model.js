@@ -77,6 +77,22 @@ export default function ChatResponseAuditsModel(sequelize) {
                 type: DataTypes.BIGINT,
                 allowNull: true,
             },
+            jira_issue_key: {
+                type: DataTypes.STRING,
+                allowNull: true,
+            },
+            jira_issue_url: {
+                type: DataTypes.STRING,
+                allowNull: true,
+            },
+            jira_created_at: {
+                type: DataTypes.DATE,
+                allowNull: true,
+            },
+            jira_created_by: {
+                type: DataTypes.STRING,
+                allowNull: true,
+            },
         },
         {
             tableName: 'chat_response_audits',

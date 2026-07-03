@@ -9,13 +9,35 @@ function getConnectedAppsRedirect(status) {
     return `${FRONTEND_URL}/?view=connected-apps&jira=${status}`;
 }
 
+function isAdminToken(token) {
+    return String(token?.role ?? '').trim().toLowerCase() === 'admin';
+}
+
+function getAuthorizedProjectId(req, requestedProjectId) {
+    if (isAdminToken(req.token)) {
+        return requestedProjectId;
+    }
+
+    const tokenProjectId = req.token?.project_id;
+
+    if (!tokenProjectId) {
+        throw new Error('User project information not found. Please log in again.');
+    }
+
+    if (requestedProjectId && String(requestedProjectId) !== String(tokenProjectId)) {
+        throw new Error('You are not authorized to access this project');
+    }
+
+    return tokenProjectId;
+}
+
 // In-memory state store for CSRF protection during OAuth handshake.
 // Swap for Redis/DB-backed storage if running multiple server instances.
 const pendingStates = new Map();
 
 export async function initiateConnect(req, res) {
     try {
-        const projectId = req.query.project_id;
+        const projectId = getAuthorizedProjectId(req, req.query.project_id);
 
         if (!projectId) {
             return res.status(400).json({ message: 'project_id is required' });
@@ -69,7 +91,8 @@ export async function handleCallback(req, res) {
 
 export async function getConnection(req, res) {
     try {
-        const connection = await jiraService.getConnectionByProjectId(req.params.project_id);
+        const projectId = getAuthorizedProjectId(req, req.params.project_id);
+        const connection = await jiraService.getConnectionByProjectId(projectId);
 
         return res.json(connection);
     } catch (error) {
@@ -81,7 +104,8 @@ export async function getConnection(req, res) {
 
 export async function listProjects(req, res) {
     try {
-        const projects = await jiraService.listJiraProjects(req.params.project_id);
+        const projectId = getAuthorizedProjectId(req, req.params.project_id);
+        const projects = await jiraService.listJiraProjects(projectId);
 
         return res.json(projects);
     } catch (error) {
@@ -93,8 +117,9 @@ export async function listProjects(req, res) {
 
 export async function selectProject(req, res) {
     try {
+        const projectId = getAuthorizedProjectId(req, req.params.project_id);
         const payload = {
-            projectId: req.params.project_id,
+            projectId,
             jiraProjectKey: req.body.jiraProjectKey,
             jiraProjectName: req.body.jiraProjectName,
             userId: req.token.id,
@@ -112,11 +137,14 @@ export async function selectProject(req, res) {
 
 export async function createIssue(req, res) {
     try {
+        const projectId = getAuthorizedProjectId(req, req.params.project_id);
         const payload = {
-            projectId: req.params.project_id,
+            projectId,
             summary: req.body.summary,
             description: req.body.description,
             issueType: req.body.issueType,
+            auditId: req.body.auditId,
+            userId: req.token.id,
         };
 
         const issue = await jiraService.createIssue(payload);
@@ -131,7 +159,8 @@ export async function createIssue(req, res) {
 
 export async function disconnect(req, res) {
     try {
-        await jiraService.disconnectProject(req.params.project_id);
+        const projectId = getAuthorizedProjectId(req, req.params.project_id);
+        await jiraService.disconnectProject(projectId);
 
         return res.status(200).json({
             message: 'Jira disconnected',

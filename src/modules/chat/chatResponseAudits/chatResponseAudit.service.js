@@ -21,9 +21,13 @@ const updatableFields = [
     'topic',
     'reviewed_by',
     'reviewed_at',
+    'jira_issue_key',
+    'jira_issue_url',
+    'jira_created_at',
+    'jira_created_by',
 ];
 
-const allowedQualityStatuses = new Set(['normal', 'needs_review', 'unresolved']);
+const allowedQualityStatuses = new Set(['normal', 'needs_review', 'unresolved', 'escalated']);
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export async function createChatResponseAudit(payload) {
@@ -163,7 +167,7 @@ function validateQualityStatus(qualityStatus) {
     }
 
     if (!allowedQualityStatuses.has(qualityStatus)) {
-        throw new Error('quality_status must be one of: normal, needs_review, unresolved');
+        throw new Error('quality_status must be one of: normal, needs_review, unresolved, escalated');
     }
 }
 

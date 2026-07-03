@@ -57,7 +57,7 @@ export default function defineJiraConnection(sequelize) {
         updatedBy: {
             type: DataTypes.TEXT,
             allowNull: true,
-        },
+        }
     }, {
         tableName: 'jira_connections',
         timestamps: true,

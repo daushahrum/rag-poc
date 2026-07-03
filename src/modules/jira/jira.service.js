@@ -1,6 +1,7 @@
 // modules/jira/jira.service.js
 
 import * as jiraRepository from './jira.repository.js';
+import * as chatResponseAuditService from '../chat/chatResponseAudits/chatResponseAudit.service.js';
 
 const JIRA_CLIENT_ID = process.env.JIRA_CLIENT_ID;
 const JIRA_CLIENT_SECRET = process.env.JIRA_CLIENT_SECRET;
@@ -201,20 +202,12 @@ async function ensureValidAccessToken(connection) {
 
 // ---------- Jira REST API calls ----------
 
-export async function listJiraProjects(projectId) {
-    const connection = await jiraRepository.getConnectionByProjectId(projectId);
-
-    if (!connection) {
-        throw new Error('No Jira connection found for this project');
-    }
-
-    const freshConnection = await ensureValidAccessToken(connection);
-
+async function fetchJiraProjectsForConnection(connection) {
     const response = await fetch(
-        `${API_BASE_URL}/ex/jira/${freshConnection.cloudId}/rest/api/3/project`,
+        `${API_BASE_URL}/ex/jira/${connection.cloudId}/rest/api/3/project`,
         {
             headers: {
-                Authorization: `Bearer ${freshConnection.accessToken}`,
+                Authorization: `Bearer ${connection.accessToken}`,
                 Accept: 'application/json',
             },
         }
@@ -228,7 +221,41 @@ export async function listJiraProjects(projectId) {
     return response.json();
 }
 
-export async function createIssue({ projectId, summary, description, issueType = 'Task' }) {
+async function ensureJiraProjectSelected(connection) {
+    const freshConnection = await ensureValidAccessToken(connection);
+
+    if (freshConnection.jiraProjectKey) {
+        return freshConnection;
+    }
+
+    const projects = await fetchJiraProjectsForConnection(freshConnection);
+    const project = Array.isArray(projects) ? projects[0] : null;
+
+    if (!project?.key) {
+        throw new Error('No Jira projects found for this connection');
+    }
+
+    await jiraRepository.updateConnection(freshConnection.id, {
+        jiraProjectKey: project.key,
+        jiraProjectName: project.name,
+    });
+
+    return jiraRepository.getConnectionById(freshConnection.id);
+}
+
+export async function listJiraProjects(projectId) {
+    const connection = await jiraRepository.getConnectionByProjectId(projectId);
+
+    if (!connection) {
+        throw new Error('No Jira connection found for this project');
+    }
+
+    const freshConnection = await ensureValidAccessToken(connection);
+
+    return fetchJiraProjectsForConnection(freshConnection);
+}
+
+export async function createIssue({ projectId, summary, description, issueType = 'Task', auditId, userId }) {
     if (!summary) {
         throw new Error('summary is required');
     }
@@ -239,11 +266,16 @@ export async function createIssue({ projectId, summary, description, issueType =
         throw new Error('No Jira connection found for this project');
     }
 
-    if (!connection.jiraProjectKey) {
-        throw new Error('No Jira project selected for this connection');
+    if (auditId) {
+        const audit = await chatResponseAuditService.getChatResponseAuditById(auditId);
+        const auditProjectId = audit?.project_id ?? audit?.get?.('project_id');
+
+        if (!audit || String(auditProjectId) !== String(projectId)) {
+            throw new Error('Jira issue audit does not belong to this project');
+        }
     }
 
-    const freshConnection = await ensureValidAccessToken(connection);
+    const freshConnection = await ensureJiraProjectSelected(connection);
 
     const body = {
         fields: {
@@ -283,6 +315,25 @@ export async function createIssue({ projectId, summary, description, issueType =
         throw new Error(`Failed to create Jira issue: ${errorText}`);
     }
 
-    return response.json();
-    // { id, key, self }
+    const issue = await response.json();
+    const issueUrl = issue.key && freshConnection.siteUrl
+        ? `${freshConnection.siteUrl.replace(/\/$/, '')}/browse/${issue.key}`
+        : issue.self;
+
+    if (auditId) {
+        await chatResponseAuditService.updateChatResponseAudit({
+            id: auditId,
+            quality_status: 'escalated',
+            jira_issue_key: issue.key,
+            jira_issue_url: issueUrl,
+            jira_created_at: new Date(),
+            jira_created_by: userId,
+        });
+    }
+
+    return {
+        ...issue,
+        jira_issue_url: issueUrl,
+    };
+    // { id, key, self, jira_issue_url }
 }

@@ -1,4 +1,5 @@
 import { fetchChatResponseAudits } from '../../../domain/use-cases/chat.use-cases.js';
+import { createJiraIssue, getJiraConnection } from '../../../domain/use-cases/jira.use-cases.js';
 
 const analyticsTablePageSize = 10;
 
@@ -347,6 +348,19 @@ function createStatusBadge(value, { tone } = {}) {
     return badge;
 }
 
+function createJiraIssueLink(audit) {
+    if (!audit.jira_issue_url) {
+        return document.createTextNode('-');
+    }
+
+    const link = document.createElement('a');
+    link.href = audit.jira_issue_url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.textContent = audit.jira_issue_key || 'Open';
+    return link;
+}
+
 function getAuditById(rows, auditId) {
     if (!auditId) {
         return null;
@@ -378,6 +392,116 @@ function createBadgeDetailField(label, badge) {
 
     field.append(labelEl, badge);
     return field;
+}
+
+function buildJiraIssueDefaults(audit) {
+    const query = String(audit.user_message?.content ?? '').trim();
+    const response = String(audit.assistant_message?.content ?? '').trim();
+    const reason = humanizeAuditReasonText(audit.audit_reason);
+
+    return {
+        summary: `Review ANDI response: ${truncateText(query, 80)}`,
+        issueType: 'Task',
+        description: [
+            `Audit ID: ${audit.id ?? '-'}`,
+            `Status: ${humanizeStatus(audit.quality_status)}`,
+            `Confidence: ${humanizeStatus(audit.confidence_level)}`,
+            `Reason: ${reason}`,
+            '',
+            'User query:',
+            query || '-',
+            '',
+            'ANDI response:',
+            response || '-',
+        ].join('\n'),
+    };
+}
+
+function showJiraIssueForm(defaults) {
+    return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.className = 'confirm-dialog-overlay';
+
+        const dialog = document.createElement('form');
+        dialog.className = 'confirm-dialog form-dialog jira-issue-dialog';
+        dialog.setAttribute('role', 'dialog');
+        dialog.setAttribute('aria-modal', 'true');
+
+        const title = document.createElement('h2');
+        title.className = 'confirm-dialog-title';
+        title.textContent = 'Create JIRA Issue';
+
+        const summaryLabel = document.createElement('label');
+        summaryLabel.className = 'jira-issue-field';
+        summaryLabel.textContent = 'Summary';
+        const summaryInput = document.createElement('input');
+        summaryInput.name = 'summary';
+        summaryInput.required = true;
+        summaryInput.value = defaults.summary;
+        summaryLabel.append(summaryInput);
+
+        const typeLabel = document.createElement('label');
+        typeLabel.className = 'jira-issue-field';
+        typeLabel.textContent = 'Issue type';
+        const typeInput = document.createElement('input');
+        typeInput.name = 'issueType';
+        typeInput.required = true;
+        typeInput.value = defaults.issueType;
+        typeLabel.append(typeInput);
+
+        const descriptionLabel = document.createElement('label');
+        descriptionLabel.className = 'jira-issue-field';
+        descriptionLabel.textContent = 'Description';
+        const descriptionInput = document.createElement('textarea');
+        descriptionInput.name = 'description';
+        descriptionInput.required = true;
+        descriptionInput.rows = 10;
+        descriptionInput.value = defaults.description;
+        descriptionLabel.append(descriptionInput);
+
+        const actions = document.createElement('div');
+        actions.className = 'confirm-dialog-actions';
+
+        const cancelButton = document.createElement('button');
+        cancelButton.type = 'button';
+        cancelButton.className = 'confirm-dialog-button confirm-dialog-button-cancel';
+        cancelButton.textContent = 'Cancel';
+
+        const submitButton = document.createElement('button');
+        submitButton.type = 'submit';
+        submitButton.className = 'confirm-dialog-button confirm-dialog-button-confirm';
+        submitButton.textContent = 'Create issue';
+
+        actions.append(cancelButton, submitButton);
+        dialog.append(title, summaryLabel, typeLabel, descriptionLabel, actions);
+        overlay.append(dialog);
+        document.body.append(overlay);
+        summaryInput.focus();
+
+        cancelButton.addEventListener('click', () => finish(null));
+        overlay.addEventListener('click', (event) => {
+            if (event.target === overlay) finish(null);
+        });
+        document.addEventListener('keydown', handleKeydown);
+        dialog.addEventListener('submit', (event) => {
+            event.preventDefault();
+            finish({
+                summary: summaryInput.value.trim(),
+                issueType: typeInput.value.trim(),
+                description: descriptionInput.value.trim(),
+            });
+        });
+
+        function handleKeydown(event) {
+            if (event.key === 'Escape') finish(null);
+        }
+
+        function finish(value) {
+            overlay.remove();
+            document.removeEventListener('keydown', handleKeydown);
+            resolve(value);
+        }
+    });
 }
 
 // function createTopicBreakdown(topicRows = []) {
@@ -442,7 +566,7 @@ function createReasonDetailField(label, reasonKey) {
     return field;
 }
 
-function createSelectedAuditPanel({ audit, mode, onClose }) {
+function createSelectedAuditPanel({ audit, mode, projectId, onClose }) {
     const panel = document.createElement('aside');
     panel.className = 'analytics-side-panel';
 
@@ -520,20 +644,88 @@ function createSelectedAuditPanel({ audit, mode, onClose }) {
         body.append(signalList);
     }
 
-    panel.append(header, meta, body);
-    return panel;
-}
+    const actions = document.createElement('div');
+    actions.className = 'analytics-side-actions';
+    const jiraButton = document.createElement('button');
+    jiraButton.type = 'button';
+    jiraButton.className = 'analytics-create-jira-button';
+    const hasJiraIssue = Boolean(audit.jira_issue_url);
+    jiraButton.textContent = hasJiraIssue ? 'View Issue' : 'Create JIRA Issue';
+    jiraButton.disabled = !hasJiraIssue;
+    jiraButton.title = hasJiraIssue ? 'Open this JIRA issue.' : 'Checking JIRA connection...';
+    if (!hasJiraIssue) {
+        actions.title = 'Checking JIRA connection...';
+    }
+    const jiraStatus = document.createElement('p');
+    jiraStatus.className = 'create-user-status';
+    actions.append(jiraButton, jiraStatus);
 
-function createSelectionHeaderCheckbox({ rows, selectedIds, label, onToggleAll }) {
-    const checkbox = document.createElement('input');
-    checkbox.type = 'checkbox';
-    const selectedVisibleCount = rows.filter((row) => selectedIds.has(String(row.id))).length;
-    checkbox.checked = rows.length > 0 && selectedVisibleCount === rows.length;
-    checkbox.indeterminate = selectedVisibleCount > 0 && selectedVisibleCount < rows.length;
-    checkbox.disabled = rows.length === 0;
-    checkbox.setAttribute('aria-label', label);
-    checkbox.addEventListener('change', onToggleAll);
-    return checkbox;
+    if (hasJiraIssue) {
+        actions.removeAttribute('title');
+    } else if (!projectId) {
+        jiraButton.title = 'Select a project before creating a JIRA issue.';
+        actions.title = 'Select a project before creating a JIRA issue.';
+    } else {
+        getJiraConnection(projectId)
+            .then((connection) => {
+                if (connection) {
+                    jiraButton.disabled = false;
+                    jiraButton.title = 'Create a JIRA issue for this response.';
+                    actions.removeAttribute('title');
+                    return;
+                }
+
+                jiraButton.title = 'Connect your JIRA project first.';
+                actions.title = 'Connect your JIRA project first.';
+            })
+            .catch(() => {
+                jiraButton.title = 'Connect your JIRA project first.';
+                actions.title = 'Connect your JIRA project first.';
+            });
+    }
+
+    jiraButton.addEventListener('click', async () => {
+        if (audit.jira_issue_url) {
+            window.open(audit.jira_issue_url, '_blank', 'noopener,noreferrer');
+            return;
+        }
+
+        if (!projectId) {
+            jiraStatus.textContent = 'Select a project before creating a JIRA issue.';
+            jiraStatus.className = 'create-user-status error';
+            return;
+        }
+
+        const payload = await showJiraIssueForm(buildJiraIssueDefaults(audit));
+        if (!payload) return;
+
+        jiraButton.disabled = true;
+        jiraStatus.textContent = 'Creating JIRA issue...';
+        jiraStatus.className = 'create-user-status';
+
+        try {
+            const issue = await createJiraIssue(projectId, {
+                ...payload,
+                auditId: audit.id,
+            });
+            audit.quality_status = 'escalated';
+            audit.jira_issue_key = issue.key;
+            audit.jira_issue_url = issue.jira_issue_url;
+            audit.jira_created_at = new Date().toISOString();
+            jiraButton.textContent = 'View Issue';
+            jiraButton.title = 'Open this JIRA issue.';
+            jiraStatus.textContent = `Created ${issue.key ?? 'JIRA issue'}.`;
+            jiraStatus.classList.add('success');
+        } catch (error) {
+            jiraStatus.textContent = error.message;
+            jiraStatus.classList.add('error');
+        } finally {
+            jiraButton.disabled = false;
+        }
+    });
+
+    panel.append(header, meta, body, actions);
+    return panel;
 }
 
 function getTotalPages(rows) {
@@ -590,7 +782,7 @@ function createTablePagination({ rows, page, onPageChange }) {
     return pagination;
 }
 
-function createUnresolvedTable({ rows, page, selectedIds, detailAuditId, onPageChange, onOpenDetail, onToggle, onToggleAll }) {
+function createUnresolvedTable({ rows, page, detailAuditId, onPageChange, onOpenDetail }) {
     const section = document.createElement('section');
     section.className = 'analytics-detail-section';
     const pageRows = getPageRows(rows, page);
@@ -610,20 +802,9 @@ function createUnresolvedTable({ rows, page, selectedIds, detailAuditId, onPageC
 
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
-    ['select', 'User Query', 'Response', 'Topic', 'User', 'Created At', 'Status'].forEach((label, index) => {
+    ['User Query', 'Response', 'Topic', 'User', 'Created At', 'Status', 'JIRA URL'].forEach((label) => {
         const th = document.createElement('th');
-
-        if (index === 0) {
-            th.append(createSelectionHeaderCheckbox({
-                rows: pageRows,
-                selectedIds,
-                label: 'Select all unresolved queries',
-                onToggleAll,
-            }));
-        } else {
-            th.textContent = label;
-        }
-
+        th.textContent = label;
         headerRow.append(th);
     });
     thead.append(headerRow);
@@ -641,12 +822,7 @@ function createUnresolvedTable({ rows, page, selectedIds, detailAuditId, onPageC
     } else {
         pageRows.forEach((audit) => {
             const row = document.createElement('tr');
-            const isSelected = selectedIds.has(String(audit.id));
             const isDetailOpen = String(audit.id) === String(detailAuditId);
-
-            if (isSelected) {
-                row.classList.add('selected');
-            }
 
             if (isDetailOpen) {
                 row.classList.add('detail-open');
@@ -660,19 +836,6 @@ function createUnresolvedTable({ rows, page, selectedIds, detailAuditId, onPageC
                     onOpenDetail(audit.id);
                 }
             });
-
-            const selectCell = document.createElement('td');
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.checked = isSelected;
-            checkbox.setAttribute('aria-label', 'Select unresolved query');
-            checkbox.addEventListener('click', (event) => event.stopPropagation());
-            checkbox.addEventListener('keydown', (event) => event.stopPropagation());
-            checkbox.addEventListener('change', (event) => {
-                event.stopPropagation();
-                onToggle(audit.id);
-            });
-            selectCell.append(checkbox);
 
             const queryCell = document.createElement('td');
             queryCell.textContent = truncateText(audit.user_message?.content);
@@ -692,9 +855,12 @@ function createUnresolvedTable({ rows, page, selectedIds, detailAuditId, onPageC
             createdCell.textContent = formatRelativeTime(audit.created_at);
 
             const statusCell = document.createElement('td');
-            statusCell.append(createStatusBadge('unresolved'));
+            statusCell.append(createStatusBadge(audit.quality_status));
 
-            row.append(selectCell, queryCell, responseCell, topicCell, userCell, createdCell, statusCell);
+            const jiraCell = document.createElement('td');
+            jiraCell.append(createJiraIssueLink(audit));
+
+            row.append(queryCell, responseCell, topicCell, userCell, createdCell, statusCell, jiraCell);
             tbody.append(row);
         });
     }
@@ -702,24 +868,11 @@ function createUnresolvedTable({ rows, page, selectedIds, detailAuditId, onPageC
     table.append(thead, tbody);
     tableShell.append(table);
 
-    const actions = document.createElement('div');
-    actions.className = 'analytics-table-actions';
-
-    const markResolvedButton = document.createElement('button');
-    markResolvedButton.type = 'button';
-    markResolvedButton.className = 'analytics-mark-resolved-button';
-    markResolvedButton.textContent = 'Mark resolved';
-    markResolvedButton.disabled = true;
-    markResolvedButton.title = selectedIds.size > 0
-        ? 'Resolving selected queries is not implemented yet.'
-        : 'Select unresolved queries to review.';
-    actions.append(markResolvedButton);
-
-    section.append(header, tableShell, createTablePagination({ rows, page, onPageChange }), actions);
+    section.append(header, tableShell, createTablePagination({ rows, page, onPageChange }));
     return section;
 }
 
-function createLowConfidenceTable({ rows, page, selectedIds, detailAuditId, onPageChange, onOpenDetail, onToggle, onToggleAll }) {
+function createLowConfidenceTable({ rows, page, detailAuditId, onPageChange, onOpenDetail }) {
     const section = document.createElement('section');
     section.className = 'analytics-detail-section';
     const pageRows = getPageRows(rows, page);
@@ -740,7 +893,6 @@ function createLowConfidenceTable({ rows, page, selectedIds, detailAuditId, onPa
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
     [
-        'select',
         'User Query',
         'Response',
         'Topic',
@@ -750,20 +902,9 @@ function createLowConfidenceTable({ rows, page, selectedIds, detailAuditId, onPa
         'Status',
         'Reason',
         'Created At',
-    ].forEach((label, index) => {
+    ].forEach((label) => {
         const th = document.createElement('th');
-
-        if (index === 0) {
-            th.append(createSelectionHeaderCheckbox({
-                rows: pageRows,
-                selectedIds,
-                label: 'Select all low confidence queries',
-                onToggleAll,
-            }));
-        } else {
-            th.textContent = label;
-        }
-
+        th.textContent = label;
         headerRow.append(th);
     });
     thead.append(headerRow);
@@ -773,7 +914,7 @@ function createLowConfidenceTable({ rows, page, selectedIds, detailAuditId, onPa
     if (rows.length === 0) {
         const emptyRow = document.createElement('tr');
         const emptyCell = document.createElement('td');
-        emptyCell.colSpan = 10;
+        emptyCell.colSpan = 9;
         emptyCell.className = 'analytics-table-empty';
         emptyCell.textContent = 'No low confidence queries.';
         emptyRow.append(emptyCell);
@@ -781,13 +922,8 @@ function createLowConfidenceTable({ rows, page, selectedIds, detailAuditId, onPa
     } else {
         pageRows.forEach((audit) => {
             const row = document.createElement('tr');
-            const isSelected = selectedIds.has(String(audit.id));
             const isDetailOpen = String(audit.id) === String(detailAuditId);
             const reason = getAuditReason(audit);
-
-            if (isSelected) {
-                row.classList.add('selected');
-            }
 
             if (isDetailOpen) {
                 row.classList.add('detail-open');
@@ -801,19 +937,6 @@ function createLowConfidenceTable({ rows, page, selectedIds, detailAuditId, onPa
                     onOpenDetail(audit.id);
                 }
             });
-
-            const selectCell = document.createElement('td');
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.checked = isSelected;
-            checkbox.setAttribute('aria-label', 'Select low confidence query');
-            checkbox.addEventListener('click', (event) => event.stopPropagation());
-            checkbox.addEventListener('keydown', (event) => event.stopPropagation());
-            checkbox.addEventListener('change', (event) => {
-                event.stopPropagation();
-                onToggle(audit.id);
-            });
-            selectCell.append(checkbox);
 
             const queryCell = document.createElement('td');
             queryCell.textContent = truncateText(audit.user_message?.content);
@@ -848,7 +971,6 @@ function createLowConfidenceTable({ rows, page, selectedIds, detailAuditId, onPa
             createdCell.textContent = formatRelativeTime(audit.created_at);
 
             row.append(
-                selectCell,
                 queryCell,
                 responseCell,
                 topicCell,
@@ -873,13 +995,11 @@ function createInitialAnalyticsView(previousActiveMetric = 'unresolved') {
     return {
         activeMetric: previousActiveMetric,
         unresolvedRows: [],
-        unresolvedSelectedIds: new Set(),
         unresolvedPage: 1,
         unresolvedLoading: false,
         unresolvedLoaded: false,
         unresolvedError: null,
         lowConfidenceRows: [],
-        lowConfidenceSelectedIds: new Set(),
         lowConfidencePage: 1,
         lowConfidenceLoading: false,
         lowConfidenceLoaded: false,
@@ -980,8 +1100,6 @@ export function renderAnalyticsDashboardScreen(context, options = {}) {
         activeMetric: state.analyticsView.activeMetric,
         onSelect: async (metricKey) => {
             state.analyticsView.activeMetric = metricKey;
-            state.analyticsView.unresolvedSelectedIds = new Set();
-            state.analyticsView.lowConfidenceSelectedIds = new Set();
             state.analyticsView.unresolvedPage = 1;
             state.analyticsView.lowConfidencePage = 1;
             state.analyticsView.detailMode = null;
@@ -1029,7 +1147,6 @@ export function renderAnalyticsDashboardScreen(context, options = {}) {
             const table = createUnresolvedTable({
                 rows: state.analyticsView.unresolvedRows,
                 page: state.analyticsView.unresolvedPage,
-                selectedIds: state.analyticsView.unresolvedSelectedIds,
                 detailAuditId: state.analyticsView.detailMode === 'unresolved'
                     ? state.analyticsView.detailAuditId
                     : null,
@@ -1042,34 +1159,6 @@ export function renderAnalyticsDashboardScreen(context, options = {}) {
                 onOpenDetail: (auditId) => {
                     state.analyticsView.detailMode = 'unresolved';
                     state.analyticsView.detailAuditId = String(auditId);
-                    renderAnalyticsDashboardScreen(context, options);
-                },
-                onToggle: (auditId) => {
-                    const id = String(auditId);
-
-                    if (state.analyticsView.unresolvedSelectedIds.has(id)) {
-                        state.analyticsView.unresolvedSelectedIds.delete(id);
-                    } else {
-                        state.analyticsView.unresolvedSelectedIds.add(id);
-                    }
-
-                    renderAnalyticsDashboardScreen(context, options);
-                },
-                onToggleAll: () => {
-                    const pageRows = getPageRows(
-                        state.analyticsView.unresolvedRows,
-                        state.analyticsView.unresolvedPage,
-                    );
-                    const pageIds = pageRows.map((row) => String(row.id));
-                    const isPageSelected = pageIds.length > 0
-                        && pageIds.every((id) => state.analyticsView.unresolvedSelectedIds.has(id));
-
-                    if (isPageSelected) {
-                        pageIds.forEach((id) => state.analyticsView.unresolvedSelectedIds.delete(id));
-                    } else {
-                        pageIds.forEach((id) => state.analyticsView.unresolvedSelectedIds.add(id));
-                    }
-
                     renderAnalyticsDashboardScreen(context, options);
                 },
             });
@@ -1087,7 +1176,6 @@ export function renderAnalyticsDashboardScreen(context, options = {}) {
             const table = createLowConfidenceTable({
                 rows: state.analyticsView.lowConfidenceRows,
                 page: state.analyticsView.lowConfidencePage,
-                selectedIds: state.analyticsView.lowConfidenceSelectedIds,
                 detailAuditId: state.analyticsView.detailMode === 'low_confidence'
                     ? state.analyticsView.detailAuditId
                     : null,
@@ -1100,34 +1188,6 @@ export function renderAnalyticsDashboardScreen(context, options = {}) {
                 onOpenDetail: (auditId) => {
                     state.analyticsView.detailMode = 'low_confidence';
                     state.analyticsView.detailAuditId = String(auditId);
-                    renderAnalyticsDashboardScreen(context, options);
-                },
-                onToggle: (auditId) => {
-                    const id = String(auditId);
-
-                    if (state.analyticsView.lowConfidenceSelectedIds.has(id)) {
-                        state.analyticsView.lowConfidenceSelectedIds.delete(id);
-                    } else {
-                        state.analyticsView.lowConfidenceSelectedIds.add(id);
-                    }
-
-                    renderAnalyticsDashboardScreen(context, options);
-                },
-                onToggleAll: () => {
-                    const pageRows = getPageRows(
-                        state.analyticsView.lowConfidenceRows,
-                        state.analyticsView.lowConfidencePage,
-                    );
-                    const pageIds = pageRows.map((row) => String(row.id));
-                    const isPageSelected = pageIds.length > 0
-                        && pageIds.every((id) => state.analyticsView.lowConfidenceSelectedIds.has(id));
-
-                    if (isPageSelected) {
-                        pageIds.forEach((id) => state.analyticsView.lowConfidenceSelectedIds.delete(id));
-                    } else {
-                        pageIds.forEach((id) => state.analyticsView.lowConfidenceSelectedIds.add(id));
-                    }
-
                     renderAnalyticsDashboardScreen(context, options);
                 },
             });
@@ -1162,6 +1222,7 @@ export function renderAnalyticsDashboardScreen(context, options = {}) {
         screen.append(createSelectedAuditPanel({
             audit: selectedDetail.audit,
             mode: selectedDetail.mode,
+            projectId: state.activeProjectId,
             onClose: () => {
                 state.analyticsView.detailMode = null;
                 state.analyticsView.detailAuditId = null;
@@ -1216,7 +1277,7 @@ async function loadUnresolvedRows(context, options = {}) {
         state.analyticsView.unresolvedRows = await fetchChatResponseAudits({
             project_id: options.includeProjectFilter === false ? null : state.activeProjectId,
             environment_id: state.selectedEnvironmentId,
-            quality_status: 'unresolved',
+            quality_statuses: 'unresolved,escalated',
         });
         state.analyticsView.unresolvedPage = 1;
         state.analyticsView.unresolvedLoaded = true;

@@ -55,3 +55,22 @@ export async function disconnectJira(projectId) {
 
     return data;
 }
+
+export async function createJiraIssue(projectId, payload) {
+    const response = await fetch(`/api/jira/${projectId}/issues`, {
+        method: 'POST',
+        headers: {
+            ...getAuthHeaders(),
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+        throw new Error(data.error ?? data.message ?? 'Could not create Jira issue.');
+    }
+
+    return data;
+}

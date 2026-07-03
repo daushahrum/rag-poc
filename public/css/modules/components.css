@@ -751,6 +751,12 @@
     box-shadow: 0 20px 40px rgba(0, 0, 0, 0.18);
 }
 
+.confirm-dialog.form-dialog {
+    width: min(720px, calc(100vw - 32px));
+    align-items: stretch;
+    text-align: left;
+}
+
 .confirm-dialog-icon {
     width: 32px;
     height: 32px;
