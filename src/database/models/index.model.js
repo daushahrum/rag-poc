@@ -14,6 +14,7 @@ import QueryQualityDailyModel from './queryQualityDaily.model.js';
 import QueryQualityStatusBreakdownModel from './queryQualityStatusBreakdown.model.js';
 import ProjectUserModel from './projectUser.model.js';
 import ProjectTopicModel from './projectTopic.model.js';
+import JiraConnectionModel from './jira.model.js';
 
 export function initModels(sequelize) {
     const models = {
@@ -32,6 +33,7 @@ export function initModels(sequelize) {
         QueryQualityStatusBreakdown: QueryQualityStatusBreakdownModel(sequelize),
         ProjectUser: ProjectUserModel(sequelize),
         ProjectTopic: ProjectTopicModel(sequelize),
+        JiraConnection: JiraConnectionModel(sequelize),
     };
 
     Object.values(models).forEach((m) => {

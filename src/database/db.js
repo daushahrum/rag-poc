@@ -86,4 +86,32 @@ db.ensureProjectTopicProjectIdColumn = async function() {
   `);
 }
 
+db.ensureJiraConnectionsTable = async function() {
+  await sequelize.query(`
+    CREATE TABLE IF NOT EXISTS jira_connections (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      project_id BIGINT NOT NULL UNIQUE,
+      access_token TEXT NOT NULL,
+      refresh_token TEXT,
+      cloud_id VARCHAR(255) NOT NULL,
+      site_name VARCHAR(255),
+      site_url VARCHAR(255),
+      jira_project_key VARCHAR(255),
+      jira_project_name VARCHAR(255),
+      scopes TEXT,
+      expires_at TIMESTAMPTZ,
+      created_by TEXT,
+      updated_by TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  await sequelize.query(`
+    ALTER TABLE jira_connections
+    ALTER COLUMN created_by TYPE TEXT USING created_by::TEXT,
+    ALTER COLUMN updated_by TYPE TEXT USING updated_by::TEXT
+  `);
+}
+
 export { sequelize, models, db };

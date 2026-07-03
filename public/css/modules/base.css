@@ -15,6 +15,8 @@
   --accent: #00b4d8;
   --accent-dark: #0EA5E9;
   --accent-light: #E7F5FB;
+  --success: #16a34a;
+  --success-light: #f0fdf4;
   --danger: #b42318;
   --danger-light: #fff5f5;
   --danger-dark: #991b1b;
@@ -43,6 +45,8 @@
   --accent: #38c7e5;
   --accent-dark: #69d7ef;
   --accent-light: #1f4d5c;
+  --success: #4ade80;
+  --success-light: #1e3a2f;
   --danger: #ff8a80;
   --danger-light: #4a2a2f;
   --danger-dark: #ffc0ba;
@@ -86,11 +90,4 @@ button:disabled {
 
 [hidden] {
   display: none !important;
-}
-
-.project-key-warning {
-  margin-top: 8px;
-  font-size: 12px;
-  color: #b45309;
-  line-height: 1.4;
 }

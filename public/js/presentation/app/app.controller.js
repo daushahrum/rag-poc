@@ -1239,6 +1239,23 @@ logoutButton.addEventListener('click', () => {
     window.location.href = '/login';
 });
 
+function handleInitialRoute() {
+    const params = new URLSearchParams(window.location.search);
+
+    if (params.get('view') !== 'connected-apps') {
+        return;
+    }
+
+    const jiraStatus = params.get('jira');
+    if (jiraStatus) {
+        sessionStorage.setItem('andi-jira-return-status', jiraStatus);
+    }
+
+    projectAppsButton.click();
+
+    window.history.replaceState({}, '', window.location.pathname);
+}
+
 // ─── Bootstrap ────────────────────────────────────────────────────────────────
 
 clearKnowledgeEditor();
@@ -1246,4 +1263,5 @@ resizeTextarea(input);
 initializeTheme();
 renderRoleMenu();
 initializeRoleView();
+handleInitialRoute();
 }

@@ -13,6 +13,7 @@ import toolRoutes from "./src/modules/tool/tool.route.js";
 import documentChunkRoutes from "./src/modules/knowledge/documentChunk/documentChunk.route.js";
 import knowledgeDocumentRoutes from "./src/modules/knowledge/knowledgeDocument/knowledgeDocument.route.js";
 import ragRoutes from "./src/modules/rag/rag.route.js";
+import jiraRoutes from "./src/modules/jira/jira.route.js";
 
 import * as chatSessionController from "./src/modules/chat/chatSession/chatSession.controller.js";
 import * as chatMessageController from "./src/modules/chat/chatMessages/chatMessage.controller.js";
@@ -29,6 +30,7 @@ db.testConnection();
 try {
   await db.ensureChatMessageConfidenceColumns();
   await db.ensureProjectTopicProjectIdColumn();
+  await db.ensureJiraConnectionsTable();
 } catch (error) {
   console.error("Unable to ensure database compatibility columns:", error);
 }
@@ -60,6 +62,7 @@ app.use("/api/tool", toolRoutes);
 app.use("/api/documentChunk", documentChunkRoutes);
 app.use("/api/knowledge_document", knowledgeDocumentRoutes);
 app.use("/api/rag", ragRoutes);
+app.use("/api/jira", jiraRoutes);
 
 // Legacy UI endpoints - forward to new API routes
 app.post("/sessions", auth.authenticate, chatSessionController.createChatSession);

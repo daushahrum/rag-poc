@@ -356,6 +356,7 @@ async function verifyRetrievedEvidence({ query, answer, chunks }) {
         const response = await openai.chat.completions.create({
             model: 'gpt-4o-mini',
             response_format: { type: 'json_object' },
+            temperature: 0,
             messages: [
                 {
                     role: 'system',

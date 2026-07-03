@@ -1,6 +1,12 @@
 import { createApp, deleteApp, fetchProjectApps, updateApp } from '../../../domain/use-cases/app.use-cases.js';
+import {
+    disconnectJira,
+    getJiraAuthorizationUrl,
+    getJiraConnection,
+} from '../../../domain/use-cases/jira.use-cases.js';
 import { createFormField, createInput } from '../../components/form-controls.js';
 import { createProjectManagerScreen } from '../components/project-manager-layout.js';
+import { showConfirmDialog } from '../components/confirm-dialog.js';
 
 function generateProjectKey() {
     const bytes = new Uint8Array(32);
@@ -17,8 +23,27 @@ export async function renderProjectAppsScreen(context) {
         'Manage project keys for each client app connected to this project.',
         'New app',
     );
+    createButton.parentElement?.classList.add('connected-apps-list-panel');
 
     const heading = document.createElement('h3');
+    const jiraActions = document.createElement('div');
+    jiraActions.className = 'project-knowledge-actions';
+    const jiraStatus = document.createElement('p');
+    jiraStatus.className = 'create-user-status';
+    jiraStatus.setAttribute('role', 'status');
+    const jiraReturnStatus = new URLSearchParams(window.location.search).get('jira')
+        || sessionStorage.getItem('andi-jira-return-status');
+    if (jiraReturnStatus) {
+        sessionStorage.removeItem('andi-jira-return-status');
+        jiraStatus.textContent = jiraReturnStatus === 'connected'
+            ? 'Jira connected successfully.'
+            : `Jira connection ${jiraReturnStatus.replace(/_/g, ' ')}.`;
+        jiraStatus.classList.add(jiraReturnStatus === 'connected' ? 'success' : 'error');
+    }
+    let connectJiraButton = buildJiraButton(false);
+    createButton.after(connectJiraButton);
+    jiraActions.append(jiraStatus);
+
     const fields = document.createElement('div');
     fields.className = 'project-resource-grid';
     const nameField = createInput('name', 'text', 'Customer portal', 'off');
@@ -86,10 +111,11 @@ export async function renderProjectAppsScreen(context) {
     saveButton.type = 'submit';
     buttons.append(deleteButton, saveButton);
     actions.append(status, buttons);
-    editor.append(heading, fields, accessGrid, keyPanel, actions);
+    editor.append(jiraActions, heading, fields, accessGrid, keyPanel, actions);
 
     let items = [];
     let editingId = null;
+    let jiraConnection = null;
 
     function showGeneratedKey(projectKey) {
         keyPanel.hidden = !projectKey;
@@ -138,6 +164,76 @@ export async function renderProjectAppsScreen(context) {
         }
     }
 
+    function buildJiraButton(connected) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = connected
+            ? 'knowledge-item create-list-button jira-connected'
+            : 'knowledge-item create-list-button';
+        button.innerHTML = connected
+            ? '<span class="knowledge-item-title"><img class="connect-app-icon" src="/assets/icons/jira.png" alt="" aria-hidden="true">JIRA Connected</span><span class="knowledge-item-preview">Click to unauthorize JIRA for this project.</span>'
+            : '<span class="knowledge-item-title"><img class="connect-app-icon" src="/assets/icons/jira.png" alt="" aria-hidden="true">Connect JIRA</span><span class="knowledge-item-preview">Authorize Jira for this project.</span>';
+        button.addEventListener('click', handleJiraButtonClick);
+        return button;
+    }
+
+    function renderJiraButton() {
+        const connected = Boolean(jiraConnection);
+        const nextButton = buildJiraButton(connected);
+        connectJiraButton.replaceWith(nextButton);
+        connectJiraButton = nextButton;
+    }
+
+     async function handleJiraButtonClick() {
+        if (!state.activeProjectId) return;
+ 
+        jiraStatus.className = 'create-user-status';
+        connectJiraButton.disabled = true;
+ 
+        try {
+            if (jiraConnection) {
+                const confirmed = await showConfirmDialog({
+                    iconSrc: '/assets/icons/jira.png',
+                    title: 'Disconnect JIRA?',
+                    description: 'ANDI will no longer be able to create and read your JIRA project. You can still reconnect JIRA in the future.',
+                    cancelLabel: 'Cancel',
+                    confirmLabel: 'Disconnect',
+                    destructive: true,
+                });
+                if (!confirmed) return;
+ 
+                jiraStatus.textContent = 'Disconnecting JIRA...';
+                await disconnectJira(state.activeProjectId);
+                jiraConnection = null;
+                renderJiraButton();
+                jiraStatus.textContent = 'JIRA disconnected.';
+                jiraStatus.classList.add('success');
+                return;
+            }
+ 
+            jiraStatus.textContent = 'Opening JIRA...';
+            const authorizationUrl = await getJiraAuthorizationUrl(state.activeProjectId);
+            window.location.href = authorizationUrl;
+        } catch (error) {
+            jiraStatus.textContent = error.message;
+            jiraStatus.classList.add('error');
+        } finally {
+            connectJiraButton.disabled = false;
+        }
+    }
+
+    async function loadJiraConnection() {
+        try {
+            jiraConnection = await getJiraConnection(state.activeProjectId);
+            renderJiraButton();
+        } catch (error) {
+            jiraConnection = null;
+            renderJiraButton();
+            jiraStatus.textContent = error.message;
+            jiraStatus.className = 'create-user-status error';
+        }
+    }
+
     async function loadItems() {
         list.innerHTML = '<p class="history-empty">Loading apps...</p>';
         try {
@@ -155,6 +251,7 @@ export async function renderProjectAppsScreen(context) {
         nameField.focus();
     });
     refreshButton.addEventListener('click', loadItems);
+
     editor.addEventListener('submit', async (event) => {
         event.preventDefault();
         status.className = 'create-user-status';
@@ -247,5 +344,9 @@ export async function renderProjectAppsScreen(context) {
     });
 
     setMode();
-    await loadItems();
+    renderJiraButton();
+    await Promise.all([
+        loadItems(),
+        loadJiraConnection(),
+    ]);
 }
