@@ -27,7 +27,7 @@ export async function renderProjectKnowledgeScreen(context) {
     uploadIcon.className = 'bi bi-file-earmark-text';
     uploadIcon.setAttribute('aria-hidden', 'true');
     const uploadCopy = document.createElement('p');
-    uploadCopy.textContent = 'Upload knowledge document (pdf or txt)';
+    uploadCopy.textContent = 'Upload knowledge document (pdf, txt, or md)';
     const browseButton = document.createElement('button');
     browseButton.className = 'small-button';
     browseButton.type = 'button';
@@ -43,7 +43,7 @@ export async function renderProjectKnowledgeScreen(context) {
     const uploadInput = document.createElement('input');
     uploadInput.className = 'sr-only';
     uploadInput.type = 'file';
-    uploadInput.accept = 'application/pdf,text/plain,.pdf,.txt';
+    uploadInput.accept = 'application/pdf,text/plain,text/markdown,.pdf,.txt,.md';
     uploadSection.append(uploadIcon, uploadCopy, browseButton, selectedFileLabel, ingestUploadButton, uploadInput);
     const creationDivider = document.createElement('div');
     creationDivider.className = 'knowledge-creation-divider';
@@ -111,11 +111,13 @@ export async function renderProjectKnowledgeScreen(context) {
         const isSupportedDocument = [
             'application/pdf',
             'text/plain',
-        ].includes(file.type) || /\.(pdf|txt)$/i.test(file.name);
+            'text/markdown',
+            'text/x-markdown',
+        ].includes(file.type) || /\.(pdf|txt|md)$/i.test(file.name);
 
         if (!isSupportedDocument) {
             resetUploadSelection();
-            status.textContent = 'Upload a PDF or TXT document.';
+            status.textContent = 'Upload a PDF, TXT, or Markdown document.';
             status.className = 'create-user-status';
             status.classList.add('error');
             return;

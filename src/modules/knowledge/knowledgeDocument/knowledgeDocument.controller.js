@@ -17,8 +17,10 @@ function getDocumentTitleFromFilename(filename) {
 async function extractUploadedDocumentContent(file) {
     const isPdf = file.mimetype === 'application/pdf' || /\.pdf$/i.test(file.originalname);
     const isText = file.mimetype === 'text/plain' || /\.txt$/i.test(file.originalname);
+    const isMarkdown = ['text/markdown', 'text/x-markdown'].includes(file.mimetype)
+        || /\.md$/i.test(file.originalname);
 
-    if (isText) {
+    if (isText || isMarkdown) {
         return file.buffer.toString('utf8').trim();
     }
 
@@ -32,7 +34,7 @@ async function extractUploadedDocumentContent(file) {
         }
     }
 
-    throw new Error('Only PDF or TXT documents are supported');
+    throw new Error('Only PDF, TXT, or Markdown documents are supported');
 }
 
 export async function createKnowledgeDocument(req, res) {

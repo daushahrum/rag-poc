@@ -2,6 +2,7 @@ import { fetchChatResponseAudits } from '../../../domain/use-cases/chat.use-case
 import { createJiraIssue, getJiraConnection } from '../../../domain/use-cases/jira.use-cases.js';
 
 const analyticsTablePageSize = 10;
+const jiraIssueTypes = ['Task', 'Improvement', 'Bug Fix', 'New Feature'];
 
 const confidenceReasonLabels = {
     chunks_do_not_contain_direct_answer: 'No direct answer found in retrieved knowledge',
@@ -443,10 +444,18 @@ function showJiraIssueForm(defaults) {
         const typeLabel = document.createElement('label');
         typeLabel.className = 'jira-issue-field';
         typeLabel.textContent = 'Issue type';
-        const typeInput = document.createElement('input');
+        const typeInput = document.createElement('select');
         typeInput.name = 'issueType';
         typeInput.required = true;
-        typeInput.value = defaults.issueType;
+        jiraIssueTypes.forEach((issueType) => {
+            const option = document.createElement('option');
+            option.value = issueType;
+            option.textContent = issueType;
+            typeInput.append(option);
+        });
+        typeInput.value = jiraIssueTypes.includes(defaults.issueType)
+            ? defaults.issueType
+            : jiraIssueTypes[0];
         typeLabel.append(typeInput);
 
         const descriptionLabel = document.createElement('label');
