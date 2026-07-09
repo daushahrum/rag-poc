@@ -1,8 +1,13 @@
 // modules/chat/chat.service.js
 
-import { chatCompletion } from '../../../lib/llm.js';
+import {
+    DEFAULT_CHAT_MODEL,
+    chatCompletion,
+    getBackendToolDefinition,
+    streamChatCompletion,
+} from '../../../lib/llm.js';
 import { openai } from '../../../lib/openai.js';
-import { buildContext } from '../rag/rag.service.js';
+import { retrieve } from '../rag/rag.service.js';
 
 import * as chatSessionRepository from './chatSession/chatSession.repository.js';
 import * as chatMessageRepository from './chatMessages/chatMessage.repository.js';
@@ -16,8 +21,135 @@ import {
     classifyConfidence,
     topChunksLookUnrelated,
 } from './confidence.service.js';
+import { redactSensitive, safeRedactedJson } from '../../utils/redact.js';
+
+const CHAT_LIMITS = {
+    MAX_HISTORY_MESSAGES: readPositiveIntEnv('MAX_HISTORY_MESSAGES', 10),
+    MAX_RETRIEVED_CHUNKS: readPositiveIntEnv('MAX_RETRIEVED_CHUNKS', 5),
+    MAX_CHUNK_CHARS: readPositiveIntEnv('MAX_CHUNK_CHARS', 1200),
+    MAX_TOTAL_CONTEXT_CHARS: readPositiveIntEnv('MAX_TOTAL_CONTEXT_CHARS', 8000),
+    MAX_TOOL_RESULT_CHARS: readPositiveIntEnv('MAX_TOOL_RESULT_CHARS', 3000),
+    MAX_OUTPUT_TOKENS: readPositiveIntEnv('MAX_OUTPUT_TOKENS', 400),
+};
 
 export async function sendMessage(session_id, message, userToken, isPortalAdmin) {
+    const timer = createChatTimer(session_id);
+    const chatState = await prepareChatState({
+        session_id,
+        message,
+        userToken,
+        isPortalAdmin,
+        timer,
+    });
+
+    let assistantMessage = await completeChatState(chatState);
+
+    timer.mark('save_assistant_message.start');
+    const savedMessage = await chatMessageService.createChatMessage({
+        session_id,
+        role: 'assistant',
+        content: assistantMessage.content,
+    });
+    timer.mark('save_assistant_message.end');
+
+    scheduleConfidenceEvaluation({
+        session_id,
+        message_id: savedMessage.id,
+        query: message,
+        answer: assistantMessage.content,
+        chunks: chatState.chunks,
+    });
+
+    timer.finish('return_response');
+    return savedMessage;
+}
+
+export async function sendMessageStream(session_id, message, userToken, isPortalAdmin, { sendEvent, signal } = {}) {
+    const timer = createChatTimer(`${session_id}:stream`);
+    const emit = typeof sendEvent === 'function' ? sendEvent : () => true;
+    const streamStartedAt = Date.now();
+    let firstTokenAt = null;
+    let responseContent = '';
+    let savedMessage = null;
+
+    emit({ type: 'status', message: 'Thinking...' });
+
+    const chatState = await prepareChatState({
+        session_id,
+        message,
+        userToken,
+        isPortalAdmin,
+        timer,
+        signal,
+        onStatus: (statusMessage) => emit({ type: 'status', message: statusMessage }),
+    });
+
+    assertNotAborted(signal);
+
+    try {
+        await streamChatState(chatState, {
+            signal,
+            onStatus: (statusMessage) => emit({ type: 'status', message: statusMessage }),
+            onToken: (token) => {
+                if (!firstTokenAt) {
+                    firstTokenAt = Date.now();
+                    timer.mark('chat_completion_after_tools.first_token', {
+                        time_to_first_streamed_token_ms: firstTokenAt - streamStartedAt,
+                    });
+                }
+
+                responseContent += token;
+                return emit({ type: 'token', content: token });
+            },
+        });
+
+        assertNotAborted(signal);
+
+        timer.mark('save_assistant_message.start');
+        savedMessage = await chatMessageService.createChatMessage({
+            session_id,
+            role: 'assistant',
+            content: responseContent,
+        });
+        timer.mark('save_assistant_message.end');
+
+        timer.finish('stream.complete', {
+            time_to_first_streamed_token_ms: firstTokenAt ? firstTokenAt - streamStartedAt : null,
+            total_stream_duration_ms: Date.now() - streamStartedAt,
+            final_response_char_count: responseContent.length,
+        });
+
+        emit({ type: 'done', message_id: savedMessage.id });
+
+        scheduleConfidenceEvaluation({
+            session_id,
+            message_id: savedMessage.id,
+            query: message,
+            answer: responseContent,
+            chunks: chatState.chunks,
+        });
+    } catch (error) {
+        if (isAbortError(error) || signal?.aborted) {
+            timer.finish('stream.client_disconnected', {
+                final_response_char_count: responseContent.length,
+            });
+            return;
+        }
+
+        console.error('Failed to stream chat response:', redactSensitive(error.message));
+        emit({ type: 'error', message: 'Failed to generate response' });
+    }
+}
+
+async function prepareChatState({
+    session_id,
+    message,
+    userToken,
+    isPortalAdmin,
+    timer,
+    signal,
+    onStatus,
+}) {
     if (!session_id) {
         throw new Error('session_id is required');
     }
@@ -26,116 +158,239 @@ export async function sendMessage(session_id, message, userToken, isPortalAdmin)
         throw new Error('message is required');
     }
 
-    if (!isPortalAdmin && !userToken){
+    if (!isPortalAdmin && !userToken) {
         throw new Error('Session token is required');
     }
 
-    // 1. Load session (need project_id + environment_id)
+    assertNotAborted(signal);
+
     const session = await chatSessionRepository.getChatSessionById(session_id);
+    timer.mark('load_session');
 
     if (!session) {
         throw new Error('Chat session not found');
     }
 
-const { project_id, environment_id } = session;
+    const { project_id, environment_id } = session;
 
-    // If isPortalAdmin, use the environment's auth_config token instead of user token
     if (isPortalAdmin) {
         const environment = await projectEnvironmentRepository.getProjectEnvironmentById(environment_id);
         if (environment && environment.auth_config?.token) {
             userToken = environment.auth_config.token;
         }
+        timer.mark('load_admin_environment_token');
     }
 
-    // 2. Check if this is the first message in the session (before saving it)
-    const existingMessages = await chatMessageRepository.getChatMessages({ session_id });
-    const isFirstMessage = existingMessages.length === 0;
-
-    // 3. Save the user's message
     await chatMessageService.createChatMessage({
         session_id,
         role: 'user',
         content: message,
     });
+    timer.mark('save_user_message');
 
-    // 4. Auto-generate topic from the first message (fire-and-forget, doesn't block the response)
-    if (isFirstMessage && !session.topic) {
+    assertNotAborted(signal);
+    onStatus?.('Checking project knowledge...');
+
+    const projectPromise = timeStep(timer, 'build_context.load_project_prompt', () => (
+        projectRepository.getProjectById(project_id)
+    ));
+    const historyPromise = timeStep(timer, 'build_context.load_history', () => (
+        chatMessageRepository.getChatMessages({ session_id })
+    ));
+    const chunksPromise = timeStep(timer, 'build_context.retrieve_knowledge_chunks', () => (
+        retrieve(message, project_id, CHAT_LIMITS.MAX_RETRIEVED_CHUNKS)
+    ));
+    const toolsPromise = toolRepository.getTools({ project_id, is_enabled: true });
+
+    const [project, history, rawChunks, availableTools] = await Promise.all([
+        projectPromise,
+        historyPromise,
+        chunksPromise,
+        toolsPromise,
+    ]);
+    const cappedHistory = capHistoryMessages(history, timer);
+
+    const { context, chunks } = formatCappedContext(rawChunks, timer);
+    timer.mark('build_context.format_context');
+
+    if (history.length === 1 && !session.topic) {
         generateAndSaveTopic(session_id, message).catch((err) => {
-            console.error('Failed to generate chat topic:', err.message);
+            console.error('Failed to generate chat topic:', redactSensitive(err.message));
         });
     }
 
-    // 5. Load conversation history for this session
-    const history = await chatMessageRepository.getChatMessages({ session_id });
-
-    // 6. Retrieve RAG context relevant to this message
-    const { context, chunks } = await buildContext(message, project_id);
-
-    // 7. Load project settings and available tools for this project.
-    //TODO: Consider caching the tool catalog for performance, as it is unlikely to change frequently.
-    const [project, availableTools] = await Promise.all([
-        projectRepository.getProjectById(project_id),
-        toolRepository.getTools({ project_id, is_enabled: true }),
-    ]);
-
-    const toolCatalog = availableTools.map((t) => ({
-        tool_name: t.tool_name,
-        description: t.description,
-        method: t.method,
-        endpoint: t.endpoint,
-        path_params: t.path_params,
-        query_params: t.query_params,
-        body_schema: t.body_schema,
-    }));
-
-    // 8. Build system prompt
-    const systemPrompt = buildSystemPrompt(context, toolCatalog, project?.custom_prompt);
-
-    // 9. Build message list for OpenAI
+    const selectedToolCatalog = selectToolCatalogForMessage(message, availableTools);
+    const systemPrompt = buildSystemPrompt(context, selectedToolCatalog, project?.custom_prompt);
     const messages = [
         { role: 'system', content: systemPrompt },
-        ...history.map((m) => ({ role: m.role, content: m.content })),
+        ...cappedHistory.map((m) => ({ role: m.role, content: String(m.content ?? '') })),
     ];
-
-    // 10. First completion call
-    let assistantMessage = await chatCompletion(messages);
-
-    // 11. Handle tool calls if present
-    if (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0) {
-        messages.push(assistantMessage);
-
-        for (const toolCall of assistantMessage.tool_calls) {
-            const args = JSON.parse(toolCall.function.arguments);
-
-            const toolResult = await executeBackendTool(
-                args,
-                project_id,
-                environment_id,
-                userToken
-            );
-
-            messages.push({
-                role: 'tool',
-                tool_call_id: toolCall.id,
-                content: JSON.stringify(toolResult),
-            });
-        }
-
-        // 12. Second completion call with tool results injected
-        assistantMessage = await chatCompletion(messages);
-    }
-
-    const confidence = await evaluateLowConfidence({
-        query: message,
-        answer: assistantMessage.content,
-        chunks,
+    timer.mark('build_context.build_messages');
+    timer.mark('build_context.complete', {
+        history_message_count: cappedHistory.length,
+        retrieved_chunk_count: chunks.length,
+        final_context_char_count: context.length,
+        estimated_prompt_tokens: estimatePromptTokens(messages),
+        tool_count: selectedToolCatalog.length,
+        model_name: DEFAULT_CHAT_MODEL,
+        max_output_tokens: CHAT_LIMITS.MAX_OUTPUT_TOKENS,
     });
 
-    // 13. Save assistant's final response
-    const savedMessage = await chatMessageService.createChatMessage({
+    return {
+        session,
         session_id,
-        role: 'assistant',
-        content: assistantMessage.content,
+        project_id,
+        environment_id,
+        userToken,
+        message,
+        messages,
+        chunks,
+        toolCatalog: selectedToolCatalog,
+        timer,
+    };
+}
+
+async function completeChatState(chatState) {
+    const { messages, timer, toolCatalog } = chatState;
+
+    if (toolCatalog.length === 0) {
+        timer.mark('chat_completion_initial.start');
+        const assistantMessage = await chatCompletion(messages, completionOptions({ enableTools: false }));
+        timer.mark('chat_completion_initial.end');
+        return assistantMessage;
+    }
+
+    timer.mark('chat_completion_initial.start');
+    let assistantMessage = await chatCompletion(messages, completionOptions({ enableTools: true }));
+    timer.mark('chat_completion_initial.end');
+
+    if (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0) {
+        await appendToolResults(chatState, assistantMessage);
+
+        timer.mark('chat_completion_after_tools.start');
+        assistantMessage = await chatCompletion(messages, completionOptions({ enableTools: false }));
+        timer.mark('chat_completion_after_tools.end');
+    }
+
+    return assistantMessage;
+}
+
+async function streamChatState(chatState, { signal, onStatus, onToken }) {
+    const { messages, timer, toolCatalog } = chatState;
+
+    if (toolCatalog.length === 0) {
+        onStatus?.('Generating answer...');
+        await streamFinalCompletion(messages, timer, onToken, signal);
+        return;
+    }
+
+    timer.mark('chat_completion_initial.start');
+    const assistantMessage = await chatCompletion(messages, completionOptions({
+        enableTools: true,
+        signal,
+    }));
+    timer.mark('chat_completion_initial.end');
+
+    if (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0) {
+        await appendToolResults(chatState, assistantMessage, {
+            signal,
+            onStatus,
+        });
+
+        onStatus?.('Generating answer...');
+        await streamFinalCompletion(messages, timer, onToken, signal);
+        return;
+    }
+
+    onStatus?.('Generating answer...');
+    timer.mark('chat_completion_after_tools.start');
+    emitBufferedTextAsTokens(assistantMessage.content ?? '', onToken);
+    timer.mark('chat_completion_after_tools.end');
+}
+
+async function streamFinalCompletion(messages, timer, onToken, signal) {
+    timer.mark('chat_completion_after_tools.start');
+    const stream = await streamChatCompletion(messages, completionOptions({
+        enableTools: false,
+        signal,
+    }));
+
+    for await (const chunk of stream) {
+        assertNotAborted(signal);
+        const token = chunk.choices?.[0]?.delta?.content;
+        if (token) {
+            const keepGoing = onToken(token);
+            if (keepGoing === false) {
+                throw new Error('Stream client disconnected');
+            }
+        }
+    }
+
+    timer.mark('chat_completion_after_tools.end');
+}
+
+function emitBufferedTextAsTokens(text, onToken) {
+    const parts = String(text).match(/\s+|\S+/g) ?? [];
+
+    for (const part of parts) {
+        const keepGoing = onToken(part);
+        if (keepGoing === false) {
+            throw new Error('Stream client disconnected');
+        }
+    }
+}
+
+async function appendToolResults(chatState, assistantMessage, { signal, onStatus } = {}) {
+    const { messages, project_id, environment_id, userToken, timer } = chatState;
+    messages.push(assistantMessage);
+
+    for (const toolCall of assistantMessage.tool_calls) {
+        assertNotAborted(signal);
+        const args = parseToolCallArguments(toolCall);
+        onStatus?.(`Calling tool: ${args.action}`);
+
+        timer.mark('execute_tool.start', { action: args.action });
+        const toolResult = await executeBackendTool(args, project_id, environment_id, userToken);
+        timer.mark('execute_tool.end', { action: args.action });
+
+        timer.mark('tool_result.normalize.start', { action: args.action });
+        const normalizedToolResult = normalizeToolResult(args.action, toolResult);
+        timer.mark('tool_result.normalize.end', {
+            action: args.action,
+            tool_result_raw_chars: normalizedToolResult.rawChars,
+            tool_result_final_chars: normalizedToolResult.finalChars,
+            tool_result_trimmed: normalizedToolResult.trimmed,
+        });
+
+        messages.push({
+            role: 'tool',
+            tool_call_id: toolCall.id,
+            content: normalizedToolResult.content,
+        });
+    }
+}
+
+function scheduleConfidenceEvaluation(payload) {
+    setImmediate(() => {
+        runConfidenceEvaluation(payload).catch((error) => {
+            console.error('Failed to complete confidence evaluation:', redactSensitive(error.message));
+        });
+    });
+}
+
+async function runConfidenceEvaluation({ session_id, message_id, query, answer, chunks }) {
+    const timer = createChatTimer(`${session_id}:confidence:${message_id}`);
+    timer.mark('confidence.prepare');
+
+    const confidence = await evaluateLowConfidence({
+        query,
+        answer,
+        chunks,
+        timer,
+    });
+    timer.mark('confidence.parse');
+
+    await chatMessageService.updateChatMessage(message_id, {
         low_confidence: confidence.low_confidence,
         confidence_reasons: {
             score: confidence.score,
@@ -147,14 +402,352 @@ const { project_id, environment_id } = session;
 
     await createConfidenceAudit({
         session_id,
-        message_id: savedMessage.id,
+        message_id,
         confidence,
     });
-
-    return savedMessage;
+    timer.mark('confidence.db_update');
+    timer.finish('confidence.complete');
 }
 
-async function evaluateLowConfidence({ query, answer, chunks }) {
+function createChatTimer(label) {
+    const startedAt = Date.now();
+    let lastAt = startedAt;
+
+    return {
+        mark(step, metadata = undefined) {
+            const now = Date.now();
+            const suffix = metadata ? ` ${safeRedactedJson(metadata)}` : '';
+            console.log(
+                `[chat-timing:${label}] ${step} +${now - lastAt}ms total=${now - startedAt}ms${suffix}`
+            );
+            lastAt = now;
+        },
+        finish(step, metadata = undefined) {
+            const now = Date.now();
+            const suffix = metadata ? ` ${safeRedactedJson(metadata)}` : '';
+            console.log(
+                `[chat-timing:${label}] ${step} total=${now - startedAt}ms${suffix}`
+            );
+        },
+    };
+}
+
+async function timeStep(timer, step, fn) {
+    const result = await fn();
+    timer.mark(step);
+    return result;
+}
+
+function readPositiveIntEnv(name, fallback) {
+    const value = Number.parseInt(process.env[name], 10);
+
+    return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function completionOptions({ enableTools, signal } = {}) {
+    return {
+        model: DEFAULT_CHAT_MODEL,
+        maxOutputTokens: CHAT_LIMITS.MAX_OUTPUT_TOKENS,
+        tools: enableTools ? getBackendToolDefinition() : [],
+        signal,
+    };
+}
+
+function assertNotAborted(signal) {
+    if (signal?.aborted) {
+        throw new Error('Request aborted');
+    }
+}
+
+function isAbortError(error) {
+    return error?.name === 'AbortError'
+        || /aborted|client disconnected/i.test(String(error?.message ?? ''));
+}
+
+function capHistoryMessages(history, timer) {
+    const normalizedHistory = Array.isArray(history) ? history : [];
+
+    if (normalizedHistory.length <= CHAT_LIMITS.MAX_HISTORY_MESSAGES) {
+        return normalizedHistory;
+    }
+
+    const cappedHistory = normalizedHistory.slice(-CHAT_LIMITS.MAX_HISTORY_MESSAGES);
+    timer.mark('history_messages.trimmed', {
+        before_count: normalizedHistory.length,
+        after_count: cappedHistory.length,
+    });
+
+    return cappedHistory;
+}
+
+function formatCappedContext(rawChunks, timer) {
+    const chunks = [];
+    const lines = [];
+    let totalChars = 0;
+    let trimmed = false;
+    const selectedChunks = Array.isArray(rawChunks)
+        ? rawChunks.slice(0, CHAT_LIMITS.MAX_RETRIEVED_CHUNKS)
+        : [];
+
+    selectedChunks.forEach((chunk) => {
+        const rawContent = String(chunk?.content ?? '');
+        let content = rawContent.slice(0, CHAT_LIMITS.MAX_CHUNK_CHARS);
+
+        if (content.length < rawContent.length) {
+            trimmed = true;
+            timer.mark('knowledge_chunk.trimmed', {
+                before_chars: rawContent.length,
+                after_chars: content.length,
+                max_chunk_chars: CHAT_LIMITS.MAX_CHUNK_CHARS,
+            });
+        }
+
+        const separatorChars = lines.length > 0 ? 7 : 0;
+        const remainingChars = CHAT_LIMITS.MAX_TOTAL_CONTEXT_CHARS - totalChars - separatorChars;
+
+        if (remainingChars <= 0) {
+            trimmed = true;
+            return;
+        }
+
+        if (content.length > remainingChars) {
+            content = content.slice(0, remainingChars);
+            trimmed = true;
+        }
+
+        totalChars += content.length + separatorChars;
+        lines.push(content);
+        chunks.push({
+            ...chunk,
+            content,
+        });
+    });
+
+    const context = lines.join('\n\n---\n\n');
+
+    if (trimmed) {
+        timer.mark('context.trimmed', {
+            raw_chunk_count: Array.isArray(rawChunks) ? rawChunks.length : 0,
+            final_chunk_count: chunks.length,
+            final_context_char_count: context.length,
+            max_total_context_chars: CHAT_LIMITS.MAX_TOTAL_CONTEXT_CHARS,
+        });
+    }
+
+    return { context, chunks };
+}
+
+function selectToolCatalogForMessage(message, availableTools) {
+    const toolsForPrompt = buildToolCatalog(availableTools);
+    const original = String(message ?? '');
+    const lower = original.toLowerCase();
+
+    if (/\bjob\s*order\b|\bjob-order\b|\bjo[_\s-]?\d+|\bJO\b/i.test(original)
+        || /\bjob\s*order\b|\bjob-order\b/.test(lower)) {
+        return toolsForPrompt.filter((tool) => toolCatalogMatches(tool, /job|jo/i));
+    }
+
+    if (/\bdelivery\s*order\b|\bdelivery-order\b/i.test(original)
+        || /\bD\/?O\b/.test(original)
+        || /\bDO[_\s-]?\d+/i.test(original)
+        || /\bdelivery\s*order\b|\bdelivery-order\b/.test(lower)) {
+        return toolsForPrompt.filter((tool) => toolCatalogMatches(tool, /delivery|do/i));
+    }
+
+    return [];
+}
+
+function buildToolCatalog(availableTools) {
+    return (Array.isArray(availableTools) ? availableTools : []).map((tool) => ({
+        tool_name: tool.tool_name,
+        description: tool.description,
+        method: tool.method,
+        endpoint: tool.endpoint,
+        path_params: tool.path_params,
+        query_params: tool.query_params,
+        body_schema: tool.body_schema,
+    }));
+}
+
+function toolCatalogMatches(tool, pattern) {
+    return pattern.test([
+        tool.tool_name,
+        tool.description,
+        tool.endpoint,
+    ].filter(Boolean).join(' '));
+}
+
+function estimatePromptTokens(messages) {
+    const chars = messages.reduce((total, message) => (
+        total + String(message.content ?? '').length
+    ), 0);
+
+    return Math.ceil(chars / 4);
+}
+
+function parseToolCallArguments(toolCall) {
+    try {
+        const args = JSON.parse(toolCall.function.arguments || '{}');
+
+        return {
+            action: args.action,
+            payload: args.payload ?? {},
+            module: args.module,
+        };
+    } catch {
+        return {
+            action: null,
+            payload: {},
+            module: null,
+        };
+    }
+}
+
+function normalizeToolResult(action, rawResult) {
+    const rawChars = safeJsonLength(rawResult);
+    const normalized = action === 'get_job_order_details'
+        ? normalizeJobOrderDetails(rawResult)
+        : sanitizeToolResult(rawResult);
+    let content = JSON.stringify(normalized);
+    let trimmed = false;
+
+    if (content.length > CHAT_LIMITS.MAX_TOOL_RESULT_CHARS) {
+        trimmed = true;
+        content = JSON.stringify({
+            trimmed: true,
+            preview: content.slice(0, CHAT_LIMITS.MAX_TOOL_RESULT_CHARS),
+        });
+    }
+
+    return {
+        content,
+        rawChars,
+        finalChars: content.length,
+        trimmed,
+    };
+}
+
+function normalizeJobOrderDetails(rawResult) {
+    const sanitized = sanitizeToolResult(rawResult);
+    const jobOrder = firstObject([
+        sanitized?.data?.job_order,
+        sanitized?.data?.jobOrder,
+        sanitized?.data,
+        sanitized?.job_order,
+        sanitized?.jobOrder,
+        sanitized?.result,
+        sanitized,
+    ]);
+    const customer = firstObject([jobOrder?.customer, jobOrder?.customer_details, jobOrder?.customerDetail]);
+    const staff = firstObject([jobOrder?.staff, jobOrder?.mobile_staff, jobOrder?.driver, jobOrder?.assigned_staff]);
+
+    return stripEmptyValues({
+        jo_id: pickFirst(jobOrder, ['jo_id', 'joId', 'job_order_id', 'jobOrderId', 'id']),
+        status: pickFirst(jobOrder, ['status', 'job_order_status', 'jobOrderStatus']),
+        customer: stripEmptyValues({
+            id: pickFirst(customer, ['id', 'customer_id', 'customerId']),
+            code: pickFirst(customer, ['code', 'customer_code', 'customerCode']),
+            name: pickFirst(customer, ['name', 'customer_name', 'customerName']),
+        }),
+        staff: stripEmptyValues({
+            id: pickFirst(staff, ['id', 'staff_id', 'staffId']),
+            name: pickFirst(staff, ['name', 'staff_name', 'staffName']),
+            role: pickFirst(staff, ['role', 'type', 'staff_role', 'staffRole']),
+        }),
+        wash_type: pickFirst(jobOrder, ['wash_type', 'washType']),
+        items: normalizeJobOrderItems(jobOrder),
+        rfid_count: pickFirst(jobOrder, ['rfid_count', 'rfidCount', 'total_rfid_count', 'totalRfidCount']),
+        missing_rfid_count: pickFirst(jobOrder, ['missing_rfid_count', 'missingRfidCount']),
+        parent_jo_id: pickFirst(jobOrder, ['parent_jo_id', 'parentJoId', 'parent_job_order_id', 'parentJobOrderId']),
+        comment: pickFirst(jobOrder, ['comment', 'comments', 'note', 'notes']),
+        error: jobOrder?.error,
+        status_code: jobOrder?.status,
+    });
+}
+
+function normalizeJobOrderItems(jobOrder) {
+    const items = firstArray([
+        jobOrder?.items,
+        jobOrder?.line_items,
+        jobOrder?.textiles,
+        jobOrder?.job_order_items,
+    ]);
+
+    return items.slice(0, 25).map((item) => stripEmptyValues({
+        textile_id: pickFirst(item, ['textile_id', 'textileId', 'textile_code', 'textileCode', 'id']),
+        quantity: pickFirst(item, ['quantity', 'qty']),
+        uom: pickFirst(item, ['uom', 'unit', 'unit_of_measure']),
+        category: pickFirst(item, ['category', 'textile_category', 'textileCategory']),
+    }));
+}
+
+function sanitizeToolResult(value) {
+    if (value === null || value === undefined) {
+        return value;
+    }
+
+    if (Array.isArray(value)) {
+        return value.slice(0, 50).map((item) => sanitizeToolResult(item));
+    }
+
+    if (typeof value === 'object') {
+        return Object.fromEntries(
+            Object.entries(value)
+                .filter(([key]) => !isSensitiveOrVerboseToolField(key))
+                .map(([key, entryValue]) => [key, sanitizeToolResult(entryValue)]),
+        );
+    }
+
+    return typeof value === 'string' ? redactSensitive(value) : value;
+}
+
+function isSensitiveOrVerboseToolField(key) {
+    return /email|mobile|phone|contact|address|last_login_at|created_at|updated_at|terms_and_conditions|remarks|authorization|cookie|api[-_]?key|access[-_]?token|refresh[-_]?token|token|headers?/i
+        .test(String(key));
+}
+
+function safeJsonLength(value) {
+    try {
+        return JSON.stringify(value).length;
+    } catch {
+        return 0;
+    }
+}
+
+function firstObject(values) {
+    return values.find((value) => value && typeof value === 'object' && !Array.isArray(value)) ?? {};
+}
+
+function firstArray(values) {
+    return values.find((value) => Array.isArray(value)) ?? [];
+}
+
+function pickFirst(object, keys) {
+    if (!object || typeof object !== 'object') {
+        return undefined;
+    }
+
+    for (const key of keys) {
+        if (object[key] !== undefined && object[key] !== null && object[key] !== '') {
+            return object[key];
+        }
+    }
+
+    return undefined;
+}
+
+function stripEmptyValues(object) {
+    return Object.fromEntries(
+        Object.entries(object).filter(([, value]) => (
+            value !== undefined
+            && value !== ''
+            && !(Array.isArray(value) && value.length === 0)
+            && !(value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0)
+        )),
+    );
+}
+
+async function evaluateLowConfidence({ query, answer, chunks, timer }) {
     const signals = [];
     const reasons = [];
     const hardLowConfidenceReasons = [];
@@ -213,6 +806,7 @@ async function evaluateLowConfidence({ query, answer, chunks }) {
             query,
             answer,
             chunks: normalizedChunks.slice(0, 5),
+            timer,
         });
 
         if (verifierResult.direct_answer_present === false) {
@@ -236,6 +830,8 @@ async function evaluateLowConfidence({ query, answer, chunks }) {
         if (verifierResult.partially_answers_question === true) {
             signals.push(createConfidenceSignal('retrieved_text_only_partially_answers_question', -0.14));
         }
+    } else {
+        timer?.mark('confidence.model_call', { skipped: true });
     }
 
     score = Math.min(1, Math.max(0, score + signals.reduce(
@@ -276,7 +872,7 @@ async function createConfidenceAudit({ session_id, message_id, confidence }) {
             reviewed_at: new Date(),
         });
     } catch (error) {
-        console.error('Failed to create confidence audit:', error.message);
+        console.error('Failed to create confidence audit:', redactSensitive(error.message));
     }
 }
 
@@ -343,7 +939,7 @@ function isDontKnowAnswer(answer = '') {
         || /\bi(?:'|’)m\s+not\s+sure\b/.test(normalized);
 }
 
-async function verifyRetrievedEvidence({ query, answer, chunks }) {
+async function verifyRetrievedEvidence({ query, answer, chunks, timer }) {
     const fallback = {
         direct_answer_present: true,
         chunks_contradict: false,
@@ -353,6 +949,7 @@ async function verifyRetrievedEvidence({ query, answer, chunks }) {
     };
 
     try {
+        timer?.mark('confidence.model_call.start');
         const response = await openai.chat.completions.create({
             model: 'gpt-4o-mini',
             response_format: { type: 'json_object' },
@@ -392,6 +989,7 @@ Set partially_answers_question to true when the chunks answer only part of what 
                 },
             ],
         });
+        timer?.mark('confidence.model_call');
 
         const parsed = JSON.parse(response.choices[0]?.message?.content ?? '{}');
 
@@ -413,7 +1011,7 @@ Set partially_answers_question to true when the chunks answer only part of what 
                 : fallback.partially_answers_question,
         };
     } catch (error) {
-        console.error('Failed to verify retrieved evidence:', error.message);
+        console.error('Failed to verify retrieved evidence:', redactSensitive(error.message));
         return fallback;
     }
 }
@@ -445,14 +1043,20 @@ Use these project-specific instructions when answering, as long as they do not c
 `
         : 'No project-specific instructions are configured.';
 
-    return `You are ANDI, a helpful AI assistant to help users with accomplish their tasks.
+    const basePrompt = `You are ANDI, a helpful AI assistant to help users with accomplish their tasks.
 
 ${projectInstructions}
 
 Use the following knowledge base context to answer questions when relevant:
 
 ${context || 'No relevant context found.'}
+`;
 
+    if (!toolCatalog || toolCatalog.length === 0) {
+        return basePrompt;
+    }
+
+    return `${basePrompt}
 You also have access to backend tools described below. Use the callBackendTool function
 when the user asks for live operational data. Set "action" to the exact tool_name and
 "payload" to the parameters required by that tool's schema.
@@ -464,6 +1068,10 @@ ${JSON.stringify(toolCatalog, null, 2)}
 
 async function executeBackendTool(args, project_id, environment_id, userToken) {
     const { action, payload } = args;
+
+    if (!action) {
+        return { error: 'Tool action is required' };
+    }
 
     const tool = await toolRepository.getToolByName(action, project_id);
 
@@ -485,7 +1093,7 @@ async function executeBackendTool(args, project_id, environment_id, userToken) {
         }
     }
 
-const url = `${environment.base_url}${path}`;
+    const url = `${environment.base_url}${path}`;
 
     // If the caller passed their own token (external user), forward it so Liniq
     // applies that user's actual role-based permissions. Otherwise fall back to
@@ -494,16 +1102,15 @@ const url = `${environment.base_url}${path}`;
         ? { 'Content-Type': 'application/json', Authorization: _buildUserToken(userToken, environment) }
         : buildAuthHeaders(environment);
 
-// Console log the tool execution details
-    console.log('========== Tool Execution ==========');
-    console.log('Tool Name:', action);
-    console.log('Method:', tool.method || 'GET');
-    console.log('URL:', url);
-    console.log('Payload:', JSON.stringify(payload, null, 2));
-    console.log('Headers:', JSON.stringify(headers, null, 2));
-    console.log('=================================');
+    console.log('[tool-execution:start]', safeRedactedJson({
+        tool_name: action,
+        method: tool.method || 'GET',
+        url: redactSensitive(url),
+        payload_chars: safeJsonLength(payload),
+        headers,
+    }));
 
-try {
+    try {
         const response = await fetch(url, {
             method: tool.method || 'GET',
             headers,
@@ -525,25 +1132,30 @@ try {
                 errorData = await response.text();
             }
             
-            console.log('Tool Error:', {
+            console.log('[tool-execution:error]', safeRedactedJson({
+                tool_name: action,
                 status: response.status,
                 statusText: response.statusText,
-                error: errorData
-            });
+                error_chars: safeJsonLength(errorData),
+            }));
             
             return { 
                 error: `Tool '${action}' returned HTTP ${response.status}: ${response.statusText}`,
                 status: response.status,
-                details: errorData
+                details: sanitizeToolResult(errorData)
             };
         }
 
         const data = await response.json();
-        console.log('Tool Response:', JSON.stringify(data, null, 2));
+        console.log('[tool-execution:end]', safeRedactedJson({
+            tool_name: action,
+            status: response.status,
+            response_chars: safeJsonLength(data),
+        }));
         return data;
     } catch (error) {
         const errorResult = { error: `Failed to call tool '${action}': ${error.message}` };
-        console.log('Tool Error:', errorResult);
+        console.log('[tool-execution:error]', safeRedactedJson(errorResult));
         return errorResult;
     }
 }

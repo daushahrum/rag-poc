@@ -8,6 +8,17 @@ export async function createChatMessage(payload) {
     return ChatMessages.create(payload);
 }
 
+export async function updateChatMessage(id, payload) {
+    await ChatMessages.update(
+        payload,
+        {
+            where: { id },
+        }
+    );
+
+    return ChatMessages.findByPk(id);
+}
+
 export async function deleteChatMessage(id) {
     return ChatMessages.destroy({
         where: { id },

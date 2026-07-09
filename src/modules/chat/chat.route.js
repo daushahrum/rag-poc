@@ -31,5 +31,12 @@ router.post(
     chatController.sendMessage
 );
 
+router.post(
+    '/send-stream',
+    markPublic,
+    verifyProjectAndSessionKey,
+    chatController.sendMessageStream
+);
+
 
 export default router;

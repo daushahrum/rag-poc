@@ -28,6 +28,18 @@ export async function createChatMessage(payload) {
     return chatMessageRepository.createChatMessage(payload);
 }
 
+export async function updateChatMessage(id, payload) {
+    if (!id) {
+        throw new Error('Chat message id is required');
+    }
+
+    if (!payload || typeof payload !== 'object') {
+        throw new Error('Chat message payload is required');
+    }
+
+    return chatMessageRepository.updateChatMessage(id, payload);
+}
+
 export async function deleteChatMessage(id) {
     if (!id) {
         throw new Error('Chat message id is required');
