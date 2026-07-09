@@ -1,9 +1,11 @@
+import { apiRequest } from './http.js';
+
 /**
  * Auth API — handles calls to /api/auth/*
  */
 
 export async function login(email, password) {
-    const response = await fetch('/api/auth/login', {
+    return apiRequest('/api/auth/login', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -12,13 +14,5 @@ export async function login(email, password) {
             id: email,
             password: password,
         }),
-    });
-
-    const data = await response.json().catch(() => ({}));
-
-    if (!response.ok) {
-        throw new Error(data.message || 'Login failed');
-    }
-
-    return data;
+    }, 'Login failed');
 }

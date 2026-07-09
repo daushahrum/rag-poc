@@ -3,22 +3,17 @@
  */
 
 import { getAuthHeaders } from '../../core/auth/session.js';
+import { apiRequest } from './http.js';
 
 async function request(path, options = {}) {
-    const response = await fetch(`/api/tool/${path}`, {
+    return apiRequest(`/api/tool/${path}`, {
         ...options,
         headers: {
             ...(options.body ? { 'Content-Type': 'application/json' } : {}),
             ...getAuthHeaders(),
             ...options.headers,
         },
-    });
-
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-        throw new Error(data.error ?? data.message ?? 'Tool request failed.');
-    }
-    return data;
+    }, 'Tool request failed.');
 }
 
 export function fetchProjectTools(projectId) {

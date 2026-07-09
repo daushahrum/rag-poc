@@ -3,24 +3,17 @@
  */
 
 import { getAuthHeaders } from '../../core/auth/session.js';
+import { apiRequest } from './http.js';
 
 async function request(path, options = {}) {
-    const response = await fetch(`/api/user/${path}`, {
+    return apiRequest(`/api/user/${path}`, {
         ...options,
         headers: {
             ...(options.body ? { 'Content-Type': 'application/json' } : {}),
             ...getAuthHeaders(),
             ...options.headers,
         },
-    });
-
-    const data = await response.json().catch(() => ({}));
-
-    if (!response.ok) {
-        throw new Error(data.message ?? data.error ?? 'User request failed.');
-    }
-
-    return data;
+    }, 'User request failed.');
 }
 
 export function createUser(payload) {

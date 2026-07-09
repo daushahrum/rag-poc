@@ -1,20 +1,15 @@
 import { getAuthHeaders } from '../../core/auth/session.js';
+import { apiRequest } from './http.js';
 
 async function mutateApp(path, payload) {
-    const response = await fetch(`/api/apps/${path}`, {
+    return apiRequest(`/api/apps/${path}`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             ...getAuthHeaders(),
         },
         body: JSON.stringify(payload),
-    });
-
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-        throw new Error(data.error ?? data.message ?? `Could not ${path} app.`);
-    }
-    return data;
+    }, `Could not ${path} app.`);
 }
 
 export function createApp(payload) {
@@ -35,15 +30,8 @@ export async function fetchProjectApps(projectId) {
         params.set('project_id', projectId);
     }
 
-    const response = await fetch(`/api/apps/list?${params.toString()}`, {
+    const data = await apiRequest(`/api/apps/list?${params.toString()}`, {
         headers: getAuthHeaders(),
-    });
-
-    if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.error ?? data.message ?? 'Could not load connected apps.');
-    }
-
-    const data = await response.json();
+    }, 'Could not load connected apps.');
     return Array.isArray(data) ? data : (data.apps ?? []);
 }

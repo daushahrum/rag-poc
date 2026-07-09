@@ -3,9 +3,10 @@
  */
 
 import { getAuthHeaders } from '../../core/auth/session.js';
+import { apiRequest } from './http.js';
 
 export async function sendMessage(sessionId, message) {
-    const response = await fetch('/api/chat/portal/send', {
+    return apiRequest('/api/chat/portal/send', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -15,13 +16,7 @@ export async function sendMessage(sessionId, message) {
             session_id: sessionId,
             message,
         }),
-    });
-    if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.error ?? 'The assistant could not answer right now.');
-    }
-
-    return response.json();
+    }, 'The assistant could not answer right now.');
 }
 
 export async function fetchSessions({
@@ -41,16 +36,9 @@ export async function fetchSessions({
     const query = params.toString();
     const url = query ? `/api/chat/sessions/list?${query}` : '/api/chat/sessions/list';
 
-    const response = await fetch(url, {
+    const data = await apiRequest(url, {
         headers: getAuthHeaders(),
-    });
-
-    if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.error ?? 'Could not load chat history.');
-    }
-
-    const data = await response.json();
+    }, 'Could not load chat history.');
     const sessions = Array.isArray(data) ? data : (data.sessions ?? []);
 
     return sessions.map((session) => ({
@@ -60,16 +48,9 @@ export async function fetchSessions({
 }
 
 export async function fetchSessionMessages(sessionId) {
-    const response = await fetch(`/api/chat/messages/list?session_id=${encodeURIComponent(sessionId)}`, {
+    const data = await apiRequest(`/api/chat/messages/list?session_id=${encodeURIComponent(sessionId)}`, {
         headers: getAuthHeaders(),
-    });
-
-    if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-throw new Error(data.error ?? 'Could not load that chat.');
-    }
-
-    const data = await response.json();
+    }, 'Could not load that chat.');
     return data ?? [];
 }
 
@@ -80,45 +61,25 @@ export async function createChatSession(user, environmentId) {
         environment_id: environmentId,
     };
 
-    const response = await fetch('/api/chat/sessions/portal/create', {
+    return apiRequest('/api/chat/sessions/portal/create', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             ...getAuthHeaders(),
         },
         body: JSON.stringify(payload),
-    });
-
-    const responseBody = await response.clone().json().catch(async () => {
-        return await response.clone().text();
-    });
-
-    if (!response.ok) {
-        throw new Error(
-            responseBody?.error ?? 'Could not start a new chat session.'
-        );
-    }
-
-    return responseBody;
+    }, 'Could not start a new chat session.');
 }
 
 export async function createChatResponseAudit(payload) {
-    const response = await fetch('/api/chat/response-audits/create', {
+    return apiRequest('/api/chat/response-audits/create', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             ...getAuthHeaders(),
         },
         body: JSON.stringify(payload),
-    });
-
-    const data = await response.json().catch(() => ({}));
-
-    if (!response.ok) {
-        throw new Error(data.error ?? data.message ?? 'Could not save response feedback.');
-    }
-
-    return data;
+    }, 'Could not save response feedback.');
 }
 
 export async function fetchQueryQualityAnalytics({
@@ -137,16 +98,9 @@ export async function fetchQueryQualityAnalytics({
         ? `/api/chat/response-audits/analytics?${query}`
         : '/api/chat/response-audits/analytics';
 
-    const response = await fetch(url, {
+    return apiRequest(url, {
         headers: getAuthHeaders(),
-    });
-    const data = await response.json().catch(() => ({}));
-
-    if (!response.ok) {
-        throw new Error(data.error ?? data.message ?? 'Could not load analytics.');
-    }
-
-    return data;
+    }, 'Could not load analytics.');
 }
 
 export async function fetchChatResponseAudits(filters = {}) {
@@ -163,14 +117,8 @@ export async function fetchChatResponseAudits(filters = {}) {
         ? `/api/chat/response-audits/list?${query}`
         : '/api/chat/response-audits/list';
 
-    const response = await fetch(url, {
+    const data = await apiRequest(url, {
         headers: getAuthHeaders(),
-    });
-    const data = await response.json().catch(() => ({}));
-
-    if (!response.ok) {
-        throw new Error(data.error ?? data.message ?? 'Could not load response audits.');
-    }
-
+    }, 'Could not load response audits.');
     return Array.isArray(data) ? data : [];
 }

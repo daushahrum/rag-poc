@@ -3,36 +3,23 @@
  */
 
 import { getAuthHeaders } from '../../core/auth/session.js';
+import { apiRequest } from './http.js';
 
 export async function ingestKnowledge(title, content, projectId) {
-    const response = await fetch('/api/knowledge_document/create', {
+    return apiRequest('/api/knowledge_document/create', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             ...getAuthHeaders(),
         },
         body: JSON.stringify({ title, content, project_id: projectId }),
-    });
-
-    if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.error ?? data.message ?? 'Could not ingest knowledge.');
-    }
-
-    return response.json();
+    }, 'Could not ingest knowledge.');
 }
 
 export async function fetchKnowledgeDocuments(projectId) {
-    const response = await fetch(`/api/knowledge_document/project/${encodeURIComponent(projectId)}`, {
+    const data = await apiRequest(`/api/knowledge_document/project/${encodeURIComponent(projectId)}`, {
         headers: getAuthHeaders(),
-    });
-
-    if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.error ?? data.message ?? 'Could not load knowledge documents.');
-    }
-
-    const data = await response.json();
+    }, 'Could not load knowledge documents.');
     return (Array.isArray(data) ? data : (data.documents ?? [])).map((document) => {
         const chunks = [...(document.chunks ?? [])].sort(
             (left, right) => left.chunk_index - right.chunk_index
@@ -49,53 +36,32 @@ export async function fetchKnowledgeDocuments(projectId) {
 }
 
 export async function fetchKnowledgeDocument(documentId) {
-    const response = await fetch(`/api/knowledge_document/${encodeURIComponent(documentId)}`, {
+    const data = await apiRequest(`/api/knowledge_document/${encodeURIComponent(documentId)}`, {
         headers: getAuthHeaders(),
-    });
-
-    if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.error ?? 'Could not load knowledge document.');
-    }
-
-    const data = await response.json();
+    }, 'Could not load knowledge document.');
     return data.document ?? data;
 }
 
 export async function updateKnowledgeDocument(documentId, payload) {
-    const response = await fetch('/api/knowledge_document/update', {
+    return apiRequest('/api/knowledge_document/update', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             ...getAuthHeaders(),
         },
         body: JSON.stringify({ id: documentId, ...payload }),
-    });
-
-    if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.error ?? data.message ?? 'Could not update knowledge document.');
-    }
-
-    return response.json();
+    }, 'Could not update knowledge document.');
 }
 
 export async function deleteKnowledgeDocument(documentId) {
-    const response = await fetch('/api/knowledge_document/delete', {
+    return apiRequest('/api/knowledge_document/delete', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             ...getAuthHeaders(),
         },
         body: JSON.stringify({ id: documentId }),
-    });
-
-    if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.error ?? data.message ?? 'Could not delete knowledge document.');
-    }
-
-    return response.json();
+    }, 'Could not delete knowledge document.');
 }
 
 export async function ingestDocumentFile(file, options = {}) {
@@ -105,16 +71,9 @@ export async function ingestDocumentFile(file, options = {}) {
     if (projectId) formData.append('project_id', projectId);
     if (title) formData.append('title', title);
 
-    const response = await fetch('/api/knowledge_document/create', {
+    return apiRequest('/api/knowledge_document/create', {
         method: 'POST',
         headers: getAuthHeaders(),
         body: formData,
-    });
-
-    if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.error ?? data.message ?? 'Could not ingest document.');
-    }
-
-    return response.json();
+    }, 'Could not ingest document.');
 }

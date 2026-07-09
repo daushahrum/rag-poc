@@ -3,6 +3,7 @@
  */
 
 import { getAuthHeaders } from '../../core/auth/session.js';
+import { apiRequest } from './http.js';
 
 export async function getJiraAuthorizationUrl(projectId) {
     const params = new URLSearchParams({
@@ -10,15 +11,9 @@ export async function getJiraAuthorizationUrl(projectId) {
         format: 'json',
     });
 
-    const response = await fetch(`/api/jira/connect?${params.toString()}`, {
+    const data = await apiRequest(`/api/jira/connect?${params.toString()}`, {
         headers: getAuthHeaders(),
-    });
-
-    const data = await response.json().catch(() => ({}));
-
-    if (!response.ok) {
-        throw new Error(data.error ?? data.message ?? 'Could not start Jira connection.');
-    }
+    }, 'Could not start Jira connection.');
 
     if (!data.authorizationUrl) {
         throw new Error('Jira authorization URL was not returned.');
@@ -28,49 +23,25 @@ export async function getJiraAuthorizationUrl(projectId) {
 }
 
 export async function getJiraConnection(projectId) {
-    const response = await fetch(`/api/jira/${projectId}/connection`, {
+    return apiRequest(`/api/jira/${projectId}/connection`, {
         headers: getAuthHeaders(),
-    });
-
-    const data = await response.json().catch(() => null);
-
-    if (!response.ok) {
-        throw new Error(data?.error ?? data?.message ?? 'Could not load Jira connection.');
-    }
-
-    return data;
+    }, 'Could not load Jira connection.');
 }
 
 export async function disconnectJira(projectId) {
-    const response = await fetch(`/api/jira/${projectId}/disconnect`, {
+    return apiRequest(`/api/jira/${projectId}/disconnect`, {
         method: 'DELETE',
         headers: getAuthHeaders(),
-    });
-
-    const data = await response.json().catch(() => ({}));
-
-    if (!response.ok) {
-        throw new Error(data.error ?? data.message ?? 'Could not disconnect Jira.');
-    }
-
-    return data;
+    }, 'Could not disconnect Jira.');
 }
 
 export async function createJiraIssue(projectId, payload) {
-    const response = await fetch(`/api/jira/${projectId}/issues`, {
+    return apiRequest(`/api/jira/${projectId}/issues`, {
         method: 'POST',
         headers: {
             ...getAuthHeaders(),
             'Content-Type': 'application/json',
         },
         body: JSON.stringify(payload),
-    });
-
-    const data = await response.json().catch(() => ({}));
-
-    if (!response.ok) {
-        throw new Error(data.error ?? data.message ?? 'Could not create Jira issue.');
-    }
-
-    return data;
+    }, 'Could not create Jira issue.');
 }

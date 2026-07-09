@@ -22,6 +22,7 @@ import * as knowledgeDocumentController from "./src/modules/knowledge/knowledgeD
 import * as projectController from "./src/modules/project/project.controller.js";
 
 import * as auth from "./src/middleware/authenticate.js";
+import { apiResponseEnvelope } from "./src/middleware/apiResponseEnvelope.js";
 
 import { db } from "./src/database/db.js";
 
@@ -50,6 +51,7 @@ app.get("/login", (req, res) => {
 });
 
 // API routes
+app.use("/api", apiResponseEnvelope);
 app.use("/api/auth", authRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/project", projectRoutes);
@@ -106,7 +108,7 @@ app.post("/projects", auth.authenticate, projectController.createProject);
 app.get("/projects", auth.authenticate, projectController.listProject);
 
 const PORT = 3000;
-const HOST = "127.0.0.1";
+const HOST = "0.0.0.0";
 
 app.listen(PORT, HOST, () => {
   console.log(`Server running on http://${HOST}:${PORT}`);
