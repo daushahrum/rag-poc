@@ -55,6 +55,25 @@ export function createTypingMessage() {
     return article;
 }
 
+export function createStreamingMessage(status = 'Thinking...') {
+    const article = document.createElement('article');
+    article.className = 'message assistant streaming';
+
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.setAttribute('role', 'status');
+    bubble.setAttribute('aria-live', 'polite');
+    bubble.textContent = status;
+
+    article.append(bubble);
+    return article;
+}
+
+export function updateStreamingMessage(article, content) {
+    const bubble = article.querySelector('.bubble');
+    if (bubble) bubble.textContent = content;
+}
+
 export function createSources(sources) {
     const wrapper = document.createElement('div');
     wrapper.className = 'sources';

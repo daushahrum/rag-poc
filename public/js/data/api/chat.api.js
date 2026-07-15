@@ -3,20 +3,94 @@
  */
 
 import { getAuthHeaders } from '../../core/auth/session.js';
-import { apiRequest } from './http.js';
+import { apiRequest, getApiErrorMessage } from './http.js';
 
-export async function sendMessage(sessionId, message) {
-    return apiRequest('/api/chat/portal/send', {
+export async function sendMessage(sessionId, message, { onEvent } = {}) {
+    const response = await fetch('/api/chat/portal/send-stream', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
+            'Accept': 'text/event-stream',
             ...getAuthHeaders(),
         },
         body: JSON.stringify({
             session_id: sessionId,
             message,
         }),
-    }, 'The assistant could not answer right now.');
+    });
+
+    if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(getApiErrorMessage(payload, 'The assistant could not answer right now.'));
+    }
+
+    if (!response.body) {
+        throw new Error('Streaming is not supported by this browser.');
+    }
+
+    const result = {
+        content: '',
+        id: null,
+        session_id: sessionId,
+        sources: [],
+        low_confidence: false,
+    };
+
+    await readEventStream(response.body, (event) => {
+        if (event.type === 'token') {
+            result.content += event.content ?? '';
+        } else if (event.type === 'response_complete') {
+            result.id = event.message_id;
+        } else if (event.type === 'confidence') {
+            result.low_confidence = event.low_confidence === true;
+        } else if (event.type === 'done') {
+            result.id ??= event.message_id;
+        } else if (event.type === 'error') {
+            throw new Error(event.message || 'The assistant could not answer right now.');
+        }
+
+        onEvent?.(event, result);
+    });
+
+    return result;
+}
+
+export async function readEventStream(stream, onEvent) {
+    const reader = stream.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    const consumeFrame = (frame) => {
+        const data = frame
+            .split(/\r?\n/)
+            .filter((line) => line.startsWith('data:'))
+            .map((line) => line.slice(5).trimStart())
+            .join('\n');
+
+        if (!data) return;
+        onEvent(JSON.parse(data));
+    };
+
+    try {
+        while (true) {
+            const { done, value } = await reader.read();
+            buffer += decoder.decode(value, { stream: !done });
+
+            let boundary = buffer.match(/\r?\n\r?\n/);
+            while (boundary?.index !== undefined) {
+                const frame = buffer.slice(0, boundary.index);
+                buffer = buffer.slice(boundary.index + boundary[0].length);
+                consumeFrame(frame);
+                boundary = buffer.match(/\r?\n\r?\n/);
+            }
+
+            if (done) break;
+        }
+
+        if (buffer.trim()) consumeFrame(buffer);
+    } finally {
+        reader.releaseLock();
+    }
 }
 
 export async function fetchSessions({

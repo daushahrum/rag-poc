@@ -27,7 +27,11 @@ import {
     ingestDocumentFile,
 } from '../../domain/use-cases/knowledge.use-cases.js';
 
-import { createMessage, createTypingMessage } from '../components/message.js';
+import {
+    createMessage,
+    createStreamingMessage,
+    updateStreamingMessage,
+} from '../components/message.js';
 
 import { formatSessionTime } from '../../core/utils/text.js';
 import { scrollToBottom, resizeTextarea } from '../../core/utils/dom.js';
@@ -639,15 +643,24 @@ form.addEventListener('submit', async (event) => {
     input.value = '';
     resizeTextarea(input);
 
-    const typing = createTypingMessage();
-    messages.append(typing);
+    const streamingMessage = createStreamingMessage();
+    messages.append(streamingMessage);
     scrollToBottom(messages);
 
     sendButton.disabled = true;
 
     try {
-        const data = await sendMessage(state.sessionId, message);
-        typing.replaceWith(createMessage(
+        const data = await sendMessage(state.sessionId, message, {
+            onEvent: (streamEvent, partial) => {
+                if (streamEvent.type === 'status' && !partial.content) {
+                    updateStreamingMessage(streamingMessage, streamEvent.message);
+                } else if (streamEvent.type === 'token') {
+                    updateStreamingMessage(streamingMessage, partial.content);
+                }
+                scrollToBottom(messages);
+            },
+        });
+        streamingMessage.replaceWith(createMessage(
             'assistant',
             data.content,
             data.sources,
@@ -664,7 +677,7 @@ form.addEventListener('submit', async (event) => {
         ));
         await refreshSessions();
     } catch (error) {
-        typing.replaceWith(createMessage('assistant', error.message));
+        streamingMessage.replaceWith(createMessage('assistant', error.message));
     } finally {
         sendButton.disabled = !state.selectedEnvironmentId;
         input.focus();

@@ -25,6 +25,13 @@ router.post(
 );
 
 router.post(
+    '/portal/send-stream',
+    markPortal,
+    auth.authenticate,
+    chatController.sendMessageStream
+);
+
+router.post(
     '/send',
     markPublic,
     verifyProjectAndSessionKey,

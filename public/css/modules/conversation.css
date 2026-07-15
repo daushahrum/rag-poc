@@ -172,6 +172,10 @@
   overflow-wrap: anywhere;
 }
 
+.message.streaming .bubble {
+  white-space: pre-wrap;
+}
+
 .message.user .bubble {
   padding: 10px 14px;
   border-radius: 10px;

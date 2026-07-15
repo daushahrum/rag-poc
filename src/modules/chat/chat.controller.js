@@ -38,15 +38,18 @@ export async function sendMessageStream(req, res) {
     const abortController = new AbortController();
     let completed = false;
 
-    req.on('close', () => {
+    res.on('close', () => {
         if (!completed) {
             abortController.abort();
         }
     });
 
+    req.on('aborted', () => abortController.abort());
+
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders?.();
 
     const sendEvent = (event) => {
@@ -55,6 +58,7 @@ export async function sendMessageStream(req, res) {
         }
 
         res.write(`data: ${JSON.stringify(event)}\n\n`);
+        res.flush?.();
         return true;
     };
 
