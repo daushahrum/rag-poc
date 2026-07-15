@@ -1,4 +1,19 @@
-export function classifyConfidence({ chunks = [], confidenceScore, hardLowConfidenceReasons = [] } = {}) {
+export function classifyConfidence({
+    chunks = [],
+    confidenceScore,
+    hardLowConfidenceReasons = [],
+    requiresKnowledgeBase = true,
+    hasToolEvidence = false,
+} = {}) {
+    if (!requiresKnowledgeBase) {
+        return buildConfidenceClassification({
+            confidence_level: 'high',
+            requested_quality_status: 'answered',
+            reason: 'casual_interaction_no_knowledge_required',
+            show_low_confidence_marker: false,
+        });
+    }
+
     const top = chunks[0];
     const second = chunks[1];
     const third = chunks[2];
@@ -22,9 +37,26 @@ export function classifyConfidence({ chunks = [], confidenceScore, hardLowConfid
         });
     }
 
+    if (hardLowConfidenceReasons.includes('andi_answered_i_dont_know')) {
+        return buildConfidenceClassification({
+            confidence_level: 'low',
+            requested_quality_status: 'needs_review',
+            reason: 'andi_answered_i_dont_know',
+            show_low_confidence_marker: true,
+        });
+    }
+
+    if (hasToolEvidence) {
+        return buildConfidenceClassification({
+            confidence_level: 'high',
+            requested_quality_status: 'answered',
+            reason: 'tool_result_supported_answer',
+            show_low_confidence_marker: false,
+        });
+    }
+
     if (
-        hardLowConfidenceReasons.includes('andi_answered_i_dont_know')
-        || hardLowConfidenceReasons.includes('chunks_do_not_contain_direct_answer')
+        hardLowConfidenceReasons.includes('chunks_do_not_contain_direct_answer')
         || hardLowConfidenceReasons.includes('top_chunks_contradict_each_other')
     ) {
         return buildConfidenceClassification({
@@ -97,6 +129,24 @@ export function classifyConfidence({ chunks = [], confidenceScore, hardLowConfid
     });
 }
 
+export function isCasualInteraction(value) {
+    const normalized = String(value ?? '')
+        .toLowerCase()
+        .replace(/[^a-z0-9\s']/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    if (!normalized) {
+        return false;
+    }
+
+    return /^(?:hi|hello|hey|hiya|howdy|greetings)(?: there| everyone| all)?$/.test(normalized)
+        || /^(?:good morning|good afternoon|good evening)(?: everyone| all)?$/.test(normalized)
+        || /^(?:thanks|thank you|thank you very much|thanks a lot|many thanks)$/.test(normalized)
+        || /^(?:bye|goodbye|see you|see you later|take care)$/.test(normalized)
+        || /^(?:how are you|how's it going|whats up|what's up)$/.test(normalized);
+}
+
 export function buildConfidenceAuditReason(confidence) {
     const retrievalScore = Number.isFinite(confidence.retrieval_score)
         ? confidence.retrieval_score.toFixed(3)
@@ -112,6 +162,9 @@ export function buildConfidenceAuditReason(confidence) {
         `confidence_level=${classification.confidence_level}`,
         `quality_status=${classification.quality_status}`,
         `reason=${classification.reason}`,
+        confidence.tool_evidence_count > 0
+            ? `tool_evidence_count=${confidence.tool_evidence_count}`
+            : null,
         classification.requested_quality_status !== classification.quality_status
             ? `requested_quality_status=${classification.requested_quality_status}`
             : null,

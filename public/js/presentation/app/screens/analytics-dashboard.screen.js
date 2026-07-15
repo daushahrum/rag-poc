@@ -17,6 +17,7 @@ const confidenceReasonLabels = {
     moderate_similarity_clustered_support: 'Moderate match with clustered document support',
     usable_confidence_score: 'Confidence score is acceptable',
     strong_confidence_score: 'High confidence answer',
+    tool_result_supported_answer: 'Answer supported by a successful tool result',
     query_uses_vague_pronouns: 'Question used vague references',
     top_score_and_second_score_are_close: 'Top retrieved results were too similar to distinguish',
     top_chunks_from_unrelated_documents: 'Top retrieved results came from unrelated documents',
@@ -575,7 +576,7 @@ function createReasonDetailField(label, reasonKey) {
     return field;
 }
 
-function createSelectedAuditPanel({ audit, mode, projectId, onClose }) {
+function createSelectedAuditPanel({ audit, mode, projectId, onClose, onIssueCreated }) {
     const panel = document.createElement('aside');
     panel.className = 'analytics-side-panel';
 
@@ -725,6 +726,7 @@ function createSelectedAuditPanel({ audit, mode, projectId, onClose }) {
             jiraButton.title = 'Open this JIRA issue.';
             jiraStatus.textContent = `Created ${issue.key ?? 'JIRA issue'}.`;
             jiraStatus.classList.add('success');
+            onIssueCreated?.();
         } catch (error) {
             jiraStatus.textContent = error.message;
             jiraStatus.classList.add('error');
@@ -1237,6 +1239,7 @@ export function renderAnalyticsDashboardScreen(context, options = {}) {
                 state.analyticsView.detailAuditId = null;
                 renderAnalyticsDashboardScreen(context, options);
             },
+            onIssueCreated: () => renderAnalyticsDashboardScreen(context, options),
         }));
     }
 

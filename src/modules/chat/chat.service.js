@@ -19,6 +19,7 @@ import * as chatResponseAuditService from './chatResponseAudits/chatResponseAudi
 import {
     buildConfidenceAuditReason,
     classifyConfidence,
+    isCasualInteraction,
     topChunksLookUnrelated,
 } from './confidence.service.js';
 import { redactSensitive, safeRedactedJson } from '../../utils/redact.js';
@@ -28,7 +29,7 @@ const CHAT_LIMITS = {
     MAX_RETRIEVED_CHUNKS: readPositiveIntEnv('MAX_RETRIEVED_CHUNKS', 5),
     MAX_CHUNK_CHARS: readPositiveIntEnv('MAX_CHUNK_CHARS', 1200),
     MAX_TOTAL_CONTEXT_CHARS: readPositiveIntEnv('MAX_TOTAL_CONTEXT_CHARS', 8000),
-    MAX_TOOL_RESULT_CHARS: readPositiveIntEnv('MAX_TOOL_RESULT_CHARS', 3000),
+    MAX_TOOL_RESULT_CHARS: readPositiveIntEnv('MAX_TOOL_RESULT_CHARS', 8000),
     MAX_OUTPUT_TOKENS: readPositiveIntEnv('MAX_OUTPUT_TOKENS', 400),
 };
 
@@ -52,16 +53,21 @@ export async function sendMessage(session_id, message, userToken, isPortalAdmin)
     });
     timer.mark('save_assistant_message.end');
 
-    scheduleConfidenceEvaluation({
-        session_id,
-        message_id: savedMessage.id,
-        query: message,
-        answer: assistantMessage.content,
-        chunks: chatState.chunks,
-    });
+    try {
+        await runConfidenceEvaluation({
+            session_id,
+            message_id: savedMessage.id,
+            query: message,
+            answer: assistantMessage.content,
+            chunks: chatState.chunks,
+            toolEvidence: chatState.toolEvidence,
+        });
+    } catch (error) {
+        console.error('Failed to complete confidence evaluation:', redactSensitive(error.message));
+    }
 
     timer.finish('return_response');
-    return savedMessage;
+    return chatMessageService.getChatMessageById(savedMessage.id);
 }
 
 export async function sendMessageStream(session_id, message, userToken, isPortalAdmin, { sendEvent, signal } = {}) {
@@ -119,15 +125,36 @@ export async function sendMessageStream(session_id, message, userToken, isPortal
             final_response_char_count: responseContent.length,
         });
 
-        emit({ type: 'done', message_id: savedMessage.id });
+        emit({ type: 'response_complete', message_id: savedMessage.id });
 
-        scheduleConfidenceEvaluation({
+        const confidencePayload = {
             session_id,
             message_id: savedMessage.id,
             query: message,
             answer: responseContent,
             chunks: chatState.chunks,
-        });
+            toolEvidence: chatState.toolEvidence,
+        };
+
+        try {
+            const confidence = await runConfidenceEvaluation(confidencePayload);
+            emit({
+                type: 'confidence',
+                message_id: savedMessage.id,
+                low_confidence: confidence.low_confidence,
+                status: 'completed',
+            });
+        } catch (error) {
+            console.error('Failed to complete confidence evaluation:', redactSensitive(error.message));
+            emit({
+                type: 'confidence',
+                message_id: savedMessage.id,
+                low_confidence: null,
+                status: 'failed',
+            });
+        }
+
+        emit({ type: 'done', message_id: savedMessage.id });
     } catch (error) {
         if (isAbortError(error) || signal?.aborted) {
             timer.finish('stream.client_disconnected', {
@@ -219,8 +246,8 @@ async function prepareChatState({
         });
     }
 
-    const selectedToolCatalog = selectToolCatalogForMessage(message, availableTools);
-    const systemPrompt = buildSystemPrompt(context, selectedToolCatalog, project?.custom_prompt);
+    const toolCatalog = buildToolCatalog(availableTools);
+    const systemPrompt = buildSystemPrompt(context, toolCatalog, project?.custom_prompt);
     const messages = [
         { role: 'system', content: systemPrompt },
         ...cappedHistory.map((m) => ({ role: m.role, content: String(m.content ?? '') })),
@@ -231,7 +258,7 @@ async function prepareChatState({
         retrieved_chunk_count: chunks.length,
         final_context_char_count: context.length,
         estimated_prompt_tokens: estimatePromptTokens(messages),
-        tool_count: selectedToolCatalog.length,
+        tool_count: toolCatalog.length,
         model_name: DEFAULT_CHAT_MODEL,
         max_output_tokens: CHAT_LIMITS.MAX_OUTPUT_TOKENS,
     });
@@ -245,7 +272,8 @@ async function prepareChatState({
         message,
         messages,
         chunks,
-        toolCatalog: selectedToolCatalog,
+        toolCatalog,
+        toolEvidence: [],
         timer,
     };
 }
@@ -354,7 +382,7 @@ async function appendToolResults(chatState, assistantMessage, { signal, onStatus
         timer.mark('execute_tool.end', { action: args.action });
 
         timer.mark('tool_result.normalize.start', { action: args.action });
-        const normalizedToolResult = normalizeToolResult(args.action, toolResult);
+        const normalizedToolResult = normalizeToolResult(toolResult);
         timer.mark('tool_result.normalize.end', {
             action: args.action,
             tool_result_raw_chars: normalizedToolResult.rawChars,
@@ -367,18 +395,17 @@ async function appendToolResults(chatState, assistantMessage, { signal, onStatus
             tool_call_id: toolCall.id,
             content: normalizedToolResult.content,
         });
+
+        if (isSuccessfulToolResult(toolResult, normalizedToolResult.content)) {
+            chatState.toolEvidence.push({
+                action: args.action,
+                content: normalizedToolResult.content,
+            });
+        }
     }
 }
 
-function scheduleConfidenceEvaluation(payload) {
-    setImmediate(() => {
-        runConfidenceEvaluation(payload).catch((error) => {
-            console.error('Failed to complete confidence evaluation:', redactSensitive(error.message));
-        });
-    });
-}
-
-async function runConfidenceEvaluation({ session_id, message_id, query, answer, chunks }) {
+async function runConfidenceEvaluation({ session_id, message_id, query, answer, chunks, toolEvidence }) {
     const timer = createChatTimer(`${session_id}:confidence:${message_id}`);
     timer.mark('confidence.prepare');
 
@@ -386,6 +413,7 @@ async function runConfidenceEvaluation({ session_id, message_id, query, answer, 
         query,
         answer,
         chunks,
+        toolEvidence,
         timer,
     });
     timer.mark('confidence.parse');
@@ -397,6 +425,7 @@ async function runConfidenceEvaluation({ session_id, message_id, query, answer, 
             classification: confidence.classification,
             reasons: confidence.reasons,
             signals: confidence.signals,
+            tool_evidence_count: confidence.tool_evidence_count,
         },
     });
 
@@ -407,6 +436,7 @@ async function runConfidenceEvaluation({ session_id, message_id, query, answer, 
     });
     timer.mark('confidence.db_update');
     timer.finish('confidence.complete');
+    return confidence;
 }
 
 function createChatTimer(label) {
@@ -537,26 +567,6 @@ function formatCappedContext(rawChunks, timer) {
     return { context, chunks };
 }
 
-function selectToolCatalogForMessage(message, availableTools) {
-    const toolsForPrompt = buildToolCatalog(availableTools);
-    const original = String(message ?? '');
-    const lower = original.toLowerCase();
-
-    if (/\bjob\s*order\b|\bjob-order\b|\bjo[_\s-]?\d+|\bJO\b/i.test(original)
-        || /\bjob\s*order\b|\bjob-order\b/.test(lower)) {
-        return toolsForPrompt.filter((tool) => toolCatalogMatches(tool, /job|jo/i));
-    }
-
-    if (/\bdelivery\s*order\b|\bdelivery-order\b/i.test(original)
-        || /\bD\/?O\b/.test(original)
-        || /\bDO[_\s-]?\d+/i.test(original)
-        || /\bdelivery\s*order\b|\bdelivery-order\b/.test(lower)) {
-        return toolsForPrompt.filter((tool) => toolCatalogMatches(tool, /delivery|do/i));
-    }
-
-    return [];
-}
-
 function buildToolCatalog(availableTools) {
     return (Array.isArray(availableTools) ? availableTools : []).map((tool) => ({
         tool_name: tool.tool_name,
@@ -567,14 +577,6 @@ function buildToolCatalog(availableTools) {
         query_params: tool.query_params,
         body_schema: tool.body_schema,
     }));
-}
-
-function toolCatalogMatches(tool, pattern) {
-    return pattern.test([
-        tool.tool_name,
-        tool.description,
-        tool.endpoint,
-    ].filter(Boolean).join(' '));
 }
 
 function estimatePromptTokens(messages) {
@@ -603,11 +605,9 @@ function parseToolCallArguments(toolCall) {
     }
 }
 
-function normalizeToolResult(action, rawResult) {
+function normalizeToolResult(rawResult) {
     const rawChars = safeJsonLength(rawResult);
-    const normalized = action === 'get_job_order_details'
-        ? normalizeJobOrderDetails(rawResult)
-        : sanitizeToolResult(rawResult);
+    const normalized = sanitizeToolResult(rawResult);
     let content = JSON.stringify(normalized);
     let trimmed = false;
 
@@ -627,58 +627,18 @@ function normalizeToolResult(action, rawResult) {
     };
 }
 
-function normalizeJobOrderDetails(rawResult) {
-    const sanitized = sanitizeToolResult(rawResult);
-    const jobOrder = firstObject([
-        sanitized?.data?.job_order,
-        sanitized?.data?.jobOrder,
-        sanitized?.data,
-        sanitized?.job_order,
-        sanitized?.jobOrder,
-        sanitized?.result,
-        sanitized,
-    ]);
-    const customer = firstObject([jobOrder?.customer, jobOrder?.customer_details, jobOrder?.customerDetail]);
-    const staff = firstObject([jobOrder?.staff, jobOrder?.mobile_staff, jobOrder?.driver, jobOrder?.assigned_staff]);
+function isSuccessfulToolResult(rawResult, normalizedContent) {
+    if (rawResult === null || rawResult === undefined) {
+        return false;
+    }
 
-    return stripEmptyValues({
-        jo_id: pickFirst(jobOrder, ['jo_id', 'joId', 'job_order_id', 'jobOrderId', 'id']),
-        status: pickFirst(jobOrder, ['status', 'job_order_status', 'jobOrderStatus']),
-        customer: stripEmptyValues({
-            id: pickFirst(customer, ['id', 'customer_id', 'customerId']),
-            code: pickFirst(customer, ['code', 'customer_code', 'customerCode']),
-            name: pickFirst(customer, ['name', 'customer_name', 'customerName']),
-        }),
-        staff: stripEmptyValues({
-            id: pickFirst(staff, ['id', 'staff_id', 'staffId']),
-            name: pickFirst(staff, ['name', 'staff_name', 'staffName']),
-            role: pickFirst(staff, ['role', 'type', 'staff_role', 'staffRole']),
-        }),
-        wash_type: pickFirst(jobOrder, ['wash_type', 'washType']),
-        items: normalizeJobOrderItems(jobOrder),
-        rfid_count: pickFirst(jobOrder, ['rfid_count', 'rfidCount', 'total_rfid_count', 'totalRfidCount']),
-        missing_rfid_count: pickFirst(jobOrder, ['missing_rfid_count', 'missingRfidCount']),
-        parent_jo_id: pickFirst(jobOrder, ['parent_jo_id', 'parentJoId', 'parent_job_order_id', 'parentJobOrderId']),
-        comment: pickFirst(jobOrder, ['comment', 'comments', 'note', 'notes']),
-        error: jobOrder?.error,
-        status_code: jobOrder?.status,
-    });
-}
+    if (rawResult && typeof rawResult === 'object') {
+        if (rawResult.error || rawResult.success === false || Number(rawResult.status) >= 400) {
+            return false;
+        }
+    }
 
-function normalizeJobOrderItems(jobOrder) {
-    const items = firstArray([
-        jobOrder?.items,
-        jobOrder?.line_items,
-        jobOrder?.textiles,
-        jobOrder?.job_order_items,
-    ]);
-
-    return items.slice(0, 25).map((item) => stripEmptyValues({
-        textile_id: pickFirst(item, ['textile_id', 'textileId', 'textile_code', 'textileCode', 'id']),
-        quantity: pickFirst(item, ['quantity', 'qty']),
-        uom: pickFirst(item, ['uom', 'unit', 'unit_of_measure']),
-        category: pickFirst(item, ['category', 'textile_category', 'textileCategory']),
-    }));
+    return !['', '{}', '[]', 'null'].includes(String(normalizedContent ?? '').trim());
 }
 
 function sanitizeToolResult(value) {
@@ -714,53 +674,53 @@ function safeJsonLength(value) {
     }
 }
 
-function firstObject(values) {
-    return values.find((value) => value && typeof value === 'object' && !Array.isArray(value)) ?? {};
-}
-
-function firstArray(values) {
-    return values.find((value) => Array.isArray(value)) ?? [];
-}
-
-function pickFirst(object, keys) {
-    if (!object || typeof object !== 'object') {
-        return undefined;
-    }
-
-    for (const key of keys) {
-        if (object[key] !== undefined && object[key] !== null && object[key] !== '') {
-            return object[key];
-        }
-    }
-
-    return undefined;
-}
-
-function stripEmptyValues(object) {
-    return Object.fromEntries(
-        Object.entries(object).filter(([, value]) => (
-            value !== undefined
-            && value !== ''
-            && !(Array.isArray(value) && value.length === 0)
-            && !(value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0)
-        )),
-    );
-}
-
-async function evaluateLowConfidence({ query, answer, chunks, timer }) {
+async function evaluateLowConfidence({ query, answer, chunks, toolEvidence, timer }) {
     const signals = [];
     const reasons = [];
     const hardLowConfidenceReasons = [];
     const normalizedChunks = Array.isArray(chunks) ? chunks : [];
-    const topSimilarity = normalizedChunks.length > 0
-        ? Number(normalizedChunks[0]?.similarity ?? 0)
+    const normalizedToolEvidence = Array.isArray(toolEvidence) ? toolEvidence : [];
+    const evidenceChunks = normalizedToolEvidence.length > 0
+        ? normalizedToolEvidence.map((evidence, index) => ({
+            content: evidence.content,
+            similarity: 1,
+            document_id: `tool:${evidence.action ?? 'unknown'}:${index}`,
+            document_title: `Tool result: ${evidence.action ?? 'unknown'}`,
+        }))
+        : normalizedChunks;
+    const hasToolEvidence = normalizedToolEvidence.length > 0;
+    const topSimilarity = evidenceChunks.length > 0
+        ? Number(evidenceChunks[0]?.similarity ?? 0)
         : 0;
-    const secondSimilarity = normalizedChunks.length > 1
-        ? Number(normalizedChunks[1]?.similarity ?? 0)
+    const secondSimilarity = evidenceChunks.length > 1
+        ? Number(evidenceChunks[1]?.similarity ?? 0)
         : null;
     let score = Math.min(0.95, Math.max(0, topSimilarity || 0));
 
-    if (normalizedChunks.length === 0) {
+    if (isCasualInteraction(query)) {
+        const classification = classifyConfidence({ requiresKnowledgeBase: false });
+        const casualReason = classification.reason;
+
+        timer?.mark('confidence.model_call', {
+            skipped: true,
+            reason: casualReason,
+        });
+
+        return {
+            low_confidence: false,
+            score: 1,
+            classification,
+            signals: [createConfidenceSignal(casualReason, 0)],
+            reasons: [casualReason],
+            retrieval_score: normalizedChunks.length > 0
+                ? Number(normalizedChunks[0]?.similarity ?? 0)
+                : null,
+            retrieved_chunk_count: normalizedChunks.length,
+            tool_evidence_count: normalizedToolEvidence.length,
+        };
+    }
+
+    if (evidenceChunks.length === 0) {
         score = 0;
         signals.push(createConfidenceSignal('no_chunks_found', -0.8));
         hardLowConfidenceReasons.push('no_chunks_found');
@@ -771,8 +731,8 @@ async function evaluateLowConfidence({ query, answer, chunks, timer }) {
         hardLowConfidenceReasons.push('andi_answered_i_dont_know');
     }
 
-    if (normalizedChunks.length > 0) {
-        if (queryKeywordsAppearInChunks(query, normalizedChunks)) {
+    if (evidenceChunks.length > 0) {
+        if (queryKeywordsAppearInChunks(query, evidenceChunks)) {
             signals.push(createConfidenceSignal('query_keyword_or_entity_found_in_chunks', 0.08));
         }
 
@@ -780,7 +740,7 @@ async function evaluateLowConfidence({ query, answer, chunks, timer }) {
             signals.push(createConfidenceSignal('top_result_has_strong_gap_from_second', 0.07));
         }
 
-        if (chunkContainsDirectAnswerWords(normalizedChunks[0])) {
+        if (chunkContainsDirectAnswerWords(evidenceChunks[0])) {
             signals.push(createConfidenceSignal('top_chunk_contains_direct_answer_words', 0.06));
         }
 
@@ -796,16 +756,16 @@ async function evaluateLowConfidence({ query, answer, chunks, timer }) {
             signals.push(createConfidenceSignal('top_score_and_second_score_are_close', -0.08));
         }
 
-        if (topChunksLookUnrelated(normalizedChunks)) {
+        if (topChunksLookUnrelated(evidenceChunks)) {
             signals.push(createConfidenceSignal('top_chunks_from_unrelated_documents', -0.12));
         }
     }
 
-    if (normalizedChunks.length > 0) {
+    if (evidenceChunks.length > 0) {
         const verifierResult = await verifyRetrievedEvidence({
             query,
             answer,
-            chunks: normalizedChunks.slice(0, 5),
+            chunks: evidenceChunks.slice(0, 5),
             timer,
         });
 
@@ -840,9 +800,10 @@ async function evaluateLowConfidence({ query, answer, chunks, timer }) {
     )));
 
     const classification = classifyConfidence({
-        chunks: normalizedChunks,
+        chunks: evidenceChunks,
         confidenceScore: score,
         hardLowConfidenceReasons,
+        hasToolEvidence,
     });
 
     reasons.push(classification.reason, ...hardLowConfidenceReasons);
@@ -853,8 +814,11 @@ async function evaluateLowConfidence({ query, answer, chunks, timer }) {
         classification,
         signals,
         reasons: [...new Set(reasons)],
-        retrieval_score: normalizedChunks.length > 0 ? topSimilarity : null,
+        retrieval_score: normalizedChunks.length > 0
+            ? Number(normalizedChunks[0]?.similarity ?? 0)
+            : null,
         retrieved_chunk_count: normalizedChunks.length,
+        tool_evidence_count: normalizedToolEvidence.length,
     };
 }
 
@@ -957,7 +921,7 @@ async function verifyRetrievedEvidence({ query, answer, chunks, timer }) {
             messages: [
                 {
                     role: 'system',
-                    content: `You verify whether retrieved knowledge chunks support an assistant answer.
+                    content: `You verify whether supplied evidence supports an assistant answer. Evidence may come from retrieved knowledge or a successful backend tool call.
 Return only JSON with:
 {
   "direct_answer_present": boolean,
@@ -967,11 +931,11 @@ Return only JSON with:
   "partially_answers_question": boolean
 }
 
-Set direct_answer_present to true only when at least one chunk directly contains the information needed for the assistant's answer.
-Set chunks_contradict to true when the top chunks make conflicting claims about the same answer-critical fact.
-Set multiple_chunks_agree to true when two or more chunks support the same answer-critical fact.
-Set requires_missing_policy_or_process to true when the user asks for a policy/process/permission/requirement and the chunks do not contain that policy/process.
-Set partially_answers_question to true when the chunks answer only part of what the user asked.`,
+Set direct_answer_present to true only when at least one evidence item directly contains the information needed for the assistant's answer.
+Set chunks_contradict to true when the evidence items make conflicting claims about the same answer-critical fact.
+Set multiple_chunks_agree to true when two or more evidence items support the same answer-critical fact.
+Set requires_missing_policy_or_process to true when the user asks for a policy/process/permission/requirement and the evidence does not contain that policy/process.
+Set partially_answers_question to true when the evidence answers only part of what the user asked.`,
                 },
                 {
                     role: 'user',
@@ -1060,6 +1024,9 @@ ${context || 'No relevant context found.'}
 You also have access to backend tools described below. Use the callBackendTool function
 when the user asks for live operational data. Set "action" to the exact tool_name and
 "payload" to the parameters required by that tool's schema.
+When answering from a successful tool result, include all relevant operational fields.
+Summarize repeated records compactly while preserving their important identifiers and counts.
+Do not omit relevant fields unless the user asks for a brief answer.
 
 Available tools:
 ${JSON.stringify(toolCatalog, null, 2)}
@@ -1095,9 +1062,9 @@ async function executeBackendTool(args, project_id, environment_id, userToken) {
 
     const url = `${environment.base_url}${path}`;
 
-    // If the caller passed their own token (external user), forward it so Liniq
-    // applies that user's actual role-based permissions. Otherwise fall back to
-    // the environment's configured service credential (e.g. for portal admins).
+    // If the caller passed their own token, forward it so the target backend applies
+    // that user's actual role-based permissions. Otherwise fall back to the
+    // environment's configured service credential (e.g. for portal admins).
     const headers = userToken
         ? { 'Content-Type': 'application/json', Authorization: _buildUserToken(userToken, environment) }
         : buildAuthHeaders(environment);
