@@ -216,6 +216,15 @@
     align-items: stretch;
   }
 
+  .integration-agent-prompt {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .integration-agent-copy-button {
+    width: 100%;
+  }
+
   .status-pill {
     display: none;
   }

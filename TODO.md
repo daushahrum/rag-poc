@@ -1,59 +1,89 @@
-# TODO - Update chat header, composer, and sidebar motion
+# TODO - Platform-specific agent integration prompt
 
-## Goal
+## Feature understanding
 
-Replace the static `ANDI` chat header with the signed-in user's project name and an environment selector, update the message composer to use a fully rounded shape and the placeholder `ask anything`, and smooth the sidebar collapse/expand motion.
+Connected Apps should help a project owner hand an app integration task to a coding agent.
+When the selected app uses a supported platform (`flutter` or `nodejs`), its editor shows a
+section titled **Give your agent everything it needs** with a **Copy prompt** button.
 
-## Plan
+The copied value is not general product documentation. It is a ready-to-use implementation
+brief tailored to the selected platform and current project. It should tell an agent what to
+build, which ANDI endpoints and headers to use, how sessions and streaming work, and which
+runtime values belong to this app.
 
-1. [x] Add stable header elements in `views/index.html`
-   - Replace the static `ANDI` heading with a project-name element.
-   - Replace the static subtitle with an accessible environment `<select>`.
-   - Keep sensible loading/fallback text while project data is unavailable.
-   - Change the chat textarea placeholder to `ask anything`.
+Prompt content is maintained outside the screen renderer in
+`public/js/config/integration-agent-prompts.config.js`. Adding or changing prompt wording must
+not require editing UI code. Unsupported platforms do not show the section until a prompt is
+added for their platform key.
 
-2. [x] Extend `public/js/data/api/project.api.js`
-   - Add a helper for `GET /api/project/:id`.
-   - Reuse the existing authenticated request pattern.
-   - Return a clear error when project details cannot be loaded.
+## Runtime prompt values
 
-3. [x] Initialize project and environment state in `public/js/presentation/pages/app.page.js`
-   - Read `project_id` from the authenticated user.
-   - Fetch the project details and environments during page initialization.
-   - Render the project `name` in the header.
-   - Populate the environment selector from each environment's `id` and `environment` label.
-   - Default to the first available environment and store its ID in `selectedEnvironmentId`.
-   - Load chat sessions only after the environment has been selected.
+The UI interpolates these tokens when copying a configured prompt:
 
-4. [x] Wire environment changes into chat behavior
-   - Update `selectedEnvironmentId` when the selector changes.
-   - Clear/reset the active chat state for the newly selected environment.
-   - Refresh the session history using the selected environment.
-   - Create the next chat session with that same environment.
-   - Handle projects with no environments without leaving a stale selection.
+- `{{baseUrl}}` - the current ANDI origin.
+- `{{projectCode}}` - the active project's public code.
+- `{{projectKey}}` - the newly generated or rotated plaintext app key.
+- `{{environmentId}}` - the chosen/default environment, when one is available.
 
-5. [x] Update `public/css/styles.css`
-   - Lay out the project name and environment selector cleanly within the existing header.
-   - Style the selector consistently with the current UI and preserve keyboard focus visibility.
-   - Set `.composer-box` to a pill-shaped/full border radius.
-   - Confirm the rounded composer still accommodates multiline textarea growth and the send button.
-   - Preserve usable spacing and wrapping on narrow/mobile layouts.
-   - Animate desktop sidebar width changes with a smooth easing curve while keeping drag-resize immediate.
-   - Smooth the mobile sidebar slide and shadow transitions.
+App keys are stored as hashes, so an existing key cannot be reconstructed after the create or
+rotate response. If the current browser session does not have the plaintext key, the copied
+prompt must use an obvious `<PROJECT_KEY>` placeholder and the UI must explain that the owner
+can rotate the key to generate a copyable value. The feature must never imply that a masked or
+unavailable key is the real credential.
 
-6. [x] Validate
-   - Confirm the header shows the authenticated user's project name.
-   - Confirm every available environment appears in the selector.
-   - Confirm switching environments refreshes the relevant chat history and new-session context.
-   - Confirm missing project/environment data displays a safe fallback.
-   - Confirm the textarea says `ask anything`.
-   - Confirm the composer remains fully rounded at desktop and mobile widths.
-   - Run the available static checks/tests and inspect the final diff without modifying unrelated backend work.
+## Revised plan
+
+1. [x] Add the editable prompt configuration
+   - Define prompt templates for `flutter` and `nodejs`.
+   - Keep platform identifiers aligned with Connected Apps platform values.
+   - Document the supported interpolation tokens next to the templates.
+
+2. [x] Add a small prompt-template utility
+   - Resolve a template by platform.
+   - Replace all known runtime tokens without evaluating arbitrary code.
+   - Supply explicit placeholders for unavailable project key or environment values.
+   - Return no guide for unsupported platforms.
+
+3. [x] Add the Connected Apps section
+   - Render **Give your agent everything it needs** and **Copy prompt** in the app editor.
+   - Show it only while a Flutter or Node.js app is selected or has just been created.
+   - Update visibility immediately when the platform field changes.
+   - Keep it separate from the one-time key panel and normal save/delete actions.
+
+4. [x] Connect project and credential context
+   - Use `state.activeProject.code` for the project code and `window.location.origin` for the
+     base URL.
+   - Use the first/selected project environment where available.
+   - Retain a newly created/rotated plaintext key only in screen memory; do not persist it.
+   - Fall back to `<PROJECT_KEY>` plus a clear rotate-key hint after reload.
+
+5. [x] Implement copy feedback and accessibility
+   - Copy the fully interpolated prompt with the Clipboard API.
+   - Provide a selection/manual-copy fallback when clipboard access fails.
+   - Announce copied, missing-key, and copy-failure states through the existing status region.
+   - Preserve keyboard focus and use an explicit button label.
+
+6. [x] Style responsively
+   - Add a visually distinct but compact integration-prompt panel.
+   - Keep the heading, explanation, and copy action usable on narrow screens and in dark mode.
+
+7. [x] Validate
+   - Verify Flutter and Node.js each copy their own configured prompt.
+   - Verify token substitution, including repeated tokens.
+   - Verify unsupported platforms render no prompt section.
+   - Verify create, edit, platform-change, rotate-key, reload, and missing-environment states.
+   - Run `npm test` and inspect the final diff without disturbing unrelated work.
+
+Automated template and substitution coverage passes with the full Node test suite. The screen
+state paths were reviewed for create, edit, platform changes, key rotation, deletion, missing
+clipboard access, and context placeholders.
 
 ## Expected files
 
-- `views/index.html`
-- `public/js/data/api/project.api.js`
-- `public/js/presentation/pages/app.page.js`
-- `public/css/styles.css`
+- `public/js/config/integration-agent-prompts.config.js`
+- `public/js/core/utils/prompt-template.js`
+- `public/js/presentation/app/screens/project-apps.screen.js`
+- `public/css/modules/components.css`
+- `public/css/modules/responsive.css`
+- `test/prompt-template.test.js`
 - `TODO.md`

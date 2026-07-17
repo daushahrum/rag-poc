@@ -642,6 +642,57 @@
   font-size: 12px;
 }
 
+.integration-agent-prompt {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, var(--accent) 38%, var(--border));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent-light) 65%, var(--surface));
+}
+
+.integration-agent-prompt strong {
+  display: block;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.integration-agent-prompt p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.integration-agent-prompt small {
+  display: block;
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.integration-agent-copy-button {
+  gap: 7px;
+  min-height: 38px;
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  background: var(--surface);
+}
+
+.project-resource-editor .integration-agent-prompt-fallback {
+  grid-column: 1 / -1;
+  min-height: 180px;
+  padding: 10px 12px;
+  border-color: var(--accent);
+  border-radius: 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
 .upload-dropzone {
   display: grid;
   place-items: center;

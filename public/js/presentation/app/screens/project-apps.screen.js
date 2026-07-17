@@ -1,4 +1,9 @@
 import { createApp, deleteApp, fetchProjectApps, updateApp } from '../../../domain/use-cases/app.use-cases.js';
+import { fetchProjectEnvironments } from '../../../domain/use-cases/project.use-cases.js';
+import {
+    buildIntegrationAgentPrompt,
+    hasIntegrationAgentPrompt,
+} from '../../../core/utils/prompt-template.js';
 import {
     disconnectJira,
     getJiraAuthorizationUrl,
@@ -13,6 +18,43 @@ function generateProjectKey() {
     crypto.getRandomValues(bytes);
     const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
     return `andi_${hex}`;
+}
+
+const PLATFORM_OPTIONS = [
+    ['web', 'Web / Browser'],
+    ['nodejs', 'Node.js'],
+    ['react', 'React'],
+    ['nextjs', 'Next.js'],
+    ['react-native', 'React Native'],
+    ['flutter', 'Flutter'],
+    ['kotlin', 'Kotlin (Android)'],
+    ['java', 'Java (Android / JVM)'],
+    ['swift', 'Swift (iOS)'],
+    ['python', 'Python'],
+    ['dotnet', '.NET'],
+    ['php', 'PHP'],
+    ['go', 'Go'],
+    ['ruby', 'Ruby'],
+    ['other', 'Other'],
+];
+
+function getPlatformLabel(value) {
+    return PLATFORM_OPTIONS.find(([platform]) => platform === value)?.[1] ?? value;
+}
+
+function createPlatformSelect() {
+    const select = document.createElement('select');
+    select.name = 'platform';
+    select.required = true;
+
+    for (const [value, label] of PLATFORM_OPTIONS) {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = label;
+        select.append(option);
+    }
+
+    return select;
 }
 
 export async function renderProjectAppsScreen(context) {
@@ -47,7 +89,7 @@ export async function renderProjectAppsScreen(context) {
     const fields = document.createElement('div');
     fields.className = 'project-resource-grid';
     const nameField = createInput('name', 'text', 'Customer portal', 'off');
-    const platformField = createInput('platform', 'text', 'web', 'off');
+    const platformField = createPlatformSelect();
     fields.append(
         createFormField('App name', nameField),
         createFormField('Platform', platformField),
@@ -95,6 +137,27 @@ export async function renderProjectAppsScreen(context) {
     copyKeyButton.textContent = 'Copy';
     keyPanel.append(keyText, keyOutput, copyKeyButton);
 
+    const promptPanel = document.createElement('section');
+    promptPanel.className = 'integration-agent-prompt';
+    promptPanel.hidden = true;
+    const promptText = document.createElement('div');
+    const promptTitle = document.createElement('strong');
+    promptTitle.textContent = 'Give your agent everything it needs';
+    const promptDescription = document.createElement('p');
+    promptDescription.textContent = 'Copy a ready-to-use brief for integrating this app with ANDI.';
+    const promptKeyHint = document.createElement('small');
+    promptText.append(promptTitle, promptDescription, promptKeyHint);
+    const copyPromptButton = document.createElement('button');
+    copyPromptButton.className = 'small-button integration-agent-copy-button';
+    copyPromptButton.type = 'button';
+    copyPromptButton.innerHTML = '<i class="bi bi-copy" aria-hidden="true"></i><span>Copy prompt</span>';
+    const promptFallback = document.createElement('textarea');
+    promptFallback.className = 'integration-agent-prompt-fallback';
+    promptFallback.readOnly = true;
+    promptFallback.hidden = true;
+    promptFallback.setAttribute('aria-label', 'Integration agent prompt for manual copying');
+    promptPanel.append(promptText, copyPromptButton, promptFallback);
+
     const actions = document.createElement('div');
     actions.className = 'project-knowledge-actions';
     const status = document.createElement('p');
@@ -111,27 +174,87 @@ export async function renderProjectAppsScreen(context) {
     saveButton.type = 'submit';
     buttons.append(deleteButton, saveButton);
     actions.append(status, buttons);
-    editor.append(jiraActions, heading, fields, accessGrid, keyPanel, actions);
+    editor.append(jiraActions, heading, fields, accessGrid, keyPanel, promptPanel, actions);
 
     let items = [];
     let editingId = null;
     let jiraConnection = null;
+    let promptEnvironments = Array.isArray(state.environments) ? state.environments : [];
+    const generatedProjectKeys = new Map();
 
     function showGeneratedKey(projectKey) {
         keyPanel.hidden = !projectKey;
         keyOutput.value = projectKey ?? '';
     }
 
+    function getActiveProject() {
+        if (String(state.activeProject?.id) === String(state.activeProjectId)) {
+            return state.activeProject;
+        }
+
+        return state.projects?.find(
+            (project) => String(project.id) === String(state.activeProjectId)
+        ) ?? null;
+    }
+
+    function getPromptEnvironmentId() {
+        const selectedEnvironment = promptEnvironments.find(
+            (environment) => String(environment.id) === String(state.selectedEnvironmentId)
+        );
+
+        return selectedEnvironment?.id ?? promptEnvironments[0]?.id;
+    }
+
+    function getCurrentProjectKey() {
+        return editingId ? generatedProjectKeys.get(String(editingId)) : null;
+    }
+
+    function refreshPromptPanel() {
+        const isSupportedApp = Boolean(editingId)
+            && hasIntegrationAgentPrompt(platformField.value);
+        promptPanel.hidden = !isSupportedApp;
+        promptFallback.hidden = true;
+        promptFallback.value = '';
+
+        if (!isSupportedApp) return;
+
+        promptKeyHint.textContent = getCurrentProjectKey()
+            ? 'The newly generated project key will be included. Keep the copied prompt secure.'
+            : 'The existing key cannot be recovered. The prompt will use <PROJECT_KEY>; rotate the key to include a new value.';
+    }
+
+    async function loadPromptContext() {
+        if (promptEnvironments.length > 0 || !state.activeProjectId) return;
+
+        try {
+            promptEnvironments = await fetchProjectEnvironments(state.activeProjectId);
+        } catch {
+            promptEnvironments = [];
+        }
+    }
+
     function setMode(item = null) {
         editingId = item?.id ?? null;
         heading.textContent = item ? 'Edit app' : 'Create app';
         nameField.value = item?.name ?? '';
-        platformField.value = item?.platform ?? '';
+        platformField.querySelector('[data-custom-platform]')?.remove();
+        const platform = item?.platform ?? 'web';
+        const existingPlatform = Array.from(platformField.options)
+            .some((option) => option.value === platform);
+        if (!existingPlatform) {
+            const customOption = document.createElement('option');
+            customOption.value = platform;
+            customOption.textContent = `${platform} (existing)`;
+            customOption.dataset.customPlatform = 'true';
+            platformField.append(customOption);
+        }
+        platformField.value = platform;
         statusSelect.value = item?.status ?? 'active';
         rotateKeyWrapper.hidden = !item;
         deleteButton.hidden = !item;
         saveButton.textContent = item ? 'Save changes' : 'Create app';
         showGeneratedKey(null);
+        refreshPromptPanel();
         status.textContent = '';
         status.className = 'create-user-status';
         list.querySelectorAll('.knowledge-item').forEach((button) => {
@@ -157,7 +280,7 @@ export async function renderProjectAppsScreen(context) {
             title.textContent = item.name;
             const meta = document.createElement('span');
             meta.className = 'knowledge-item-meta';
-            meta.textContent = `${item.platform} · ${item.status === 'active' ? 'Active' : 'Inactive'}`;
+            meta.textContent = `${getPlatformLabel(item.platform)} · ${item.status === 'active' ? 'Active' : 'Inactive'}`;
             button.append(title, meta);
             button.addEventListener('click', () => setMode(item));
             list.append(button);
@@ -251,6 +374,7 @@ export async function renderProjectAppsScreen(context) {
         nameField.focus();
     });
     refreshButton.addEventListener('click', loadItems);
+    platformField.addEventListener('change', refreshPromptPanel);
 
     editor.addEventListener('submit', async (event) => {
         event.preventDefault();
@@ -271,6 +395,9 @@ export async function renderProjectAppsScreen(context) {
                 ? await updateApp(editingId, payload)
                 : await createApp(payload);
             const savedId = editingId ?? saved.id;
+            if (saved.project_key) {
+                generatedProjectKeys.set(String(savedId), saved.project_key);
+            }
             await loadItems();
             setMode(items.find((item) => String(item.id) === String(savedId)) ?? null);
             showGeneratedKey(saved.project_key);
@@ -297,7 +424,9 @@ export async function renderProjectAppsScreen(context) {
         try {
             const projectKey = generateProjectKey();
             await updateApp(editingId, { project_key: projectKey });
+            generatedProjectKeys.set(String(editingId), projectKey);
             showGeneratedKey(projectKey);
+            refreshPromptPanel();
             status.textContent = 'Key rotated.';
             status.classList.add('success');
         } catch (error) {
@@ -322,6 +451,36 @@ export async function renderProjectAppsScreen(context) {
             status.className = 'create-user-status';
         }
     });
+    copyPromptButton.addEventListener('click', async () => {
+        const prompt = buildIntegrationAgentPrompt(platformField.value, {
+            baseUrl: window.location.origin,
+            projectCode: getActiveProject()?.code,
+            projectKey: getCurrentProjectKey(),
+            environmentId: getPromptEnvironmentId(),
+        });
+        if (!prompt) return;
+
+        promptFallback.hidden = true;
+        promptFallback.value = '';
+
+        try {
+            if (!navigator.clipboard?.writeText) {
+                throw new Error('Clipboard API unavailable');
+            }
+            await navigator.clipboard.writeText(prompt);
+            status.textContent = getCurrentProjectKey()
+                ? 'Integration prompt copied. It contains a project key; handle it securely.'
+                : 'Integration prompt copied with a <PROJECT_KEY> placeholder.';
+            status.className = 'create-user-status success';
+        } catch {
+            promptFallback.value = prompt;
+            promptFallback.hidden = false;
+            promptFallback.focus();
+            promptFallback.select();
+            status.textContent = 'Automatic copy was unavailable. The prompt is selected for manual copying.';
+            status.className = 'create-user-status';
+        }
+    });
     deleteButton.addEventListener('click', async () => {
         if (!editingId || !window.confirm('Delete this app?')) return;
         saveButton.disabled = true;
@@ -329,6 +488,7 @@ export async function renderProjectAppsScreen(context) {
         rotateKeyButton.disabled = true;
         try {
             await deleteApp(editingId);
+            generatedProjectKeys.delete(String(editingId));
             setMode();
             await loadItems();
             status.textContent = 'App deleted.';
@@ -348,5 +508,6 @@ export async function renderProjectAppsScreen(context) {
     await Promise.all([
         loadItems(),
         loadJiraConnection(),
+        loadPromptContext(),
     ]);
 }
