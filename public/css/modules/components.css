@@ -125,6 +125,11 @@
   font-weight: 650;
 }
 
+.project-knowledge-editor label,
+.project-resource-field {
+  font-size: 14px;
+}
+
 .create-user-field,
 .project-resource-field {
   display: grid;
@@ -180,6 +185,7 @@
 .project-knowledge-editor select {
   padding: 10px 12px;
   border-radius: 9px;
+  font-size: 14px;
 }
 
 .project-form input:focus,

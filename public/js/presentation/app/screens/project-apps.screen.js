@@ -59,13 +59,13 @@ function createPlatformSelect() {
 
 export async function renderProjectAppsScreen(context) {
     const { state } = context;
-    const { createButton, refreshButton, list, editor } = createProjectManagerScreen(
+    const { createButton, list, editor, listPanel, divider } = createProjectManagerScreen(
         context,
         'Connected Apps',
         'Manage project keys for each client app connected to this project.',
         'New app',
     );
-    createButton.parentElement?.classList.add('connected-apps-list-panel');
+    listPanel.classList.add('connected-apps-list-panel');
 
     const heading = document.createElement('h3');
     const jiraActions = document.createElement('div');
@@ -83,7 +83,7 @@ export async function renderProjectAppsScreen(context) {
         jiraStatus.classList.add(jiraReturnStatus === 'connected' ? 'success' : 'error');
     }
     let connectJiraButton = buildJiraButton(false);
-    createButton.after(connectJiraButton);
+    listPanel.insertBefore(connectJiraButton, divider);
     jiraActions.append(jiraStatus);
 
     const fields = document.createElement('div');
@@ -373,7 +373,6 @@ export async function renderProjectAppsScreen(context) {
         setMode();
         nameField.focus();
     });
-    refreshButton.addEventListener('click', loadItems);
     platformField.addEventListener('change', refreshPromptPanel);
 
     editor.addEventListener('submit', async (event) => {

@@ -11,7 +11,7 @@ import { createProjectManagerScreen } from '../components/project-manager-layout
 
 export async function renderProjectKnowledgeScreen(context) {
     const { state } = context;
-    const { createButton, refreshButton, list, editor } = createProjectManagerScreen(
+    const { createButton, list, editor } = createProjectManagerScreen(
         context,
         'Documents',
         'Create and maintain project knowledge.',
@@ -199,7 +199,6 @@ export async function renderProjectKnowledgeScreen(context) {
         setEditorMode();
         titleField.focus();
     });
-    refreshButton.addEventListener('click', loadDocuments);
 
     async function uploadKnowledgeDocument(file) {
         if (!file) return;

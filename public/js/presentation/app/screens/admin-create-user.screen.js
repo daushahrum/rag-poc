@@ -8,7 +8,7 @@ export async function renderCreateUserScreen(context) {
     const { currentUser } = state;
     if (state.roleMode !== 'admin') return;
 
-    const { createButton, refreshButton, list, editor } = createProjectManagerScreen(
+    const { createButton, list, editor } = createProjectManagerScreen(
         context,
         'Users',
         'Create and maintain admin and project owner accounts.',
@@ -193,7 +193,6 @@ export async function renderCreateUserScreen(context) {
         setMode();
         usernameInput.focus();
     });
-    refreshButton.addEventListener('click', loadItems);
 
     editor.addEventListener('submit', async (event) => {
         event.preventDefault();

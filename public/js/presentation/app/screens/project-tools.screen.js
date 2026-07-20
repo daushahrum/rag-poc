@@ -4,7 +4,7 @@ import { createProjectManagerScreen } from '../components/project-manager-layout
 
 export async function renderProjectToolsScreen(context) {
     const { state } = context;
-    const { createButton, refreshButton, list, editor } = createProjectManagerScreen(context, 
+    const { createButton, list, editor } = createProjectManagerScreen(context,
         'Tools',
         'Define the project APIs ANDI can call while answering questions.',
         'New tool',
@@ -173,7 +173,6 @@ export async function renderProjectToolsScreen(context) {
         setMode();
         nameField.focus();
     });
-    refreshButton.addEventListener('click', loadItems);
     editor.addEventListener('submit', async (event) => {
         event.preventDefault();
         status.className = 'create-user-status';

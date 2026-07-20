@@ -129,7 +129,8 @@
   }
 
   .project-knowledge-list-panel {
-    max-height: 280px;
+    max-height: min(440px, 55vh);
+    padding: 16px;
     border-right: 0;
     border-bottom: 1px solid var(--border);
   }

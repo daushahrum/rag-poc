@@ -11,7 +11,7 @@ export async function renderCreateProjectScreen(context) {
     const { state } = context;
     if (state.roleMode !== 'admin') return;
 
-    const { createButton, refreshButton, list, editor } = createProjectManagerScreen(
+    const { createButton, list, editor } = createProjectManagerScreen(
         context,
         'Projects',
         'Create and maintain ANDI projects.',
@@ -139,7 +139,6 @@ export async function renderCreateProjectScreen(context) {
         setMode();
         nameInput.focus();
     });
-    refreshButton.addEventListener('click', loadItems);
 
     editor.addEventListener('submit', async (event) => {
         event.preventDefault();

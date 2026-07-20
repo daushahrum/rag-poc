@@ -5,7 +5,7 @@ import { createProjectManagerScreen } from '../components/project-manager-layout
 export async function renderProjectEnvironmentsScreen(context) {
     const { state, helpers } = context;
     const { renderEnvironmentOptions } = helpers;
-    const { createButton, refreshButton, list, editor } = createProjectManagerScreen(context, 
+    const { createButton, list, editor } = createProjectManagerScreen(context,
         'Environments',
         'Configure the API environments available to this project.',
         'New environment',
@@ -143,7 +143,6 @@ export async function renderProjectEnvironmentsScreen(context) {
         setMode();
         nameField.focus();
     });
-    refreshButton.addEventListener('click', loadItems);
     editor.addEventListener('submit', async (event) => {
         event.preventDefault();
         status.className = 'create-user-status';

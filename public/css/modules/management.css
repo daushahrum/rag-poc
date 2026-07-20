@@ -134,6 +134,132 @@
   grid-template-rows: auto auto auto auto minmax(0, 1fr);
 }
 
+.project-list-add-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.project-list-search {
+  position: relative;
+  display: block;
+}
+
+.project-list-search input {
+  width: 100%;
+  height: 36px;
+  padding: 0 36px 0 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 14px;
+}
+
+.project-list-search input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-light);
+  outline: none;
+}
+
+.project-list-search i {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  color: var(--muted);
+  font-size: 14px;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.project-manager-list-region {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto auto;
+  gap: 10px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.project-list-search-empty {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 7px;
+  min-height: 0;
+  padding: 24px 12px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.project-list-search-empty[hidden] {
+  display: none;
+}
+
+.project-list-search-empty i {
+  font-size: 24px;
+}
+
+.project-list-search-empty strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.project-list-search-empty span {
+  font-size: 11px;
+}
+
+.project-list-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 32px;
+  padding-top: 2px;
+}
+
+.project-list-pagination[hidden] {
+  display: none;
+}
+
+.project-list-result-count,
+.project-list-page-label {
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.project-list-pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.project-list-page-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.project-list-page-button:not(:disabled):hover {
+  border-color: var(--accent);
+  background: var(--accent-light);
+  color: var(--accent-dark);
+}
+
+.project-list-page-button:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .project-list-divider {
   width: 100%;
   height: 1px;
@@ -1198,6 +1324,6 @@
 .project-tool-json-grid textarea {
   min-height: 110px;
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 14px;
   resize: vertical;
 }

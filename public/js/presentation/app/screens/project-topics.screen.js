@@ -15,7 +15,7 @@ function formatKeywords(keywords) {
 
 export async function renderProjectTopicsScreen(context) {
     const { state } = context;
-    const { createButton, refreshButton, list, editor } = createProjectManagerScreen(
+    const { createButton, list, editor } = createProjectManagerScreen(
         context,
         'Topics',
         'Configure the allowed topics used for query audit categorization.',
@@ -146,7 +146,6 @@ export async function renderProjectTopicsScreen(context) {
         nameField.focus();
     });
 
-    refreshButton.addEventListener('click', loadItems);
 
     editor.addEventListener('submit', async (event) => {
         event.preventDefault();

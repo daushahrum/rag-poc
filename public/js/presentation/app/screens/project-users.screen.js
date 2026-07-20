@@ -5,7 +5,7 @@ import { createProjectManagerScreen } from '../components/project-manager-layout
 export async function renderProjectUsersScreen(context) {
     const { state } = context;
     const { currentUser, activeProjectId } = state;
-    const { createButton, refreshButton, list, editor } = createProjectManagerScreen(context, 
+    const { createButton, list, editor } = createProjectManagerScreen(context,
         'Users',
         'Manage the project owners who can access this workspace.',
         'New user',
@@ -145,7 +145,6 @@ export async function renderProjectUsersScreen(context) {
         setMode();
         usernameField.focus();
     });
-    refreshButton.addEventListener('click', loadItems);
     editor.addEventListener('submit', async (event) => {
         event.preventDefault();
         status.className = 'create-user-status';
