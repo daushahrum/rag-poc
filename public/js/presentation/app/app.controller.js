@@ -241,8 +241,8 @@ const {
     adminProjectField,
     environmentField,
     historySectionLabel,
-    openIngestButton,
-    openProjectButton,
+    projectKnowledgeButton,
+    projectToolsButton,
     closeAllPanels,
 });
 

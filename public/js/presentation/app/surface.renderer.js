@@ -8,8 +8,8 @@ export function createSurfaceRenderer({
     adminProjectField,
     environmentField,
     historySectionLabel,
-    openIngestButton,
-    openProjectButton,
+    projectKnowledgeButton,
+    projectToolsButton,
     closeAllPanels,
 }) {
     function renderWelcomeMessage() {
@@ -39,19 +39,19 @@ export function createSurfaceRenderer({
             const cards = document.createElement('div');
             cards.className = 'welcome-cards';
 
-            const ingestCard = document.createElement('button');
-            ingestCard.className = 'welcome-card';
-            ingestCard.type = 'button';
-            ingestCard.innerHTML = '<i class="bi bi-database-down"></i><span class="welcome-card-title">Ingest new knowledge</span><span class="welcome-card-subtitle">Teach ANDI new information on specific projects.</span>';
-            ingestCard.addEventListener('click', () => openIngestButton.click());
+            const knowledgeCard = document.createElement('button');
+            knowledgeCard.className = 'welcome-card';
+            knowledgeCard.type = 'button';
+            knowledgeCard.innerHTML = '<i class="bi bi-database-down"></i><span class="welcome-card-title">Ingest knowledge</span><span class="welcome-card-subtitle">Add information to your project knowledge base.</span>';
+            knowledgeCard.addEventListener('click', () => projectKnowledgeButton.click());
 
-            const projectCard = document.createElement('button');
-            projectCard.className = 'welcome-card';
-            projectCard.type = 'button';
-            projectCard.innerHTML = '<i class="bi bi-folder-plus"></i><span class="welcome-card-title">Create new project</span><span class="welcome-card-subtitle">Establish new projects for ANDI to explore on.</span>';
-            projectCard.addEventListener('click', () => openProjectButton.click());
+            const toolsCard = document.createElement('button');
+            toolsCard.className = 'welcome-card';
+            toolsCard.type = 'button';
+            toolsCard.innerHTML = '<i class="bi bi-tools"></i><span class="welcome-card-title">Add tools</span><span class="welcome-card-subtitle">Connect tools that let ANDI retrieve live project data.</span>';
+            toolsCard.addEventListener('click', () => projectToolsButton.click());
 
-            cards.append(ingestCard, projectCard);
+            cards.append(knowledgeCard, toolsCard);
             screen.append(cards);
         }
 
