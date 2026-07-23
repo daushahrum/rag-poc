@@ -390,10 +390,10 @@ form.addEventListener('submit', async (e) => {
     e.preventDefault();
     clearError();
 
-    const email = document.getElementById('email').value.trim();
+    const username = document.getElementById('username').value.trim();
     const password = document.getElementById('password').value;
 
-    if (!email || !password) {
+    if (!username || !password) {
         showError('Please fill in all fields.');
         return;
     }
@@ -401,12 +401,12 @@ form.addEventListener('submit', async (e) => {
     setLoading(true);
 
     try {
-        const data = await login(email, password);
+        const data = await login(username, password);
         setAuth(data.token, data.user);
         window.location.href = '/';
     } catch (err) {
         console.error('Login error:', err);
-        showError(err.message || 'Invalid email or password.');
+        showError(err.message || 'Invalid username or password.');
     } finally {
         setLoading(false);
     }

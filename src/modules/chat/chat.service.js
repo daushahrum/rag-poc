@@ -22,6 +22,7 @@ import {
     isCasualInteraction,
     topChunksLookUnrelated,
 } from './confidence.service.js';
+import { assertToolCallAuthorized } from './toolAuthorization.js';
 import { redactSensitive, safeRedactedJson } from '../../utils/redact.js';
 
 const CHAT_LIMITS = {
@@ -185,10 +186,6 @@ async function prepareChatState({
         throw new Error('message is required');
     }
 
-    if (!isPortalAdmin && !userToken) {
-        throw new Error('Session token is required');
-    }
-
     assertNotAborted(signal);
 
     const session = await chatSessionRepository.getChatSessionById(session_id);
@@ -269,6 +266,7 @@ async function prepareChatState({
         project_id,
         environment_id,
         userToken,
+        isPortalAdmin,
         message,
         messages,
         chunks,
@@ -369,7 +367,14 @@ function emitBufferedTextAsTokens(text, onToken) {
 }
 
 async function appendToolResults(chatState, assistantMessage, { signal, onStatus } = {}) {
-    const { messages, project_id, environment_id, userToken, timer } = chatState;
+    const {
+        messages,
+        project_id,
+        environment_id,
+        userToken,
+        isPortalAdmin,
+        timer,
+    } = chatState;
     messages.push(assistantMessage);
 
     for (const toolCall of assistantMessage.tool_calls) {
@@ -378,7 +383,13 @@ async function appendToolResults(chatState, assistantMessage, { signal, onStatus
         onStatus?.(`Calling tool: ${args.action}`);
 
         timer.mark('execute_tool.start', { action: args.action });
-        const toolResult = await executeBackendTool(args, project_id, environment_id, userToken);
+        const toolResult = await executeBackendTool(
+            args,
+            project_id,
+            environment_id,
+            userToken,
+            isPortalAdmin,
+        );
         timer.mark('execute_tool.end', { action: args.action });
 
         timer.mark('tool_result.normalize.start', { action: args.action });
@@ -1033,8 +1044,16 @@ ${JSON.stringify(toolCatalog, null, 2)}
 `;
 }
 
-async function executeBackendTool(args, project_id, environment_id, userToken) {
+async function executeBackendTool(
+    args,
+    project_id,
+    environment_id,
+    userToken,
+    isPortalAdmin,
+) {
     const { action, payload } = args;
+
+    assertToolCallAuthorized(userToken, isPortalAdmin);
 
     if (!action) {
         return { error: 'Tool action is required' };
@@ -1062,9 +1081,8 @@ async function executeBackendTool(args, project_id, environment_id, userToken) {
 
     const url = `${environment.base_url}${path}`;
 
-    // If the caller passed their own token, forward it so the target backend applies
-    // that user's actual role-based permissions. Otherwise fall back to the
-    // environment's configured service credential (e.g. for portal admins).
+    // External callers must supply their own token. Only authenticated portal
+    // admins may fall back to the environment's configured service credential.
     const headers = userToken
         ? { 'Content-Type': 'application/json', Authorization: _buildUserToken(userToken, environment) }
         : buildAuthHeaders(environment);

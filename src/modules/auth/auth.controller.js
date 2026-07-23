@@ -6,8 +6,10 @@ export async function login(req, res) {
     console.log('BODY:', req.body);
 
     try {
+        // Accept the legacy `id` field temporarily for existing API consumers.
+        const username = req.body.username ?? req.body.id;
         const result = await authService.login(
-            req.body.id,
+            username,
             req.body.password
         );
 

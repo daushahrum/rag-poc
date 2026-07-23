@@ -2,6 +2,10 @@
 
 import * as chatService from './chat.service.js';
 import { serializePublicChatMessage } from './chatMessage.serializer.js';
+import {
+    TOOL_AUTH_REQUIRED_CODE,
+    TOOL_AUTH_REQUIRED_MESSAGE,
+} from './toolAuthorization.js';
 import { redactSensitive, safeRedactedJson } from '../../utils/redact.js';
 
 export async function sendMessage(req, res) {
@@ -28,7 +32,9 @@ export async function sendMessage(req, res) {
                 : result
         );
     } catch (error) {
-        return res.status(400).json({
+        const status = error.code === TOOL_AUTH_REQUIRED_CODE ? 401 : 400;
+
+        return res.status(status).json({
             message: error.message,
         });
     }
@@ -74,7 +80,13 @@ export async function sendMessageStream(req, res) {
         });
     } catch (error) {
         console.error('Failed to handle chat stream:', redactSensitive(error.message));
-        sendEvent({ type: 'error', message: 'Failed to generate response' });
+        sendEvent({
+            type: 'error',
+            code: error.code,
+            message: error.code === TOOL_AUTH_REQUIRED_CODE
+                ? TOOL_AUTH_REQUIRED_MESSAGE
+                : 'Failed to generate response',
+        });
     } finally {
         completed = true;
 

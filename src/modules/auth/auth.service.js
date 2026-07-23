@@ -7,9 +7,9 @@ import * as authRepository from './auth.repository.js';
 import * as projectUserRepository from '../project/projectUser/projectUser.repository.js';
 import * as textValidators from '../../utils/textValidators.js';
 
-export async function login(id, password) {
-    console.log('LOGIN ID:', id);
-    const user = await authRepository.findById(id);
+export async function login(username, password) {
+    console.log('LOGIN USERNAME:', username);
+    const user = await authRepository.findById(username);
 
     if (!user) {
         throw new Error('User not found');
@@ -25,7 +25,7 @@ export async function login(id, password) {
         throw new Error('Invalid password');
     }
 
-    let project_user_id = await projectUserRepository.getProjectUser({external_user_id: id}).id;
+    let project_user_id = await projectUserRepository.getProjectUser({external_user_id: username}).id;
 
     const token = jwt.sign(
         {

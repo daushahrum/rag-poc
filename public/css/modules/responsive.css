@@ -170,6 +170,26 @@
     grid-template-columns: minmax(0, 1fr) auto auto 30px;
   }
 
+  .analytics-table-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .analytics-table-search {
+    flex-basis: auto;
+    max-width: none;
+  }
+
+  .analytics-table-filter-group {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .analytics-table-filter select {
+    width: 100%;
+    min-width: 0;
+  }
+
   .analytics-topic-chart-section {
     padding: 14px;
   }

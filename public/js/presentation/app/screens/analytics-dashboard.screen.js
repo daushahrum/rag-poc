@@ -749,6 +749,119 @@ function getPageRows(rows, page) {
     return rows.slice(start, start + analyticsTablePageSize);
 }
 
+function getAuditFilterText(audit) {
+    return [
+        audit.user_message?.content,
+        audit.assistant_message?.content,
+        audit.topic,
+        getAuditUserLabel(audit),
+        audit.quality_status,
+        humanizeStatus(audit.quality_status),
+        audit.confidence_level,
+        humanizeStatus(audit.confidence_level),
+        getAuditReason(audit),
+        humanizeReasonKey(getAuditReason(audit)),
+        audit.audit_reason,
+        audit.created_at,
+        formatRelativeTime(audit.created_at),
+        audit.jira_issue_key,
+        audit.jira_issue_url,
+    ]
+        .filter((value) => value !== null && value !== undefined)
+        .join(' ')
+        .toLocaleLowerCase();
+}
+
+function filterAnalyticsRows(rows, filters = {}) {
+    const query = String(filters.search ?? '').trim().toLocaleLowerCase();
+
+    return rows.filter((audit) => {
+        const topic = audit.topic || 'Unknown';
+        const status = audit.quality_status || 'Unknown';
+        return (!query || getAuditFilterText(audit).includes(query))
+            && (!filters.topic || topic === filters.topic)
+            && (!filters.status || status === filters.status);
+    });
+}
+
+function getFilterOptions(rows, getValue) {
+    return Array.from(new Set(rows.map(getValue).filter(Boolean)))
+        .sort((left, right) => left.localeCompare(right));
+}
+
+function createAnalyticsTableFilters({ rows, mode, filters = {}, onChange }) {
+    const toolbar = document.createElement('div');
+    toolbar.className = 'analytics-table-toolbar';
+
+    const search = document.createElement('label');
+    search.className = 'analytics-table-search';
+    const searchInput = document.createElement('input');
+    searchInput.type = 'search';
+    searchInput.value = filters.search ?? '';
+    searchInput.placeholder = 'Search analytics';
+    searchInput.autocomplete = 'off';
+    searchInput.dataset.analyticsSearch = mode;
+    searchInput.setAttribute('aria-label', 'Search analytics table');
+    const searchIcon = document.createElement('i');
+    searchIcon.className = 'bi bi-search';
+    searchIcon.setAttribute('aria-hidden', 'true');
+    search.append(searchInput, searchIcon);
+
+    const filterGroup = document.createElement('div');
+    filterGroup.className = 'analytics-table-filter-group';
+
+    function createFilter(labelText, value, options) {
+        const label = document.createElement('label');
+        label.className = 'analytics-table-filter';
+        const labelSpan = document.createElement('span');
+        labelSpan.textContent = labelText;
+        const select = document.createElement('select');
+        const allOption = document.createElement('option');
+        allOption.value = '';
+        allOption.textContent = `All`;
+        select.append(allOption);
+        options.forEach((optionValue) => {
+            const option = document.createElement('option');
+            option.value = optionValue;
+            option.textContent = labelText === 'Status'
+                ? humanizeStatus(optionValue)
+                : optionValue;
+            select.append(option);
+        });
+        select.value = value ?? '';
+        label.append(labelSpan, select);
+        return select;
+    }
+
+    const topicSelect = createFilter(
+        'Topic',
+        filters.topic,
+        getFilterOptions(rows, (audit) => audit.topic || 'Unknown'),
+    );
+    const statusSelect = createFilter(
+        'Status',
+        filters.status,
+        getFilterOptions(rows, (audit) => audit.quality_status || 'Unknown'),
+    );
+    filterGroup.append(topicSelect.parentElement, statusSelect.parentElement);
+    toolbar.append(search, filterGroup);
+
+    searchInput.addEventListener('input', () => onChange({
+        ...filters,
+        search: searchInput.value,
+    }, { focusSearch: true }));
+    topicSelect.addEventListener('change', () => onChange({
+        ...filters,
+        topic: topicSelect.value,
+    }));
+    statusSelect.addEventListener('change', () => onChange({
+        ...filters,
+        status: statusSelect.value,
+    }));
+
+    return toolbar;
+}
+
 function createTablePagination({ rows, page, onPageChange }) {
     const totalPages = getTotalPages(rows);
     const safePage = Math.min(Math.max(Number(page) || 1, 1), totalPages);
@@ -793,17 +906,33 @@ function createTablePagination({ rows, page, onPageChange }) {
     return pagination;
 }
 
-function createUnresolvedTable({ rows, page, detailAuditId, onPageChange, onOpenDetail }) {
+function createUnresolvedTable({
+    rows,
+    page,
+    filters,
+    detailAuditId,
+    onPageChange,
+    onFiltersChange,
+    onOpenDetail,
+}) {
     const section = document.createElement('section');
     section.className = 'analytics-detail-section';
-    const pageRows = getPageRows(rows, page);
+    const filteredRows = filterAnalyticsRows(rows, filters);
+    const pageRows = getPageRows(filteredRows, page);
 
     const header = document.createElement('div');
     header.className = 'analytics-detail-header';
 
     const title = document.createElement('h3');
-    title.textContent = `Unresolved Queries (${rows.length})`;
+    title.textContent = `Unresolved Queries (${filteredRows.length})`;
     header.append(title);
+
+    const toolbar = createAnalyticsTableFilters({
+        rows,
+        mode: 'unresolved',
+        filters,
+        onChange: onFiltersChange,
+    });
 
     const tableShell = document.createElement('div');
     tableShell.className = 'analytics-table-shell';
@@ -822,12 +951,14 @@ function createUnresolvedTable({ rows, page, detailAuditId, onPageChange, onOpen
 
     const tbody = document.createElement('tbody');
 
-    if (rows.length === 0) {
+    if (filteredRows.length === 0) {
         const emptyRow = document.createElement('tr');
         const emptyCell = document.createElement('td');
         emptyCell.colSpan = 7;
         emptyCell.className = 'analytics-table-empty';
-        emptyCell.textContent = 'No unresolved queries.';
+        emptyCell.textContent = rows.length === 0
+            ? 'No unresolved queries.'
+            : 'No unresolved queries match the current search and filters.';
         emptyRow.append(emptyCell);
         tbody.append(emptyRow);
     } else {
@@ -879,21 +1010,42 @@ function createUnresolvedTable({ rows, page, detailAuditId, onPageChange, onOpen
     table.append(thead, tbody);
     tableShell.append(table);
 
-    section.append(header, tableShell, createTablePagination({ rows, page, onPageChange }));
+    section.append(
+        header,
+        toolbar,
+        tableShell,
+        createTablePagination({ rows: filteredRows, page, onPageChange }),
+    );
     return section;
 }
 
-function createLowConfidenceTable({ rows, page, detailAuditId, onPageChange, onOpenDetail }) {
+function createLowConfidenceTable({
+    rows,
+    page,
+    filters,
+    detailAuditId,
+    onPageChange,
+    onFiltersChange,
+    onOpenDetail,
+}) {
     const section = document.createElement('section');
     section.className = 'analytics-detail-section';
-    const pageRows = getPageRows(rows, page);
+    const filteredRows = filterAnalyticsRows(rows, filters);
+    const pageRows = getPageRows(filteredRows, page);
 
     const header = document.createElement('div');
     header.className = 'analytics-detail-header';
 
     const title = document.createElement('h3');
-    title.textContent = `Low Confidence Queries (${rows.length})`;
+    title.textContent = `Low Confidence Queries (${filteredRows.length})`;
     header.append(title);
+
+    const toolbar = createAnalyticsTableFilters({
+        rows,
+        mode: 'low_confidence',
+        filters,
+        onChange: onFiltersChange,
+    });
 
     const tableShell = document.createElement('div');
     tableShell.className = 'analytics-table-shell analytics-table-shell-wide';
@@ -922,12 +1074,14 @@ function createLowConfidenceTable({ rows, page, detailAuditId, onPageChange, onO
 
     const tbody = document.createElement('tbody');
 
-    if (rows.length === 0) {
+    if (filteredRows.length === 0) {
         const emptyRow = document.createElement('tr');
         const emptyCell = document.createElement('td');
         emptyCell.colSpan = 9;
         emptyCell.className = 'analytics-table-empty';
-        emptyCell.textContent = 'No low confidence queries.';
+        emptyCell.textContent = rows.length === 0
+            ? 'No low confidence queries.'
+            : 'No low confidence queries match the current search and filters.';
         emptyRow.append(emptyCell);
         tbody.append(emptyRow);
     } else {
@@ -998,7 +1152,12 @@ function createLowConfidenceTable({ rows, page, detailAuditId, onPageChange, onO
 
     table.append(thead, tbody);
     tableShell.append(table);
-    section.append(header, tableShell, createTablePagination({ rows, page, onPageChange }));
+    section.append(
+        header,
+        toolbar,
+        tableShell,
+        createTablePagination({ rows: filteredRows, page, onPageChange }),
+    );
     return section;
 }
 
@@ -1007,11 +1166,17 @@ function createInitialAnalyticsView(previousActiveMetric = 'unresolved') {
         activeMetric: previousActiveMetric,
         unresolvedRows: [],
         unresolvedPage: 1,
+        unresolvedSearch: '',
+        unresolvedTopic: '',
+        unresolvedStatus: '',
         unresolvedLoading: false,
         unresolvedLoaded: false,
         unresolvedError: null,
         lowConfidenceRows: [],
         lowConfidencePage: 1,
+        lowConfidenceSearch: '',
+        lowConfidenceTopic: '',
+        lowConfidenceStatus: '',
         lowConfidenceLoading: false,
         lowConfidenceLoaded: false,
         lowConfidenceError: null,
@@ -1064,7 +1229,13 @@ export function renderAnalyticsDashboardScreen(context, options = {}) {
 
     state.analyticsView ??= createInitialAnalyticsView();
     state.analyticsView.unresolvedPage ??= 1;
+    state.analyticsView.unresolvedSearch ??= '';
+    state.analyticsView.unresolvedTopic ??= '';
+    state.analyticsView.unresolvedStatus ??= '';
     state.analyticsView.lowConfidencePage ??= 1;
+    state.analyticsView.lowConfidenceSearch ??= '';
+    state.analyticsView.lowConfidenceTopic ??= '';
+    state.analyticsView.lowConfidenceStatus ??= '';
 
     closeAllPanels();
     messages.classList.add('crud-canvas');
@@ -1149,6 +1320,23 @@ export function renderAnalyticsDashboardScreen(context, options = {}) {
     spacing.className = 'analytics-dashboard-spacing';
     content.append(spacing);
 
+    function updateTableFilters(mode, filters, { focusSearch = false } = {}) {
+        const prefix = mode === 'unresolved' ? 'unresolved' : 'lowConfidence';
+        state.analyticsView[`${prefix}Search`] = filters.search;
+        state.analyticsView[`${prefix}Topic`] = filters.topic;
+        state.analyticsView[`${prefix}Status`] = filters.status;
+        state.analyticsView[`${prefix}Page`] = 1;
+        state.analyticsView.detailMode = null;
+        state.analyticsView.detailAuditId = null;
+        renderAnalyticsDashboardScreen(context, options);
+
+        if (focusSearch) {
+            const input = messages.querySelector(`[data-analytics-search="${mode}"]`);
+            input?.focus();
+            input?.setSelectionRange(input.value.length, input.value.length);
+        }
+    }
+
     if (state.analyticsView.activeMetric === 'unresolved') {
         if (state.analyticsView.unresolvedLoading) {
             content.append(createEmptyState('Loading unresolved queries...'));
@@ -1158,6 +1346,11 @@ export function renderAnalyticsDashboardScreen(context, options = {}) {
             const table = createUnresolvedTable({
                 rows: state.analyticsView.unresolvedRows,
                 page: state.analyticsView.unresolvedPage,
+                filters: {
+                    search: state.analyticsView.unresolvedSearch,
+                    topic: state.analyticsView.unresolvedTopic,
+                    status: state.analyticsView.unresolvedStatus,
+                },
                 detailAuditId: state.analyticsView.detailMode === 'unresolved'
                     ? state.analyticsView.detailAuditId
                     : null,
@@ -1166,6 +1359,9 @@ export function renderAnalyticsDashboardScreen(context, options = {}) {
                     state.analyticsView.detailMode = null;
                     state.analyticsView.detailAuditId = null;
                     renderAnalyticsDashboardScreen(context, options);
+                },
+                onFiltersChange: (filters, focusOptions) => {
+                    updateTableFilters('unresolved', filters, focusOptions);
                 },
                 onOpenDetail: (auditId) => {
                     state.analyticsView.detailMode = 'unresolved';
@@ -1187,6 +1383,11 @@ export function renderAnalyticsDashboardScreen(context, options = {}) {
             const table = createLowConfidenceTable({
                 rows: state.analyticsView.lowConfidenceRows,
                 page: state.analyticsView.lowConfidencePage,
+                filters: {
+                    search: state.analyticsView.lowConfidenceSearch,
+                    topic: state.analyticsView.lowConfidenceTopic,
+                    status: state.analyticsView.lowConfidenceStatus,
+                },
                 detailAuditId: state.analyticsView.detailMode === 'low_confidence'
                     ? state.analyticsView.detailAuditId
                     : null,
@@ -1195,6 +1396,9 @@ export function renderAnalyticsDashboardScreen(context, options = {}) {
                     state.analyticsView.detailMode = null;
                     state.analyticsView.detailAuditId = null;
                     renderAnalyticsDashboardScreen(context, options);
+                },
+                onFiltersChange: (filters, focusOptions) => {
+                    updateTableFilters('low_confidence', filters, focusOptions);
                 },
                 onOpenDetail: (auditId) => {
                     state.analyticsView.detailMode = 'low_confidence';

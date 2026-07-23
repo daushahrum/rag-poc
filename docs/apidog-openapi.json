@@ -41,9 +41,9 @@
       },
       "LoginRequest": {
         "type": "object",
-        "required": ["id", "password"],
+        "required": ["username", "password"],
         "properties": {
-          "id": { "type": "string" },
+          "username": { "type": "string" },
           "password": { "type": "string", "format": "password" }
         }
       },
