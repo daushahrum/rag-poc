@@ -257,6 +257,66 @@
   white-space: pre;
 }
 
+.markdown-table-wrapper {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface);
+  scrollbar-width: thin;
+}
+
+.markdown-table-wrapper:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.bubble .markdown-table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+
+.bubble .markdown-table th,
+.bubble .markdown-table td {
+  padding: 9px 12px;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.bubble .markdown-table th {
+  background: var(--surface-soft);
+  font-weight: 700;
+}
+
+.bubble .markdown-table th:last-child,
+.bubble .markdown-table td:last-child {
+  border-right: 0;
+}
+
+.bubble .markdown-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.bubble .markdown-table tbody tr:hover td {
+  background: var(--accent-light);
+}
+
+.bubble .markdown-table .markdown-table-align-center {
+  text-align: center;
+}
+
+.bubble .markdown-table .markdown-table-align-right {
+  text-align: right;
+}
+
 .response-actions {
   grid-column: 2;
   display: flex;

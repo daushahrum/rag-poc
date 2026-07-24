@@ -31,7 +31,6 @@ const CHAT_LIMITS = {
     MAX_CHUNK_CHARS: readPositiveIntEnv('MAX_CHUNK_CHARS', 1200),
     MAX_TOTAL_CONTEXT_CHARS: readPositiveIntEnv('MAX_TOTAL_CONTEXT_CHARS', 8000),
     MAX_TOOL_RESULT_CHARS: readPositiveIntEnv('MAX_TOOL_RESULT_CHARS', 8000),
-    MAX_OUTPUT_TOKENS: readPositiveIntEnv('MAX_OUTPUT_TOKENS', 400),
 };
 
 export async function sendMessage(session_id, message, userToken, isPortalAdmin) {
@@ -257,7 +256,6 @@ async function prepareChatState({
         estimated_prompt_tokens: estimatePromptTokens(messages),
         tool_count: toolCatalog.length,
         model_name: DEFAULT_CHAT_MODEL,
-        max_output_tokens: CHAT_LIMITS.MAX_OUTPUT_TOKENS,
     });
 
     return {
@@ -488,7 +486,6 @@ function readPositiveIntEnv(name, fallback) {
 function completionOptions({ enableTools, signal } = {}) {
     return {
         model: DEFAULT_CHAT_MODEL,
-        maxOutputTokens: CHAT_LIMITS.MAX_OUTPUT_TOKENS,
         tools: enableTools ? getBackendToolDefinition() : [],
         signal,
     };

@@ -269,6 +269,11 @@
     width: 30px;
     height: 30px;
   }
+
+  .bubble .markdown-table th,
+  .bubble .markdown-table td {
+    padding: 8px 10px;
+  }
 }
 
 /* ── Mobile phone only (sidebar becomes a slide-in overlay) ── */
