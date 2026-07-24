@@ -958,7 +958,7 @@ async function verifyRetrievedEvidence({ query, answer, chunks, timer }) {
     try {
         timer?.mark('confidence.model_call.start');
         const response = await openai.chat.completions.create({
-            model: 'gpt-4o-mini',
+            model: DEFAULT_CHAT_MODEL,
             response_format: { type: 'json_object' },
             temperature: 0,
             messages: [

@@ -114,6 +114,16 @@ function createResponseActions({
     actions.className = 'response-actions';
     actions.setAttribute('aria-label', 'Response actions');
 
+    if (lowConfidence) {
+        const note = document.createElement('div');
+        note.className = 'low-confidence-note';
+        note.textContent = 'This generated response may not be accurate. Double-check it.';
+        actions.append(note);
+    }
+
+    const controls = document.createElement('div');
+    controls.className = 'response-action-controls';
+
     if (typeof onFeedback === 'function') {
         const upButton = createActionButton({
             label: 'Thumbs up',
@@ -133,7 +143,7 @@ function createResponseActions({
             text: 'Mark unresolved',
         });
 
-        actions.append(upButton, downButton, unresolvedButton);
+        controls.append(upButton, downButton, unresolvedButton);
     }
 
     if (typeof onExport === 'function') {
@@ -143,15 +153,10 @@ function createResponseActions({
             text: 'Export chat',
         });
         exportButton.dataset.exportChat = 'true';
-        actions.append(exportButton);
+        controls.append(exportButton);
     }
 
-    if (lowConfidence) {
-        const note = document.createElement('span');
-        note.className = 'low-confidence-note';
-        note.textContent = 'This generated response might not be accurate. Double check it';
-        actions.append(note);
-    }
+    actions.append(controls);
 
     actions.addEventListener('click', async (event) => {
         const exportButton = event.target.closest('button[data-export-chat]');
@@ -216,7 +221,7 @@ function appendLowConfidenceMarker(bubble) {
     marker.className = 'low-confidence-marker';
     marker.classList.add('bi', 'bi-exclamation-triangle-fill');
     marker.setAttribute('aria-label', 'Low confidence warning');
-    marker.title = 'This generated response might not be accurate. Double check it';
+    marker.title = 'This generated response may not be accurate. Double-check it.';
 
     const candidates = [...bubble.querySelectorAll('p, li, h3, h4, h5')];
     const target = candidates[candidates.length - 1];
