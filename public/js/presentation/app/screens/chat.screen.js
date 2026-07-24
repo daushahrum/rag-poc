@@ -1,14 +1,27 @@
 import { createChatResponseAudit, createChatSession, fetchSessionMessages, fetchSessions } from '../../../domain/use-cases/chat.use-cases.js';
+import {
+    buildChatExportFilename,
+    downloadChatTranscript,
+    formatChatTranscript,
+} from '../../../core/utils/chat-export.js';
 import { scrollToBottom } from '../../../core/utils/dom.js';
 import { createMessage, createTypingMessage } from '../../components/message.js';
 import { renderHistoryList } from '../history.renderer.js';
 
 export function createChatScreen(context) {
     const { dom, state, controllers, helpers, renderers } = context;
-    const { adminProjectField, form, input, messages, historyList, projectName } = dom;
+    const {
+        adminProjectField,
+        form,
+        input,
+        messages,
+        historyList,
+        projectName,
+    } = dom;
     const { setSidebarSelection, renderSidebarSelection } = controllers;
     const { setComposerEnabled } = helpers;
     const { renderWelcomeMessage, showChatSurface } = renderers;
+    let activeExportPromise = null;
 
     async function startSession() {
         if (!state.currentUser || !state.activeProjectId) {
@@ -111,6 +124,50 @@ export function createChatScreen(context) {
         }
     }
 
+    function exportCurrentChat() {
+        if (activeExportPromise) {
+            return activeExportPromise;
+        }
+
+        const exportPromise = (async () => {
+            const sessionId = state.sessionId;
+
+            if (!sessionId) {
+                throw new Error('No chat is available to export.');
+            }
+
+            const exportedAt = new Date();
+            const session = state.sessions.find(
+                (item) => String(item.id) === String(sessionId)
+            );
+            const title = session?.title ?? session?.topic ?? 'Chat export';
+            const sessionMessages = await fetchSessionMessages(sessionId);
+
+            if (sessionMessages.length === 0) {
+                throw new Error('This chat has no messages to export.');
+            }
+
+            const transcript = formatChatTranscript({
+                title,
+                messages: sessionMessages,
+                exportedAt,
+            });
+            const filename = buildChatExportFilename(title, exportedAt);
+
+            downloadChatTranscript(transcript, filename);
+        })();
+        activeExportPromise = exportPromise;
+
+        const clearActiveExport = () => {
+            if (activeExportPromise === exportPromise) {
+                activeExportPromise = null;
+            }
+        };
+        exportPromise.then(clearActiveExport, clearActiveExport);
+
+        return exportPromise;
+    }
+
     function renderHistory() {
         renderHistoryList({
             sessions: state.sessions,
@@ -126,6 +183,7 @@ export function createChatScreen(context) {
         }
 
         return {
+            onExport: exportCurrentChat,
             onFeedback: (feedback) => createChatResponseAudit(
                 buildAuditPayload({
                     feedback,
@@ -161,6 +219,7 @@ export function createChatScreen(context) {
 
     return {
         buildAuditPayload,
+        exportCurrentChat,
         loadSession,
         refreshSessions,
         renderHistory,

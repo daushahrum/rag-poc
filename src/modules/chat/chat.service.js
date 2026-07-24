@@ -22,6 +22,16 @@ import {
     isCasualInteraction,
     topChunksLookUnrelated,
 } from './confidence.service.js';
+import { runAgenticToolLoop } from './agenticToolLoop.js';
+import {
+    buildSessionEvidenceContext,
+    extractPriorToolObservations,
+    normalizeToolResult,
+    safeJsonLength,
+    sanitizeToolData,
+    serializeToolObservations,
+    TOOL_RELIABILITY_INSTRUCTIONS,
+} from './toolEvidence.js';
 import { assertToolCallAuthorized } from './toolAuthorization.js';
 import { redactSensitive, safeRedactedJson } from '../../utils/redact.js';
 
@@ -31,6 +41,8 @@ const CHAT_LIMITS = {
     MAX_CHUNK_CHARS: readPositiveIntEnv('MAX_CHUNK_CHARS', 1200),
     MAX_TOTAL_CONTEXT_CHARS: readPositiveIntEnv('MAX_TOTAL_CONTEXT_CHARS', 8000),
     MAX_TOOL_RESULT_CHARS: readPositiveIntEnv('MAX_TOOL_RESULT_CHARS', 8000),
+    MAX_TOOL_ROUNDS: readPositiveIntEnv('MAX_TOOL_ROUNDS', 5),
+    MAX_SESSION_EVIDENCE_CHARS: readPositiveIntEnv('MAX_SESSION_EVIDENCE_CHARS', 6000),
 };
 
 export async function sendMessage(session_id, message, userToken, isPortalAdmin) {
@@ -61,6 +73,7 @@ export async function sendMessage(session_id, message, userToken, isPortalAdmin)
             answer: assistantMessage.content,
             chunks: chatState.chunks,
             toolEvidence: chatState.toolEvidence,
+            toolObservations: chatState.toolObservations,
         });
     } catch (error) {
         console.error('Failed to complete confidence evaluation:', redactSensitive(error.message));
@@ -134,6 +147,7 @@ export async function sendMessageStream(session_id, message, userToken, isPortal
             answer: responseContent,
             chunks: chatState.chunks,
             toolEvidence: chatState.toolEvidence,
+            toolObservations: chatState.toolObservations,
         };
 
         try {
@@ -231,6 +245,11 @@ async function prepareChatState({
         chunksPromise,
         toolsPromise,
     ]);
+    const priorToolObservations = extractPriorToolObservations(history);
+    const sessionEvidence = buildSessionEvidenceContext(
+        priorToolObservations,
+        CHAT_LIMITS.MAX_SESSION_EVIDENCE_CHARS,
+    );
     const cappedHistory = capHistoryMessages(history, timer);
 
     const { context, chunks } = formatCappedContext(rawChunks, timer);
@@ -243,7 +262,12 @@ async function prepareChatState({
     }
 
     const toolCatalog = buildToolCatalog(availableTools);
-    const systemPrompt = buildSystemPrompt(context, toolCatalog, project?.custom_prompt);
+    const systemPrompt = buildSystemPrompt(
+        context,
+        toolCatalog,
+        project?.custom_prompt,
+        sessionEvidence,
+    );
     const messages = [
         { role: 'system', content: systemPrompt },
         ...cappedHistory.map((m) => ({ role: m.role, content: String(m.content ?? '') })),
@@ -255,6 +279,8 @@ async function prepareChatState({
         final_context_char_count: context.length,
         estimated_prompt_tokens: estimatePromptTokens(messages),
         tool_count: toolCatalog.length,
+        prior_tool_observation_count: priorToolObservations.length,
+        session_evidence_char_count: sessionEvidence.length,
         model_name: DEFAULT_CHAT_MODEL,
     });
 
@@ -269,7 +295,9 @@ async function prepareChatState({
         messages,
         chunks,
         toolCatalog,
+        priorToolObservations,
         toolEvidence: [],
+        toolObservations: [],
         timer,
     };
 }
@@ -284,19 +312,36 @@ async function completeChatState(chatState) {
         return assistantMessage;
     }
 
-    timer.mark('chat_completion_initial.start');
-    let assistantMessage = await chatCompletion(messages, completionOptions({ enableTools: true }));
-    timer.mark('chat_completion_initial.end');
+    const result = await runAgenticToolLoop({
+        maxToolRounds: CHAT_LIMITS.MAX_TOOL_ROUNDS,
+        requestAssistant: async (round) => {
+            markAgenticCompletionStart(timer, round);
+            const assistantMessage = await chatCompletion(
+                messages,
+                completionOptions({ enableTools: true }),
+            );
+            markAgenticCompletionEnd(timer, round);
+            return assistantMessage;
+        },
+        appendToolResults: (assistantMessage, round) => (
+            appendToolResults(chatState, assistantMessage, { round })
+        ),
+    });
 
-    if (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0) {
-        await appendToolResults(chatState, assistantMessage);
-
+    if (result.limitReached) {
+        timer.mark('tool_round_limit.reached', {
+            max_tool_rounds: CHAT_LIMITS.MAX_TOOL_ROUNDS,
+        });
         timer.mark('chat_completion_after_tools.start');
-        assistantMessage = await chatCompletion(messages, completionOptions({ enableTools: false }));
+        const assistantMessage = await chatCompletion(
+            messages,
+            completionOptions({ enableTools: false }),
+        );
         timer.mark('chat_completion_after_tools.end');
+        return assistantMessage;
     }
 
-    return assistantMessage;
+    return result.assistantMessage;
 }
 
 async function streamChatState(chatState, { signal, onStatus, onToken }) {
@@ -308,27 +353,43 @@ async function streamChatState(chatState, { signal, onStatus, onToken }) {
         return;
     }
 
-    timer.mark('chat_completion_initial.start');
-    const assistantMessage = await chatCompletion(messages, completionOptions({
-        enableTools: true,
-        signal,
-    }));
-    timer.mark('chat_completion_initial.end');
+    const result = await runAgenticToolLoop({
+        maxToolRounds: CHAT_LIMITS.MAX_TOOL_ROUNDS,
+        onRoundStart: (round) => {
+            if (round > 1) {
+                onStatus?.(`Reasoning with tool results (round ${round})...`);
+            }
+        },
+        requestAssistant: async (round) => {
+            markAgenticCompletionStart(timer, round);
+            const assistantMessage = await chatCompletion(messages, completionOptions({
+                enableTools: true,
+                signal,
+            }));
+            markAgenticCompletionEnd(timer, round);
+            return assistantMessage;
+        },
+        appendToolResults: (assistantMessage, round) => (
+            appendToolResults(chatState, assistantMessage, {
+                signal,
+                onStatus,
+                round,
+            })
+        ),
+    });
 
-    if (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0) {
-        await appendToolResults(chatState, assistantMessage, {
-            signal,
-            onStatus,
+    onStatus?.('Generating answer...');
+
+    if (result.limitReached) {
+        timer.mark('tool_round_limit.reached', {
+            max_tool_rounds: CHAT_LIMITS.MAX_TOOL_ROUNDS,
         });
-
-        onStatus?.('Generating answer...');
         await streamFinalCompletion(messages, timer, onToken, signal);
         return;
     }
 
-    onStatus?.('Generating answer...');
     timer.mark('chat_completion_after_tools.start');
-    emitBufferedTextAsTokens(assistantMessage.content ?? '', onToken);
+    emitBufferedTextAsTokens(result.assistantMessage?.content ?? '', onToken);
     timer.mark('chat_completion_after_tools.end');
 }
 
@@ -364,13 +425,15 @@ function emitBufferedTextAsTokens(text, onToken) {
     }
 }
 
-async function appendToolResults(chatState, assistantMessage, { signal, onStatus } = {}) {
+async function appendToolResults(chatState, assistantMessage, { signal, onStatus, round } = {}) {
     const {
         messages,
         project_id,
         environment_id,
         userToken,
         isPortalAdmin,
+        priorToolObservations,
+        toolObservations,
         timer,
     } = chatState;
     messages.push(assistantMessage);
@@ -380,7 +443,7 @@ async function appendToolResults(chatState, assistantMessage, { signal, onStatus
         const args = parseToolCallArguments(toolCall);
         onStatus?.(`Calling tool: ${args.action}`);
 
-        timer.mark('execute_tool.start', { action: args.action });
+        timer.mark('execute_tool.start', { action: args.action, round });
         const toolResult = await executeBackendTool(
             args,
             project_id,
@@ -388,15 +451,27 @@ async function appendToolResults(chatState, assistantMessage, { signal, onStatus
             userToken,
             isPortalAdmin,
         );
-        timer.mark('execute_tool.end', { action: args.action });
+        timer.mark('execute_tool.end', { action: args.action, round });
 
         timer.mark('tool_result.normalize.start', { action: args.action });
-        const normalizedToolResult = normalizeToolResult(toolResult);
+        const normalizedToolResult = normalizeToolResult({
+            rawResult: toolResult,
+            action: args.action,
+            payload: args.payload,
+            round,
+            priorObservations: [
+                ...priorToolObservations,
+                ...toolObservations,
+            ],
+            maxResultChars: CHAT_LIMITS.MAX_TOOL_RESULT_CHARS,
+        });
         timer.mark('tool_result.normalize.end', {
             action: args.action,
+            tool_result_status: normalizedToolResult.status,
             tool_result_raw_chars: normalizedToolResult.rawChars,
             tool_result_final_chars: normalizedToolResult.finalChars,
             tool_result_trimmed: normalizedToolResult.trimmed,
+            tool_result_conflict: Boolean(normalizedToolResult.conflict),
         });
 
         messages.push({
@@ -405,7 +480,9 @@ async function appendToolResults(chatState, assistantMessage, { signal, onStatus
             content: normalizedToolResult.content,
         });
 
-        if (isSuccessfulToolResult(toolResult, normalizedToolResult.content)) {
+        toolObservations.push(normalizedToolResult.observation);
+
+        if (normalizedToolResult.status === 'found') {
             chatState.toolEvidence.push({
                 action: args.action,
                 content: normalizedToolResult.content,
@@ -414,7 +491,33 @@ async function appendToolResults(chatState, assistantMessage, { signal, onStatus
     }
 }
 
-async function runConfidenceEvaluation({ session_id, message_id, query, answer, chunks, toolEvidence }) {
+function markAgenticCompletionStart(timer, round) {
+    if (round === 1) {
+        timer.mark('chat_completion_initial.start');
+        return;
+    }
+
+    timer.mark('chat_completion_agentic_round.start', { round });
+}
+
+function markAgenticCompletionEnd(timer, round) {
+    if (round === 1) {
+        timer.mark('chat_completion_initial.end');
+        return;
+    }
+
+    timer.mark('chat_completion_agentic_round.end', { round });
+}
+
+async function runConfidenceEvaluation({
+    session_id,
+    message_id,
+    query,
+    answer,
+    chunks,
+    toolEvidence,
+    toolObservations,
+}) {
     const timer = createChatTimer(`${session_id}:confidence:${message_id}`);
     timer.mark('confidence.prepare');
 
@@ -435,6 +538,7 @@ async function runConfidenceEvaluation({ session_id, message_id, query, answer, 
             reasons: confidence.reasons,
             signals: confidence.signals,
             tool_evidence_count: confidence.tool_evidence_count,
+            tool_observations: serializeToolObservations(toolObservations),
         },
     });
 
@@ -610,75 +714,6 @@ function parseToolCallArguments(toolCall) {
             payload: {},
             module: null,
         };
-    }
-}
-
-function normalizeToolResult(rawResult) {
-    const rawChars = safeJsonLength(rawResult);
-    const normalized = sanitizeToolResult(rawResult);
-    let content = JSON.stringify(normalized);
-    let trimmed = false;
-
-    if (content.length > CHAT_LIMITS.MAX_TOOL_RESULT_CHARS) {
-        trimmed = true;
-        content = JSON.stringify({
-            trimmed: true,
-            preview: content.slice(0, CHAT_LIMITS.MAX_TOOL_RESULT_CHARS),
-        });
-    }
-
-    return {
-        content,
-        rawChars,
-        finalChars: content.length,
-        trimmed,
-    };
-}
-
-function isSuccessfulToolResult(rawResult, normalizedContent) {
-    if (rawResult === null || rawResult === undefined) {
-        return false;
-    }
-
-    if (rawResult && typeof rawResult === 'object') {
-        if (rawResult.error || rawResult.success === false || Number(rawResult.status) >= 400) {
-            return false;
-        }
-    }
-
-    return !['', '{}', '[]', 'null'].includes(String(normalizedContent ?? '').trim());
-}
-
-function sanitizeToolResult(value) {
-    if (value === null || value === undefined) {
-        return value;
-    }
-
-    if (Array.isArray(value)) {
-        return value.slice(0, 50).map((item) => sanitizeToolResult(item));
-    }
-
-    if (typeof value === 'object') {
-        return Object.fromEntries(
-            Object.entries(value)
-                .filter(([key]) => !isSensitiveOrVerboseToolField(key))
-                .map(([key, entryValue]) => [key, sanitizeToolResult(entryValue)]),
-        );
-    }
-
-    return typeof value === 'string' ? redactSensitive(value) : value;
-}
-
-function isSensitiveOrVerboseToolField(key) {
-    return /email|mobile|phone|contact|address|last_login_at|created_at|updated_at|terms_and_conditions|remarks|authorization|cookie|api[-_]?key|access[-_]?token|refresh[-_]?token|token|headers?/i
-        .test(String(key));
-}
-
-function safeJsonLength(value) {
-    try {
-        return JSON.stringify(value).length;
-    } catch {
-        return 0;
     }
 }
 
@@ -1005,7 +1040,7 @@ async function generateAndSaveTopic(session_id, firstMessage) {
     }
 }
 
-function buildSystemPrompt(context, toolCatalog, customPrompt) {
+function buildSystemPrompt(context, toolCatalog, customPrompt, sessionEvidence = '') {
     const projectInstructions = customPrompt?.trim()
         ? `Project-specific instructions from the project manager:
 
@@ -1022,6 +1057,11 @@ ${projectInstructions}
 Use the following knowledge base context to answer questions when relevant:
 
 ${context || 'No relevant context found.'}
+
+Prior sanitized operational evidence from this chat session:
+${sessionEvidence || 'No prior tool evidence is available.'}
+
+${TOOL_RELIABILITY_INSTRUCTIONS}
 `;
 
     if (!toolCatalog || toolCatalog.length === 0) {
@@ -1032,9 +1072,13 @@ ${context || 'No relevant context found.'}
 You also have access to backend tools described below. Use the callBackendTool function
 when the user asks for live operational data. Set "action" to the exact tool_name and
 "payload" to the parameters required by that tool's schema.
+You may call tools across multiple rounds. After each tool result, decide whether another
+tool call is needed to complete the user's request. Use returned identifiers and values as
+inputs to later tool calls when operations depend on one another. When you have enough
+information, stop calling tools and answer the user.
 When answering from a successful tool result, include all relevant operational fields.
-Summarize repeated records compactly while preserving their important identifiers and counts.
-Do not omit relevant fields unless the user asks for a brief answer.
+Summarize repeated records compactly while preserving identifiers and counts relevant to the
+request. Prefer data minimization over returning every available field.
 
 Available tools:
 ${JSON.stringify(toolCatalog, null, 2)}
@@ -1124,7 +1168,7 @@ async function executeBackendTool(
             return { 
                 error: `Tool '${action}' returned HTTP ${response.status}: ${response.statusText}`,
                 status: response.status,
-                details: sanitizeToolResult(errorData)
+                details: sanitizeToolData(errorData)
             };
         }
 

@@ -3,13 +3,17 @@
 import * as chatMessageService from './chatMessage.service.js';
 import * as chatSessionService from '../chatSession/chatSession.service.js';
 import * as projectUserService from '../../project/projectUser/projectUser.service.js';
-import { serializePublicChatMessages } from '../chatMessage.serializer.js';
+import {
+    serializePortalChatMessage,
+    serializePortalChatMessages,
+    serializePublicChatMessages,
+} from '../chatMessage.serializer.js';
 
 export async function createChatMessage(req, res) {
     try {
         const chatMessage = await chatMessageService.createChatMessage(req.body);
 
-        return res.json(chatMessage);
+        return res.json(serializePortalChatMessage(chatMessage));
     } catch (error) {
         return res.status(400).json({
             message: error.message,
@@ -82,7 +86,7 @@ export async function listChatMessage(req, res) {
         return res.json(
             routeSource === 'public'
                 ? serializePublicChatMessages(chatMessages)
-                : chatMessages
+                : serializePortalChatMessages(chatMessages)
         );
     } catch (error) {
         return res.status(400).json({

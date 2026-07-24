@@ -29,8 +29,18 @@ export function createMessage(role, content, sources = [], options = {}) {
 
     article.append(bubble);
 
-    if (role === 'assistant' && typeof options.onFeedback === 'function') {
-        article.append(createResponseActions(options.onFeedback, { lowConfidence }));
+    if (
+        role === 'assistant'
+        && (
+            typeof options.onFeedback === 'function'
+            || typeof options.onExport === 'function'
+        )
+    ) {
+        article.append(createResponseActions({
+            lowConfidence,
+            onExport: options.onExport,
+            onFeedback: options.onFeedback,
+        }));
     }
 
     return article;
@@ -95,30 +105,46 @@ export function createSources(sources) {
     return wrapper;
 }
 
-function createResponseActions(onFeedback, { lowConfidence = false } = {}) {
+function createResponseActions({
+    lowConfidence = false,
+    onExport,
+    onFeedback,
+} = {}) {
     const actions = document.createElement('div');
     actions.className = 'response-actions';
-    actions.setAttribute('aria-label', 'Response feedback');
+    actions.setAttribute('aria-label', 'Response actions');
 
-    const upButton = createActionButton({
-        label: 'Thumbs up',
-        icon: 'bi-hand-thumbs-up',
-        value: 'thumbs_up',
-    });
+    if (typeof onFeedback === 'function') {
+        const upButton = createActionButton({
+            label: 'Thumbs up',
+            icon: 'bi-hand-thumbs-up',
+            value: 'thumbs_up',
+        });
 
-    const downButton = createActionButton({
-        label: 'Thumbs down',
-        icon: 'bi-hand-thumbs-down',
-        value: 'thumbs_down',
-    });
+        const downButton = createActionButton({
+            label: 'Thumbs down',
+            icon: 'bi-hand-thumbs-down',
+            value: 'thumbs_down',
+        });
 
-    const unresolvedButton = createActionButton({
-        label: 'Mark unresolved',
-        value: 'unresolved',
-        text: 'Mark unresolved',
-    });
+        const unresolvedButton = createActionButton({
+            label: 'Mark unresolved',
+            value: 'unresolved',
+            text: 'Mark unresolved',
+        });
 
-    actions.append(upButton, downButton, unresolvedButton);
+        actions.append(upButton, downButton, unresolvedButton);
+    }
+
+    if (typeof onExport === 'function') {
+        const exportButton = createActionButton({
+            label: 'Export chat',
+            icon: 'bi-download',
+            text: 'Export chat',
+        });
+        exportButton.dataset.exportChat = 'true';
+        actions.append(exportButton);
+    }
 
     if (lowConfidence) {
         const note = document.createElement('span');
@@ -128,13 +154,39 @@ function createResponseActions(onFeedback, { lowConfidence = false } = {}) {
     }
 
     actions.addEventListener('click', async (event) => {
-        const button = event.target.closest('button[data-feedback]');
+        const exportButton = event.target.closest('button[data-export-chat]');
 
-        if (!button || button.disabled) {
+        if (exportButton && !exportButton.disabled && typeof onExport === 'function') {
+            const label = exportButton.querySelector('.response-action-label');
+            exportButton.disabled = true;
+            exportButton.title = 'Export chat';
+            actions.title = '';
+            actions.dataset.status = 'exporting';
+            if (label) label.textContent = 'Exporting...';
+
+            try {
+                await onExport();
+                actions.dataset.status = 'exported';
+                exportButton.title = 'Chat exported';
+                if (label) label.textContent = 'Exported';
+            } catch (error) {
+                actions.dataset.status = 'error';
+                actions.title = error.message;
+                if (label) label.textContent = 'Export failed';
+            } finally {
+                exportButton.disabled = false;
+            }
+
             return;
         }
 
-        const buttons = actions.querySelectorAll('button');
+        const button = event.target.closest('button[data-feedback]');
+
+        if (!button || button.disabled || typeof onFeedback !== 'function') {
+            return;
+        }
+
+        const buttons = actions.querySelectorAll('button[data-feedback]');
         buttons.forEach((item) => {
             item.disabled = true;
             item.classList.remove('selected');
@@ -181,7 +233,9 @@ function createActionButton({ label, icon, value, text }) {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'response-action-button';
-    button.dataset.feedback = value;
+    if (value) {
+        button.dataset.feedback = value;
+    }
     button.setAttribute('aria-label', label);
     button.title = label;
 
@@ -194,6 +248,7 @@ function createActionButton({ label, icon, value, text }) {
 
     if (text) {
         const textEl = document.createElement('span');
+        textEl.className = 'response-action-label';
         textEl.textContent = text;
         button.append(textEl);
     }

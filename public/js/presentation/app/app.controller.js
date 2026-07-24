@@ -268,6 +268,7 @@ const appContext = {
 };
 
 const {
+    exportCurrentChat,
     loadSession,
     refreshSessions,
     renderHistory,
@@ -666,6 +667,7 @@ form.addEventListener('submit', async (event) => {
             data.sources,
             {
                 lowConfidence: data.low_confidence,
+                onExport: exportCurrentChat,
                 onFeedback: (feedback) => createChatResponseAudit(
                     buildResponseAuditPayload({
                         feedback,

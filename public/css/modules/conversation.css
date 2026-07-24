@@ -333,6 +333,8 @@
 .message.assistant:focus-within .response-actions,
 .response-actions[data-status="saving"],
 .response-actions[data-status="saved"],
+.response-actions[data-status="exporting"],
+.response-actions[data-status="exported"],
 .response-actions[data-status="error"] {
   opacity: 1;
   transform: translateY(0);

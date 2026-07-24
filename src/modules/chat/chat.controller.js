@@ -1,7 +1,10 @@
 // modules/chat/chat.controller.js
 
 import * as chatService from './chat.service.js';
-import { serializePublicChatMessage } from './chatMessage.serializer.js';
+import {
+    serializePortalChatMessage,
+    serializePublicChatMessage,
+} from './chatMessage.serializer.js';
 import {
     TOOL_AUTH_REQUIRED_CODE,
     TOOL_AUTH_REQUIRED_MESSAGE,
@@ -29,7 +32,7 @@ export async function sendMessage(req, res) {
         return res.json(
             routeSource === 'public'
                 ? serializePublicChatMessage(result)
-                : result
+                : serializePortalChatMessage(result)
         );
     } catch (error) {
         const status = error.code === TOOL_AUTH_REQUIRED_CODE ? 401 : 400;
